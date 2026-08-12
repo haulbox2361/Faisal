@@ -1181,26 +1181,30 @@ async function loadChats(){
   const list = document.getElementById('dp-chat-list');
   const contactsList = document.getElementById('dp-chat-contacts-list');
   list.innerHTML = '<div class="dp-empty">Loading…</div>';
-  try {
-    const [chatsRes, contactsRes] = await Promise.all([
-      api('/api/driver/chats'),
-      api('/api/driver/chats/contacts')
-    ]);
-    
-    if (contactsList) {
+  
+  if (contactsList) {
+    try {
+      const contactsRes = await api('/api/driver/chats/contacts');
       contactsList.innerHTML = contactsRes.contacts.map(c => {
          return '<button class="dp-chat-row" style="width:100%;text-align:left;border:1px solid var(--border-soft);" onclick="startNewChat(\'' + c.type + '\', \'' + c.id + '\')">' +
           '<div class="dp-chat-avatar ' + (c.type === 'group' ? 'dp-role-group' : (c.type === 'dispatcher' ? 'dp-role-dispatcher' : 'dp-role-admin')) + '">' + initials(c.name || c.role) + '</div>' +
           '<div class="dp-chat-body"><div class="dp-chat-name">' + escapeHtml(c.name || c.role) + '</div>' +
-          '<div class="dp-chat-preview" style="color:var(--brand);">New message</div></div>' +
+          '<div class="dp-chat-preview" style="color:var(--brand);">Start conversation</div></div>' +
           '</button>';
       }).join('');
+    } catch(e) {
+      contactsList.innerHTML = '<div class="dp-empty">Failed to load contacts</div>';
     }
+  }
 
+  try {
+    const chatsRes = await api('/api/driver/chats');
     updateChatNavBadge(chatsRes.chats.reduce((s, c) => s + (c.unreadCount || 0), 0));
     if (!chatsRes.chats.length){ list.innerHTML = '<div class="dp-empty">No recent conversations.</div>'; return; }
     list.innerHTML = chatsRes.chats.map(chatRowHtml).join('');
-  } catch(e){ list.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+  } catch(e){ 
+    list.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; 
+  }
 }
 
 async function startNewChat(type, id) {
