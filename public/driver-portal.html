@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>HaulBoX — Driver Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e1217; --surface-dark:#1c2431; --surface-dark-muted:#a2acbd;
+  --card:#171d27; --card-elev:#1e2530; --border:#262f3d; --border-soft:#1e2733;
+  --foreground:#eef1f5; --muted:#8a94a6; --muted-soft:#5c6576;
+  --brand:#34d399; --brand-strong:#10b981; --brand-soft:rgba(52,211,153,.14);
+  --warning:#f5a524; --warning-soft:rgba(245,165,36,.14);
+  --destructive:#ef4444; --destructive-soft:rgba(239,68,68,.13);
+  --info:#38bdf8; --info-soft:rgba(56,189,248,.14);
+  --role-owner:#8b6fc7; --role-admin:#5c7fb8; --role-dispatcher:#4e9974; --role-driver:#6b7480;
+  --nav-inactive:#aab4c4;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{background:var(--bg); color:var(--foreground); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; display:flex; flex-direction:column; height:100vh; overflow:hidden;}
+button,input,select,textarea{font-family:inherit;}
+::placeholder{color:var(--muted-soft);}
+button{cursor:pointer;}
+a{color:inherit;}
+.hb-pulse{animation:hbpulse 1.8s ease-in-out infinite;}
+@keyframes hbpulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+.hb-rise{animation:hbrise .28s ease both;}
+@keyframes hbrise{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+.no-scrollbar::-webkit-scrollbar{display:none;}
+.no-scrollbar{scrollbar-width:none;}
+
+/* ---- Shell ---- */
+#dp-shell{position:relative; margin:0 auto; display:flex; flex-direction:column; height:100%; width:100%; max-width:480px; background:var(--bg); box-shadow:0 0 40px rgba(0,0,0,.4);}
+
+/* ---- Login ---- */
+#login-screen{flex:1; display:flex; align-items:center; justify-content:center; padding:20px;}
+.login-card{width:100%; max-width:340px; background:var(--card); border:1px solid var(--border-soft); border-radius:20px; padding:30px 26px; text-align:center; box-shadow:0 20px 50px -20px rgba(0,0,0,.6);}
+.login-card img{width:52px; height:52px; margin-bottom:12px;}
+.login-card h1{font-size:19px; margin:0 0 4px; font-weight:800; letter-spacing:-.01em;}
+.login-card p{font-size:13px; color:var(--muted); margin:0 0 20px;}
+.login-field{text-align:left; margin-bottom:13px;}
+.login-field label{display:block; font-size:11px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em; font-weight:600;}
+.login-field input{width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:var(--bg); color:var(--foreground); font-size:14.5px; outline:none;}
+.login-field input:focus{border-color:var(--brand);}
+.login-btn{width:100%; padding:13px; border-radius:12px; border:none; background:var(--brand); color:#06251a; font-weight:700; font-size:14.5px; cursor:pointer; margin-top:8px; transition:transform .1s;}
+.login-btn:active{transform:scale(.98);}
+.login-btn:disabled{opacity:.6;}
+.login-err{color:var(--destructive); font-size:12.5px; margin-top:12px; min-height:16px;}
+
+/* ---- App shell ---- */
+#app{display:none; flex-direction:column; height:100%;}
+#dp-header{flex-shrink:0; background:var(--surface-dark); color:#fff; display:flex; align-items:center; justify-content:space-between; padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;}
+.dp-header-left{display:flex; align-items:center; gap:10px; min-width:0;}
+.dp-logo{width:34px; height:34px; flex-shrink:0; border-radius:11px; background:var(--brand); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px -4px var(--brand-soft);}
+.dp-logo img{width:20px; height:20px; object-fit:contain;}
+#dp-title-wrap{line-height:1.15;}
+#dp-title{font-size:15px; font-weight:800; letter-spacing:-.01em;}
+#dp-subtitle{font-size:11px; color:var(--surface-dark-muted); font-weight:500;}
+.dp-header-right{display:flex; align-items:center; gap:8px;}
+.dp-icon-btn{position:relative; width:36px; height:36px; border-radius:999px; border:none; background:rgba(255,255,255,.08); color:#fff; display:flex; align-items:center; justify-content:center;}
+.dp-icon-btn svg{width:18px; height:18px;}
+.dp-icon-dot{position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:999px; background:var(--brand); border:2px solid var(--surface-dark);}
+
+#dp-body{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px 16px 90px;}
+.dp-page{display:none;}
+.dp-page.active{display:block;}
+
+/* ---- Section basics ---- */
+.dp-screen-title{font-size:23px; font-weight:800; letter-spacing:-.01em; margin:0;}
+.dp-screen-sub{margin:3px 0 16px; font-size:13px; color:var(--muted);}
+.dp-card{border:1px solid var(--border-soft); background:var(--card); border-radius:22px; padding:16px; box-shadow:0 10px 28px -18px rgba(0,0,0,.5);}
+.dp-section-title{display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 12px;}
+.dp-section-title .t{display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:700;}
+.dp-section-title .icn{width:26px; height:26px; border-radius:9px; background:var(--brand-soft); color:var(--brand); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.dp-section-title .icn svg{width:14px; height:14px;}
+.dp-block{margin-top:14px;}
+.dp-block:first-child{margin-top:0;}
+
+/* ---- Status badges ---- */
+.dp-badge{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:5px 11px; border-radius:999px; white-space:nowrap;}
+.st-accepted,.st-pending-rc,.st-booked{background:var(--info-soft); color:var(--info);}
+.st-at-pickup{background:var(--warning-soft); color:var(--warning);}
+.st-in-transit,.st-loaded{background:var(--brand-soft); color:var(--brand);}
+.st-at-delivery,.st-drop-off,.st-delivered,.st-completed{background:rgba(255,255,255,.08); color:var(--muted);}
+.dp-badge .dot{width:6px; height:6px; border-radius:999px; background:currentColor;}
+
+/* ---- Driver identity strip ---- */
+.dp-identity{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+.dp-avatar-lg{width:52px; height:52px; border-radius:16px; background:linear-gradient(135deg,var(--brand),#0891b2); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:17px; color:#06251a; flex-shrink:0;}
+.dp-identity-name{font-size:16px; font-weight:800;}
+.dp-identity-sub{font-size:12.5px; color:var(--muted);}
+.dp-online-chip{margin-left:auto; display:flex; align-items:center; gap:6px; background:var(--brand-soft); color:var(--brand); padding:6px 10px; border-radius:999px; font-size:11px; font-weight:700;}
+.dp-online-chip .dot{width:6px; height:6px; border-radius:999px; background:var(--brand);}
+
+/* ---- Hero load card ---- */
+.dp-hero{border-radius:22px; overflow:hidden; border:1px solid var(--border-soft);}
+.dp-hero-top{background:var(--surface-dark); color:#fff; padding:16px;}
+.dp-hero-eyebrow{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--surface-dark-muted);}
+.dp-hero-num{font-size:21px; font-weight:800; margin-top:2px; letter-spacing:-.01em;}
+.dp-hero-broker{font-size:13px; color:var(--surface-dark-muted); margin-top:3px; display:flex; align-items:center; gap:6px;}
+.dp-hero-rate{font-size:23px; font-weight:800; color:var(--brand); text-align:right;}
+.dp-hero-stats{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;}
+.dp-hero-stat{background:rgba(255,255,255,.07); border-radius:14px; padding:10px 12px;}
+.dp-hero-stat-label{font-size:10.5px; color:var(--surface-dark-muted); font-weight:600; display:flex; align-items:center; gap:5px;}
+.dp-hero-stat-val{font-size:16px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums;}
+.dp-hero-bottom{background:var(--card); padding:14px 16px 16px;}
+.dp-route-line{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; padding:10px 0;}
+.dp-route-dot{width:8px; height:8px; border-radius:999px; flex-shrink:0;}
+.dp-route-dot.pickup{background:var(--brand);}
+.dp-route-dot.dropoff{background:var(--surface-dark-muted);}
+.dp-route-arrow{color:var(--muted); flex-shrink:0;}
+.dp-open-maps{margin-top:4px; display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:var(--brand); text-decoration:none;}
+
+/* ---- Quick actions ---- */
+.dp-actions-row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0;}
+.dp-action-btn{display:flex; align-items:center; justify-content:center; gap:7px; padding:13px; border-radius:16px; border:1px solid var(--border); background:var(--card); color:var(--foreground); font-size:13px; font-weight:700;}
+.dp-action-btn svg{width:16px; height:16px;}
+.dp-action-btn.danger{border-color:rgba(239,68,68,.3); background:var(--destructive-soft); color:var(--destructive);}
+.dp-action-btn.brand{border-color:transparent; background:var(--brand); color:#06251a;}
+
+/* ---- Stop rows ---- */
+.dp-stop{display:flex; gap:12px; padding:8px 0;}
+.dp-stop-icn{width:32px; height:32px; border-radius:999px; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;}
+.dp-stop-icn.pickup{background:var(--brand);}
+.dp-stop-icn.dropoff{background:var(--surface-dark);}
+.dp-stop-kind{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);}
+.dp-stop-when{font-size:12px; font-weight:600; color:var(--foreground); margin-left:auto; white-space:nowrap;}
+.dp-stop-addr{font-size:13.5px; font-weight:600; margin-top:2px;}
+
+/* ---- Doc / photo rows ---- */
+.dp-doc-row{display:flex; align-items:center; gap:11px; border-radius:16px; background:var(--card-elev); border:1px solid var(--border-soft); padding:11px 12px; margin-bottom:8px;}
+.dp-doc-icn{width:36px; height:36px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.dp-doc-icn.ready{background:var(--brand-soft); color:var(--brand);}
+.dp-doc-icn.empty{background:rgba(255,255,255,.06); color:var(--muted);}
+.dp-doc-name{font-size:13px; font-weight:600;}
+.dp-doc-meta{font-size:11px; color:var(--muted); margin-top:1px;}
+.dp-btn-sm{padding:7px 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--foreground); font-size:11.5px; font-weight:700; white-space:nowrap; transition:transform .1s ease, opacity .1s ease;}
+.dp-btn-sm:active{transform:scale(.96); opacity:.85;}
+.dp-btn-sm.primary{background:var(--brand); border-color:var(--brand); color:#06251a;}
+.dp-btn-sm.ghost{background:transparent;}
+.dp-chip-ready{display:inline-flex; align-items:center; gap:4px; background:var(--brand-soft); color:var(--brand); font-size:10.5px; font-weight:700; padding:4px 9px; border-radius:999px;}
+
+.dp-photo-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px;}
+.dp-photo-thumb{position:relative; aspect-ratio:1; border-radius:13px; overflow:hidden; border:1px solid var(--border-soft); background:var(--card-elev); display:flex; align-items:center; justify-content:center; text-align:center; padding:4px; font-size:10px; color:var(--muted); cursor:pointer;}
+.dp-photo-del{position:absolute; top:3px; right:3px; width:18px; height:18px; border-radius:999px; background:rgba(0,0,0,.65); color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:11px;}
+.dp-photo-add{aspect-ratio:1; border-radius:13px; border:2px dashed var(--border); background:var(--card-elev); color:var(--muted); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10.5px; font-weight:600;}
+.dp-photo-add svg{width:18px; height:18px;}
+
+/* ---- Notes banner ---- */
+.dp-notes{border-radius:16px; border:1px solid rgba(245,165,36,.3); background:var(--warning-soft); padding:12px 14px; font-size:12.5px; line-height:1.5; color:#f0c674;}
+.dp-notes b{color:var(--warning);}
+
+/* ---- Checkpoint action ---- */
+.dp-checkpoint-btn{width:100%; margin-top:4px; height:52px; border-radius:16px; border:none; background:var(--brand); color:#06251a; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 12px 26px -12px var(--brand-soft);}
+.dp-checkpoint-btn:disabled{opacity:.8;}
+.dp-checkpoint-btn svg{width:18px; height:18px;}
+.dp-checkpoint-done{background:rgba(255,255,255,.06); color:var(--muted); box-shadow:none;}
+
+/* ---- Merged-in Home content ---- */
+.dp-mini-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.dp-mini-stat{background:var(--card-elev); border-radius:14px; padding:11px 8px; text-align:center;}
+.dp-mini-stat-val{font-size:15px; font-weight:800; font-variant-numeric:tabular-nums;}
+.dp-mini-stat-label{font-size:10px; color:var(--muted); margin-top:3px; font-weight:600;}
+.dp-notif-row{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-soft); font-size:12.5px;}
+.dp-notif-row:last-child{border-bottom:none;}
+.dp-notif-icn{width:28px; height:28px; border-radius:9px; background:var(--card-elev); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0;}
+.dp-notif-time{margin-left:auto; font-size:10.5px; color:var(--muted-soft); white-space:nowrap;}
+
+/* ---- Chips / filters ---- */
+.dp-chips{display:flex; gap:7px; overflow-x:auto; padding-bottom:2px; margin-bottom:14px;}
+.dp-chip{flex-shrink:0; padding:8px 14px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--muted); font-size:12.5px; font-weight:700;}
+.dp-chip.active{background:var(--surface-dark); border-color:var(--surface-dark); color:#fff;}
+.dp-chip.brand-active{background:var(--brand); border-color:var(--brand); color:#06251a;}
+.dp-custom-range{display:none; gap:8px; margin-bottom:14px;}
+.dp-custom-range.active{display:flex;}
+.dp-custom-range input{flex:1; padding:9px 10px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--foreground); font-size:12.5px;}
+
+/* ---- Search ---- */
+.dp-search{position:relative; margin-bottom:12px;}
+.dp-search svg{position:absolute; left:13px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--muted);}
+.dp-search input{width:100%; height:46px; border-radius:16px; border:1px solid var(--border); background:var(--card); color:var(--foreground); padding:0 14px 0 38px; font-size:13.5px; outline:none;}
+.dp-search input:focus{border-color:var(--brand);}
+
+/* ---- Load list cards ---- */
+.dp-job-list{display:flex; flex-direction:column; gap:10px;}
+.dp-job-card{border-radius:20px; border:1px solid var(--border-soft); background:var(--card); padding:14px; text-align:left; transition:transform .1s ease, border-color .15s ease;}
+.dp-job-card:active{transform:scale(.985);}
+.dp-job-top{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+.dp-job-num{font-size:13px; font-weight:800;}
+.dp-job-broker{font-size:11px; color:var(--muted); margin-top:2px; display:flex; align-items:center; gap:5px;}
+.dp-job-route{display:flex; align-items:center; gap:7px; margin-top:10px; font-size:13px; font-weight:600;}
+.dp-job-foot{display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft);}
+.dp-job-meta{font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px;}
+.dp-job-rate{font-size:13.5px; font-weight:800; color:var(--brand);}
+.dp-empty{color:var(--muted); font-size:13px; text-align:center; padding:38px 10px;}
+
+/* ---- Payments hero ---- */
+.dp-pay-hero{border-radius:22px; background:var(--surface-dark); color:#fff; padding:18px; margin-bottom:14px;}
+.dp-pay-hero-label{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--surface-dark-muted); display:flex; align-items:center; gap:5px;}
+.dp-pay-hero-amt{font-size:27px; font-weight:800; margin-top:4px; letter-spacing:-.01em;}
+.dp-pay-hero-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px;}
+.dp-pay-hero-stat{background:rgba(255,255,255,.07); border-radius:14px; padding:10px 8px; text-align:center;}
+.dp-pay-hero-stat svg{width:15px; height:15px; color:var(--brand); margin:0 auto 6px;}
+.dp-pay-hero-stat-val{font-size:14px; font-weight:800;}
+.dp-pay-hero-stat-label{font-size:9.5px; color:var(--surface-dark-muted); margin-top:2px; font-weight:600;}
+
+.dp-chart-bars{display:flex; align-items:flex-end; gap:6px; height:130px; padding-top:6px;}
+.dp-chart-col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:6px; height:100%;}
+.dp-chart-bar{width:100%; max-width:26px; background:var(--brand); border-radius:8px 8px 4px 4px; min-height:3px;}
+.dp-chart-label{font-size:9.5px; color:var(--muted); font-weight:600;}
+
+.dp-pay-row{border-radius:18px; border:1px solid var(--border-soft); background:var(--card-elev); padding:12px 13px; margin-bottom:8px;}
+.dp-pay-row-top{display:flex; align-items:center; gap:11px;}
+.dp-pay-icn{width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.dp-pay-icn.paid{background:var(--brand-soft); color:var(--brand);}
+.dp-pay-icn.pending{background:var(--warning-soft); color:var(--warning);}
+.dp-pay-amount{font-size:14px; font-weight:800;}
+.dp-pay-meta{font-size:11px; color:var(--muted); margin-top:1px;}
+.dp-pay-accept-btn{margin-top:10px; width:100%; height:38px; border-radius:11px; border:none; background:var(--brand); color:#06251a; font-weight:700; font-size:12.5px;}
+.dp-pay-confirmed{margin-top:9px; display:flex; align-items:center; gap:6px; background:var(--brand-soft); color:var(--brand); font-size:11px; font-weight:600; padding:7px 10px; border-radius:10px;}
+
+/* ---- Chat ---- */
+.dp-chat-list{display:flex; flex-direction:column; gap:9px;}
+.dp-chat-row{display:flex; align-items:center; gap:11px; border-radius:20px; border:1px solid var(--border-soft); background:var(--card); padding:12px 13px;}
+.dp-chat-avatar{width:46px; height:46px; border-radius:15px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#fff; flex-shrink:0;}
+.dp-role-driver{background:var(--role-driver);}
+.dp-role-dispatcher{background:var(--role-dispatcher);}
+.dp-role-admin{background:var(--role-owner);}
+.dp-role-group{background:var(--brand-strong);}
+.dp-chat-body{flex:1; min-width:0;}
+.dp-chat-name{font-size:13.5px; font-weight:700;}
+.dp-chat-preview{font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.dp-chat-badge{background:var(--brand); color:#06251a; font-size:10.5px; font-weight:800; border-radius:999px; min-width:20px; height:20px; display:flex; align-items:center; justify-content:center; padding:0 6px; flex-shrink:0;}
+
+#dp-thread{position:fixed; inset:0; margin:0 auto; max-width:480px; background:var(--bg); display:none; flex-direction:column; z-index:80;}
+#dp-thread.active{display:flex;}
+.dp-thread-head{flex-shrink:0; display:flex; align-items:center; gap:10px; padding:calc(env(safe-area-inset-top) + 12px) 14px 13px; background:var(--surface-dark); color:#fff;}
+.dp-thread-back{width:34px; height:34px; border-radius:999px; border:none; background:rgba(255,255,255,.09); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.dp-thread-back svg{width:17px; height:17px;}
+.dp-thread-title{font-size:14.5px; font-weight:700;}
+.dp-thread-msgs{flex:1; overflow-y:auto; padding:16px 14px; display:flex; flex-direction:column; gap:9px;}
+.dp-msg{max-width:78%; padding:10px 13px; border-radius:16px; font-size:13.5px; line-height:1.45;}
+.dp-msg-mine{align-self:flex-end; background:var(--brand); color:#06251a; border-bottom-right-radius:5px;}
+.dp-msg-them{align-self:flex-start; background:var(--card); border:1px solid var(--border-soft); border-bottom-left-radius:5px;}
+.dp-msg-sender{font-size:10.5px; font-weight:700; margin-bottom:3px;}
+.dp-msg-time{font-size:9.5px; opacity:.65; margin-top:4px;}
+.dp-thread-input{flex-shrink:0; display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border-soft); background:var(--card);}
+.dp-thread-input input{flex:1; padding:11px 15px; border-radius:999px; border:1px solid var(--border); background:var(--bg); color:var(--foreground); font-size:13.5px; outline:none;}
+.dp-thread-input button{width:44px; height:44px; border-radius:999px; border:none; background:var(--brand); color:#06251a; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.dp-thread-input button svg{width:18px; height:18px;}
+
+/* ---- Profile ---- */
+.dp-profile-head{display:flex; align-items:center; gap:13px; background:var(--surface-dark); color:#fff; padding:18px; border-radius:22px 22px 0 0;}
+.dp-profile-avatar{width:60px; height:60px; border-radius:17px; background:linear-gradient(135deg,var(--brand),#0891b2); display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800; color:#06251a; flex-shrink:0; border:2px solid rgba(255,255,255,.15);}
+.dp-profile-name{font-size:16px; font-weight:800;}
+.dp-profile-sub{font-size:12px; color:var(--surface-dark-muted); margin-top:2px;}
+.dp-profile-verified{display:inline-flex; align-items:center; gap:5px; margin-top:7px; background:rgba(255,255,255,.1); padding:5px 10px; border-radius:999px; font-size:11px; font-weight:600;}
+.dp-info-block{background:var(--card); border:1px solid var(--border-soft); border-top:none; border-radius:0 0 22px 22px; padding:6px 16px 10px;}
+.dp-info-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border-soft); font-size:12.5px;}
+.dp-info-row:last-child{border-bottom:none;}
+.dp-info-row .k{color:var(--muted);}
+.dp-info-row .v{font-weight:600; text-align:right;}
+.dp-alert-card{border:1px solid rgba(245,165,36,.3); background:var(--warning-soft); border-radius:20px; padding:14px;}
+.dp-alert-item{display:flex; align-items:center; justify-content:space-between; background:var(--card); border-radius:12px; padding:9px 12px; margin-top:7px; font-size:12px;}
+.dp-vault-row{display:flex; align-items:center; gap:11px; border-radius:18px; border:1px solid var(--border-soft); background:var(--card); padding:11px 12px; margin-bottom:8px;}
+.dp-vault-badge{font-size:9.5px; font-weight:700; padding:2px 8px; border-radius:999px;}
+.dp-vault-valid{background:var(--brand-soft); color:var(--brand);}
+.dp-vault-expiring{background:var(--warning-soft); color:var(--warning);}
+.dp-vault-expired{background:var(--destructive-soft); color:var(--destructive);}
+.dp-logout-btn{width:100%; padding:13px; border-radius:14px; border:1px solid rgba(239,68,68,.3); background:var(--destructive-soft); color:var(--destructive); font-weight:700; font-size:13.5px; margin-top:6px;}
+
+/* ---- Modal ---- */
+.dp-modal-overlay{position:fixed; inset:0; margin:0 auto; max-width:480px; background:rgba(4,5,7,.65); display:none; z-index:100; flex-direction:column; justify-content:flex-end;}
+.dp-modal-overlay.active{display:flex;}
+.dp-modal{background:var(--bg); border-radius:24px 24px 0 0; max-height:88vh; overflow-y:auto; border-top:1px solid var(--border-soft);}
+.dp-modal-head{display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border-soft); position:sticky; top:0; background:var(--surface-dark); color:#fff; border-radius:24px 24px 0 0;}
+.dp-modal-head-sub{font-size:10.5px; color:var(--surface-dark-muted); font-weight:600;}
+.dp-modal-head h3{margin:2px 0 0; font-size:16px; font-weight:800;}
+.dp-modal-body{padding:16px 18px 26px;}
+.dp-modal-close{width:32px; height:32px; border-radius:999px; border:none; background:rgba(255,255,255,.1); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.dp-modal-close svg{width:16px; height:16px;}
+
+/* ---- Nav ---- */
+.dp-nav{flex-shrink:0; position:relative; display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1fr; align-items:end; background:var(--card); border-top:1px solid var(--border-soft); padding:8px 6px calc(8px + env(safe-area-inset-bottom));}
+.dp-nav-btn{position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 1px; background:none; border:none; color:var(--nav-inactive); font-size:10px; font-weight:700; font-family:inherit; transition:color .15s ease, opacity .1s ease;}
+.dp-nav-btn:active{opacity:.6;}
+.dp-nav-btn svg{width:21px; height:21px;}
+.dp-nav-btn.active{color:var(--brand-strong);}
+.dp-nav-center{display:flex; justify-content:center;}
+.dp-nav-center-btn{margin-top:-30px; width:60px; height:60px; border-radius:999px; background:var(--brand); color:#06251a; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border:4px solid var(--card); box-shadow:0 10px 22px -8px var(--brand-soft); transition:transform .1s ease;}
+.dp-nav-center-btn:active{transform:scale(.94);}
+.dp-nav-center-btn.active{background:var(--brand-strong);}
+.dp-nav-center-btn svg{width:20px; height:20px;}
+.dp-nav-center-btn span{font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.04em;}
+.dp-nav-badge{position:absolute; top:0px; right:calc(50% - 18px); min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--destructive); color:#fff; font-size:9px; font-weight:800; display:flex; align-items:center; justify-content:center;}
+
+.dp-toast{position:fixed; left:50%; bottom:88px; transform:translateX(-50%); background:var(--card); border:1px solid var(--border); color:var(--foreground); padding:11px 18px; border-radius:999px; font-size:12.5px; font-weight:600; z-index:200; display:none; box-shadow:0 10px 24px -8px rgba(0,0,0,.5); max-width:90%; text-align:center;}
+
+/* ---- OVERRIDE WITH PREMIUM NATIVE-APP DESIGN ---- */
+:root {
+  --bg: #121212 !important;
+  --surface-dark: #1A1A1A !important;
+  --surface-dark-muted: #888888 !important;
+  --card: #1E1E1E !important;
+  --card-elev: #242424 !important;
+  --border: #2A2A2A !important;
+  --border-soft: #222222 !important;
+  --foreground: #F5F5F5 !important;
+  --muted: #A0A0A0 !important;
+  --muted-soft: #666666 !important;
+  --brand: #1db954 !important;
+  --brand-strong: #1aa34a !important;
+  --brand-soft: rgba(29, 185, 84, 0.15) !important;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  background: var(--bg) !important;
+}
+
+#dp-shell {
+  background: var(--bg) !important;
+  box-shadow: none !important;
+}
+
+.dp-nav {
+  background: rgba(30, 30, 30, 0.95) !important;
+  backdrop-filter: blur(16px) !important;
+  border-top: 1px solid var(--border-soft) !important;
+  padding-bottom: env(safe-area-inset-bottom, 16px) !important;
+}
+
+.dp-nav-btn {
+  color: #888 !important;
+}
+.dp-nav-btn.active {
+  color: var(--brand) !important;
+}
+
+.dp-nav-center-btn {
+  background: var(--brand) !important;
+  color: #121212 !important;
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 28px !important;
+  border: 4px solid var(--bg) !important;
+  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4) !important;
+  margin-top: -24px !important;
+}
+
+.dp-nav-center-btn.active {
+  background: var(--brand-strong) !important;
+  box-shadow: 0 4px 20px rgba(26, 163, 74, 0.6) !important;
+}
+
+.dp-card {
+  background: var(--card) !important;
+  border-radius: 16px !important;
+  border: 1px solid var(--border-soft) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+
+.dp-msg-mine {
+  background: #1db954 !important;
+  color: #121212 !important;
+  border-bottom-right-radius: 4px !important;
+  border-radius: 18px 18px 4px 18px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
+  font-weight: 500 !important;
+}
+
+.dp-msg-them {
+  background: #2A2A2A !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-bottom-left-radius: 4px !important;
+  border-radius: 18px 18px 18px 4px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+}
+
+.dp-thread-head {
+  background: rgba(26,26,26,0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid var(--border-soft) !important;
+}
+
+.dp-thread-input {
+  background: var(--bg) !important;
+  border-top: 1px solid var(--border-soft) !important;
+  padding: 12px !important;
+}
+
+.dp-thread-input input {
+  background: var(--card-elev) !important;
+  border: 1px solid var(--border) !important;
+  padding: 12px 18px !important;
+  color: #fff !important;
+}
+
+.dp-thread-input button {
+  background: var(--brand) !important;
+  color: #121212 !important;
+}
+
+/* Chat tabs styling */
+.chat-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 12px;
+}
+.chat-tab {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 8px 0;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.chat-tab.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+.dp-chat-row {
+  background: var(--card) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border-soft) !important;
+  border-radius: 0 !important;
+  padding: 14px 16px !important;
+  margin-bottom: 0 !important;
+}
+.dp-chat-row:last-child {
+  border-bottom: none !important;
+}
+.dp-chat-list {
+  background: var(--card) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--border-soft) !important;
+  margin: 0 16px !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+</style>
+</head>
+<body>
+
+<div id="dp-shell">
+
+<div id="login-screen">
+  <div class="login-card">
+    <img src="assets/haulbox-logo-icon.png" alt="HaulBoX">
+    <h1>Driver Portal</h1>
+    <p>Sign in with your Driver ID and PIN</p>
+    <div class="login-field"><label>Driver ID</label><input id="li-driverid" autocomplete="username" placeholder="e.g. DRV-102"></div>
+    <div class="login-field"><label>PIN</label><input id="li-pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••"></div>
+    <button class="login-btn" id="li-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="li-err"></div>
+  </div>
+</div>
+
+<div id="app">
+  <header id="dp-header">
+    <div class="dp-header-left">
+      <div class="dp-logo"><img src="assets/haulbox-logo-icon.png" alt="HaulBoX"></div>
+      <div id="dp-title-wrap">
+        <div id="dp-title">Haul<span style="color:var(--brand);">BoX</span></div>
+        <div id="dp-subtitle">Driver Portal</div>
+      </div>
+    </div>
+    <div class="dp-header-right">
+      <button class="dp-icon-btn" onclick="setDriverPortalPage('chat')" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="dp-icon-dot" id="dp-header-dot" style="display:none;"></span>
+      </button>
+      <div class="dp-icon-btn" style="background:transparent; padding:0; width:auto; height:auto;" onclick="setDriverPortalPage('profile')">
+        <div class="dp-avatar-lg" id="dp-avatar" style="width:36px;height:36px;border-radius:11px;font-size:12px;">--</div>
+      </div>
+    </div>
+  </header>
+
+  <div id="dp-body">
+
+    <!-- CURRENT LOAD (default / merged Home) -->
+    <section class="dp-page active" id="dp-page-current"><div id="dp-current-content"><div class="dp-empty">Loading…</div></div></section>
+
+    <!-- LOADS -->
+    <section class="dp-page" id="dp-page-loads">
+      <h2 class="dp-screen-title">Loads</h2>
+      <p class="dp-screen-sub" id="dp-loads-sub">&nbsp;</p>
+      <div class="dp-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input id="dp-loads-search" oninput="renderLoadsList()" placeholder="Search loads, cities, brokers…">
+      </div>
+      <div class="dp-chips">
+        <div class="dp-chip active" data-period="all" onclick="setLoadPeriod('all')">All Loads</div>
+        <div class="dp-chip" data-period="weekly" onclick="setLoadPeriod('weekly')">Weekly</div>
+        <div class="dp-chip" data-period="monthly" onclick="setLoadPeriod('monthly')">Monthly</div>
+        <div class="dp-chip" data-period="yearly" onclick="setLoadPeriod('yearly')">Yearly</div>
+        <div class="dp-chip" data-period="custom" onclick="setLoadPeriod('custom')">Custom Range</div>
+      </div>
+      <div class="dp-custom-range" id="dp-custom-range">
+        <input type="date" id="dp-range-from"><input type="date" id="dp-range-to">
+        <button class="dp-btn-sm primary" onclick="loadLoads()">Go</button>
+      </div>
+      <div class="dp-job-list" id="dp-loads-list"><div class="dp-empty">Loading…</div></div>
+    </section>
+
+    <!-- PAYMENTS -->
+    <section class="dp-page" id="dp-page-payments">
+      <h2 class="dp-screen-title">Payments</h2>
+      <p class="dp-screen-sub">Earnings, settlements &amp; history</p>
+
+      <div class="dp-pay-hero">
+        <div class="dp-pay-hero-label"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg>Total Earnings</div>
+        <div class="dp-pay-hero-amt" id="pay-hero-total">$0</div>
+        <div class="dp-pay-hero-stats" id="pay-hero-stats"></div>
+      </div>
+
+      <div class="dp-chips">
+        <div class="dp-chip brand-active" data-payperiod="weekly" onclick="setPayChartPeriod('weekly')">Weekly</div>
+        <div class="dp-chip" data-payperiod="monthly" onclick="setPayChartPeriod('monthly')">Monthly</div>
+        <div class="dp-chip" data-payperiod="yearly" onclick="setPayChartPeriod('yearly')">Yearly</div>
+      </div>
+
+      <div class="dp-card dp-block" style="margin-bottom:16px;">
+        <div class="dp-section-title">
+          <div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 17l6-6 4 4 8-8"/></svg></span><span id="dp-chart-title">Weekly Earnings</span></div>
+          <span id="dp-chart-total" style="font-size:13px; font-weight:800; color:var(--brand-strong);">$0</span>
+        </div>
+        <div class="dp-chart-bars" id="dp-chart-bars"></div>
+      </div>
+
+      <div class="dp-section-title" style="margin-bottom:10px;"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></span>Payment History</div></div>
+      <div id="dp-payments-list"><div class="dp-empty">Loading…</div></div>
+    </section>
+
+    <!-- CHAT -->
+    <section class="dp-page" id="dp-page-chat">
+      <h2 class="dp-screen-title" style="padding: 16px 16px 4px;">Messages</h2>
+      <div class="chat-tabs">
+        <button class="chat-tab active" onclick="setChatFilter('all', this)">All</button>
+        <button class="chat-tab" onclick="setChatFilter('direct', this)">Direct</button>
+        <button class="chat-tab" onclick="setChatFilter('group', this)">Group</button>
+      </div>
+      <div class="dp-chat-list" id="dp-chat-list"><div class="dp-empty">Loading…</div></div>
+    </section>
+
+    <!-- PROFILE -->
+    <section class="dp-page" id="dp-page-profile"><div id="dp-profile-content"><div class="dp-empty">Loading…</div></div></section>
+
+  </div>
+
+  <nav class="dp-nav">
+    <button class="dp-nav-btn" data-page="loads" onclick="setDriverPortalPage('loads')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>Loads</button>
+    <button class="dp-nav-btn" data-page="payments" onclick="setDriverPortalPage('payments')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg>Payments</button>
+    <div class="dp-nav-center">
+      <button class="dp-nav-center-btn active" id="dp-nav-current" onclick="setDriverPortalPage('current')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+        <span>Live</span>
+      </button>
+    </div>
+    <button class="dp-nav-btn" data-page="chat" onclick="setDriverPortalPage('chat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V6a4 4 0 014-4h10a4 4 0 014 4z"/></svg>Chat
+      <span class="dp-nav-badge" id="dp-chat-nav-badge" style="display:none;">0</span>
+    </button>
+    <button class="dp-nav-btn" data-page="profile" onclick="setDriverPortalPage('profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6.5 8-6.5s6.5 2 8 6.5"/></svg>Profile</button>
+  </nav>
+</div>
+
+<!-- Load details modal -->
+<div class="dp-modal-overlay" id="dp-job-modal">
+  <div class="dp-modal">
+    <div class="dp-modal-head">
+      <div><div class="dp-modal-head-sub">Load Details</div><h3 id="dp-jd-num">Load</h3></div>
+      <button class="dp-modal-close" onclick="closeModal('dp-job-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dp-modal-body" id="dp-jd-body">—</div>
+  </div>
+</div>
+
+<!-- Full-screen photo preview -->
+<div class="dp-modal-overlay" id="dp-photo-modal">
+  <div class="dp-modal" style="border-radius:0; max-height:100%; height:100%; background:#000; display:flex; flex-direction:column;">
+    <div class="dp-modal-head" style="background:rgba(0,0,0,.7); border-radius:0;">
+      <div><h3 id="dp-photo-title" style="color:#fff;">Photo</h3></div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="dp-btn-sm" id="dp-photo-delete-btn" onclick="deleteCurrentPhoto()" style="color:var(--destructive); border-color:rgba(239,68,68,.3);">Delete</button>
+        <button class="dp-modal-close" onclick="closeModal('dp-photo-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+    </div>
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; padding:10px;">
+      <img id="dp-photo-img" src="" style="max-width:100%; max-height:100%; object-fit:contain;">
+    </div>
+  </div>
+</div>
+
+<!-- Chat thread -->
+<div id="dp-thread">
+  <div class="dp-thread-head">
+    <button class="dp-thread-back" onclick="closeThread()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="dp-chat-avatar dp-role-driver" id="dp-thread-avatar" style="width:34px;height:34px;font-size:11px;border-radius:11px;">--</div>
+    <div class="dp-thread-title" id="dp-thread-title">Chat</div>
+  </div>
+  <div class="dp-thread-msgs" id="dp-thread-msgs"></div>
+  <div class="dp-thread-input">
+    <input id="dp-thread-input-box" placeholder="Message…" onkeydown="if(event.key==='Enter')sendThreadMessage()">
+    <button onclick="sendThreadMessage()" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+  </div>
+</div>
+
+<input type="file" id="dp-file-input" accept="image/*,.pdf" style="display:none">
+<div class="dp-toast" id="dp-toast"></div>
+
+</div><!-- /#dp-shell -->
+
+<script>
+const API = '';
+let TOKEN = localStorage.getItem('hb_driver_token') || null;
+let ME = null, PERMS = {};
+let currentPeriod = 'all';
+let currentPayPeriod = 'weekly';
+let currentThreadId = null;
+let pendingUpload = null;
+let ALL_LOADS_CACHE = [];
+let PAYMENT_TXNS = [];
+
+function toast(msg){
+  const t = document.getElementById('dp-toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(()=>{ t.style.display='none'; }, 2600);
+}
+
+async function api(path, opts={}){
+  const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  if (TOKEN) headers['Authorization'] = 'Bearer ' + TOKEN;
+  const res = await fetch(API + path, Object.assign({}, opts, { headers }));
+  let data = {};
+  try { data = await res.json(); } catch(e){}
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(s=>s[0].toUpperCase()).join(''); }
+function money(n){ return '$' + (Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:0}); }
+function statusClass(s){ return 'st-' + String(s||'').toLowerCase().replace(/[\s_]+/g,'-'); }
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function mapsUrl(address){ return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address||''); }
+function etaCountdownText(eta){
+  if (!eta) return '—';
+  const t = new Date(eta);
+  if (isNaN(t.getTime())) return eta;
+  const diffMs = t - new Date();
+  if (diffMs <= 0) return 'Overdue';
+  const h = Math.floor(diffMs / 3600000), d = Math.floor(h / 24);
+  if (d > 0) return d + 'd ' + (h % 24) + 'h';
+  const m = Math.floor((diffMs % 3600000) / 60000);
+  return h + 'h ' + m + 'm';
+}
+function fmtDate(s){
+  if (!s) return '—';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleDateString(undefined, { month:'short', day:'2-digit', year:'numeric' });
+}
+
+// Driver checkpoint progression — separate from dispatch's own document-
+// upload-derived `status`. This drives the primary CTA on Current Load.
+const CHECKPOINT_ORDER = ['ACCEPTED','AT_PICKUP','IN_TRANSIT','AT_DELIVERY'];
+const CHECKPOINT_LABEL = { ACCEPTED:'Accepted', AT_PICKUP:'At Pickup', IN_TRANSIT:'In Transit', AT_DELIVERY:'At Delivery' };
+const CHECKPOINT_NEXT_CTA = {
+  null: 'Confirm Load Accepted',
+  ACCEPTED: 'Arrived at Pickup',
+  AT_PICKUP: 'Start Transit',
+  IN_TRANSIT: 'Arrived at Delivery',
+  AT_DELIVERY: null,
+};
+
+// ---------------- Login ----------------
+async function doLogin(){
+  const driverId = document.getElementById('li-driverid').value.trim();
+  const pin = document.getElementById('li-pin').value.trim();
+  const errEl = document.getElementById('li-err'); errEl.textContent = '';
+  if (!driverId || !pin){ errEl.textContent = 'Enter Driver ID and PIN'; return; }
+  const btn = document.getElementById('li-btn'); btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const res = await fetch(API + '/api/driver/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({driverId, pin}) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    TOKEN = data.token; localStorage.setItem('hb_driver_token', TOKEN);
+    ME = data.driver; PERMS = data.permissions || {};
+    document.getElementById('dp-subtitle').textContent = data.companyName || 'Driver Portal';
+    boot();
+  } catch(e){
+    errEl.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+async function tryResumeSession(){
+  if (!TOKEN) return false;
+  try { const data = await api('/api/driver/me'); ME = data.driver; PERMS = data.permissions || {}; return true; }
+  catch(e){ TOKEN=null; localStorage.removeItem('hb_driver_token'); return false; }
+}
+function logout(){
+  api('/api/driver/logout', {method:'POST'}).catch(()=>{});
+  TOKEN = null; localStorage.removeItem('hb_driver_token');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+async function boot(){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('dp-avatar').textContent = initials(ME.name);
+  setDriverPortalPage('current');
+}
+(async function init(){ if (await tryResumeSession()) boot(); })();
+
+// ---------------- Nav ----------------
+function setDriverPortalPage(page){
+  document.querySelectorAll('.dp-nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
+  document.getElementById('dp-nav-current').classList.toggle('active', page==='current');
+  document.querySelectorAll('.dp-page').forEach(el=>el.classList.toggle('active', el.id==='dp-page-'+page));
+  if (page==='current') loadCurrent();
+  else if (page==='loads') loadLoads();
+  else if (page==='payments') loadPayments();
+  else if (page==='chat') loadChats();
+  else if (page==='profile') loadProfile();
+}
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+function updateChatNavBadge(count){
+  const b = document.getElementById('dp-chat-nav-badge');
+  const dot = document.getElementById('dp-header-dot');
+  const n = count || 0;
+  b.textContent = n > 9 ? '9+' : String(n);
+  b.style.display = n > 0 ? 'flex' : 'none';
+  dot.style.display = n > 0 ? 'block' : 'none';
+}
+
+// ---------------- Current Load (+ merged Home summary) ----------------
+async function loadCurrent(){
+  const el = document.getElementById('dp-current-content');
+  el.innerHTML = '<div class="dp-empty">Loading…</div>';
+  try {
+    const [dash, home] = await Promise.all([ api('/api/driver/dashboard'), api('/api/driver/home') ]);
+    updateChatNavBadge(home.unreadMessages);
+    el.innerHTML = currentContentHtml(dash, home);
+  } catch(e){ el.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+}
+
+function identityHtml(driver){
+  return '<div class="dp-identity">' +
+    '<div class="dp-avatar-lg">' + initials(driver.name) + '</div>' +
+    '<div><div class="dp-identity-name">' + escapeHtml(driver.name||'Driver') + '</div>' +
+    '<div class="dp-identity-sub">Truck ' + escapeHtml(driver.truck||'—') + '</div></div>' +
+    '<div class="dp-online-chip"><span class="dot hb-pulse"></span>Online</div></div>';
+}
+
+function heroLoadHtml(l){
+  const pickupCity = (l.pickup||'—').split(',')[0];
+  const dropCity = (l.dropoff||'—').split(',')[0];
+  let h = '<div class="dp-hero">';
+  h += '<div class="dp-hero-top"><div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">' +
+    '<div><div class="dp-hero-eyebrow">Active Load</div><div class="dp-hero-num">' + escapeHtml(l.loadNumber||l.id) + '</div>' +
+    '<div class="dp-hero-broker"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V7l6-4 6 4v14M10 9h.01M14 9h.01M10 13h.01M14 13h.01M10 17h.01M14 17h.01"/></svg>' + escapeHtml(l.brokerName||'—') + '</div></div>' +
+    '<div><div class="dp-hero-rate">' + money(l.driverPay) + '</div>' +
+    '<div class="dp-badge ' + statusClass(l.driverProgress||'assigned') + '" style="margin-top:6px;"><span class="dot"></span>' + (CHECKPOINT_LABEL[l.driverProgress] || 'Assigned') + '</div></div>' +
+    '</div>';
+  h += '<div class="dp-hero-stats">' +
+    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">⏱ ETA</div><div class="dp-hero-stat-val">' + escapeHtml(etaCountdownText(l.eta)) + '</div></div>' +
+    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">📍 Miles Remaining</div><div class="dp-hero-stat-val">' + (l.milesRemaining!=null ? l.milesRemaining : '—') + ' <span style="font-size:11px;font-weight:500;color:var(--surface-dark-muted);">mi</span></div></div>' +
+    '</div></div>';
+  h += '<div class="dp-hero-bottom">' +
+    '<div class="dp-route-line"><span class="dp-route-dot pickup"></span><span>' + escapeHtml(pickupCity) + '</span><span class="dp-route-arrow">→</span><span class="dp-route-dot dropoff"></span><span>' + escapeHtml(dropCity) + '</span></div>' +
+    '</div></div>';
+  return h;
+}
+
+function stopBlockHtml(l){
+  let h = '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.42 4.58a5.4 5.4 0 00-7.65 0l-.77.78-.77-.78a5.4 5.4 0 00-7.65 7.65l8.42 8.42 8.42-8.42a5.4 5.4 0 000-7.65z"/></svg></span>Route Details</div></div>';
+  h += '<div class="dp-stop"><div class="dp-stop-icn pickup"><svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="10" r="3"/><path d="M12 21s7-6.5 7-11a7 7 0 10-14 0c0 4.5 7 11 7 11z"/></svg></div>' +
+    '<div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;"><span class="dp-stop-kind">Pickup</span><span class="dp-stop-when">' + escapeHtml(l.pickupDate||'—') + (l.pickupTime?(' · '+escapeHtml(l.pickupTime)):'') + '</span></div>' +
+    '<div class="dp-stop-addr">' + escapeHtml(l.pickup||'—') + '</div>' +
+    '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.pickup) + '"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Open in Maps</a></div></div>';
+  h += '<div class="dp-stop"><div class="dp-stop-icn dropoff"><svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></div>' +
+    '<div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;"><span class="dp-stop-kind">Delivery</span><span class="dp-stop-when">' + escapeHtml(l.deliveryDate||'—') + (l.deliveryTime?(' · '+escapeHtml(l.deliveryTime)):'') + '</span></div>' +
+    '<div class="dp-stop-addr">' + escapeHtml(l.dropoff||'—') + '</div>' +
+    '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.dropoff) + '"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Open in Maps</a></div></div>';
+  h += '</div>';
+  return h;
+}
+
+const DOC_LABELS = {RC:'Rate Confirmation', BOL:'Bill of Lading', POD:'Proof of Delivery'};
+function docsBlockHtml(l, extraTitle){
+  let h = '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>' + (extraTitle||'Documents') + '</div></div>';
+  ['RC','BOL','POD'].forEach(k=>{
+    const d = l.docs[k];
+    const ready = d && d.hasFile;
+    h += '<div class="dp-doc-row"><div class="dp-doc-icn ' + (ready?'ready':'empty') + '"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div>' +
+      '<div style="flex:1;min-width:0;"><div class="dp-doc-name">' + DOC_LABELS[k] + '</div><div class="dp-doc-meta">' + (ready?'Uploaded':'Not uploaded') + '</div></div>' +
+      (ready ? '<span class="dp-chip-ready">✓ Ready</span>' : '') +
+      (ready ? '<button class="dp-btn-sm ghost" onclick="viewLoadDoc(\''+l.id+'\',\''+k+'\')">View</button>' : (k!=='RC' && PERMS.canUploadDocuments ? '<button class="dp-btn-sm primary" onclick="startUploadDoc(\''+l.id+'\',\''+k+'\')">Upload</button>' : '')) +
+      '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+const PHOTO_CAPS = { PhotosPU: 6, PhotosDO: 6, Extra: 6 };
+function photoBlockHtml(title, l, key){
+  const arr = l.docs[key] || [];
+  const cap = PHOTO_CAPS[key] || 6;
+  let h = '<div class="dp-block">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+    '<span style="font-size:12.5px;font-weight:700;">' + title + '</span><span style="font-size:11px;color:var(--muted);">' + arr.length + '/' + cap + '</span></div>' +
+    '<div class="dp-photo-grid">';
+  arr.forEach(p=>{
+    h += '<div class="dp-photo-thumb" onclick="viewLoadPhoto(\''+l.id+'\',\''+key+'\','+p.index+')">' + escapeHtml(p.name||'Photo') +
+      (PERMS.canUploadDocuments ? '<button class="dp-photo-del" onclick="event.stopPropagation();deleteLoadPhoto(\''+l.id+'\',\''+key+'\','+p.index+')">✕</button>' : '') +
+      '</div>';
+  });
+  if (arr.length < cap && PERMS.canUploadDocuments) {
+    h += '<button class="dp-photo-add" onclick="startUploadDoc(\''+l.id+'\',\''+key+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add</button>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function checkpointBlockHtml(l){
+  if (!PERMS.canUpdateLoadStatus) return '';
+  const cp = l.driverProgress || null;
+  const nextCta = CHECKPOINT_NEXT_CTA[cp];
+  if (!nextCta) {
+    return '<button class="dp-checkpoint-btn dp-checkpoint-done" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>Delivered</button>';
+  }
+  const idx = cp ? CHECKPOINT_ORDER.indexOf(cp) : -1;
+  const nextStatus = CHECKPOINT_ORDER[idx+1];
+  return '<button class="dp-checkpoint-btn" id="dp-checkpoint-btn" onclick="advanceCheckpoint(\''+l.id+'\',\''+nextStatus+'\')">' + nextCta + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
+}
+async function advanceCheckpoint(loadId, status){
+  const btn = document.getElementById('dp-checkpoint-btn');
+  if (btn){ btn.disabled = true; btn.textContent = 'Updating…'; }
+  try {
+    await api('/api/driver/loads/' + loadId + '/status', { method:'POST', body: JSON.stringify({ status }) });
+    toast('Status updated: ' + CHECKPOINT_LABEL[status]);
+    loadCurrent();
+  } catch(e){ toast(e.message); if (btn) btn.disabled = false; }
+}
+
+const NOTIF_ICON = { load_status_changed:'📦', document_uploaded:'📄', payment_paid:'💰' };
+function mergedHomeHtml(home){
+  const ps = home.paymentSummary || {};
+  let h = '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></span>Payment Summary</div>' +
+    '<button class="dp-btn-sm ghost" onclick="setDriverPortalPage(\'payments\')">View all</button></div>';
+  h += '<div class="dp-mini-stats">' +
+    '<div class="dp-mini-stat"><div class="dp-mini-stat-val">' + (ps.lastPaymentReceived ? money(ps.lastPaymentReceived.amount) : '—') + '</div><div class="dp-mini-stat-label">Last Payment</div></div>' +
+    '<div class="dp-mini-stat"><div class="dp-mini-stat-val">' + money(ps.totalThisWeek) + '</div><div class="dp-mini-stat-label">This Week</div></div>' +
+    '<div class="dp-mini-stat"><div class="dp-mini-stat-val">' + money(ps.totalThisMonth) + '</div><div class="dp-mini-stat-label">This Month</div></div>' +
+    '</div></div>';
+
+  h += '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V6a4 4 0 014-4h10a4 4 0 014 4z"/></svg></span>Messages</div>' +
+    (home.unreadMessages>0 ? '<span class="dp-chat-badge">'+home.unreadMessages+'</span>' : '') + '</div>' +
+    '<button class="dp-doc-row" style="width:100%;text-align:left;border:1px solid var(--border-soft);cursor:pointer;" onclick="setDriverPortalPage(\'chat\')">' +
+    '<div class="dp-doc-icn ready"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V6a4 4 0 014-4h10a4 4 0 014 4z"/></svg></div>' +
+    '<div style="flex:1;min-width:0;"><div class="dp-doc-name">' + (home.unreadMessages>0 ? home.unreadMessages + ' unread' : 'No unread messages') + '</div>' +
+    '<div class="dp-doc-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(home.latestMessagePreview || 'Tap to open chat') + '</div></div>' +
+    '</button></div>';
+
+  h += '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span>Recent Notifications</div></div>';
+  if (home.recentNotifications && home.recentNotifications.length){
+    h += home.recentNotifications.map(n =>
+      '<div class="dp-notif-row"><div class="dp-notif-icn">' + (NOTIF_ICON[n.type]||'🔔') + '</div>' +
+      '<span>' + escapeHtml(n.title) + '</span><span class="dp-notif-time">' + fmtDate(n.createdAt) + '</span></div>'
+    ).join('');
+  } else {
+    h += '<div class="dp-empty" style="padding:16px 0;">No recent notifications.</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function currentContentHtml(dash, home){
+  const l = dash.currentLoad;
+  let h = identityHtml(dash.driver);
+  if (l) {
+    h += heroLoadHtml(l);
+    h += '<div class="dp-actions-row">' +
+      '<button class="dp-action-btn" onclick="setDriverPortalPage(\'chat\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.362 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Call Dispatcher</button>' +
+      '<button class="dp-action-btn danger" onclick="toast(\'HaulBoX safety team notified.\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Emergency</button>' +
+      '</div>';
+    h += stopBlockHtml(l);
+    h += docsBlockHtml(l);
+    h += photoBlockHtml('Loading Photos', l, 'PhotosPU');
+    h += photoBlockHtml('Unloading Photos', l, 'PhotosDO');
+    if (l.notes) h += '<div class="dp-notes dp-block"><b>Note: </b>' + escapeHtml(l.notes) + '</div>';
+    h += '<div class="dp-block">' + checkpointBlockHtml(l) + '</div>';
+  } else {
+    h += '<div class="dp-card dp-empty" style="margin-bottom:14px;">No Active Load Assigned</div>';
+  }
+  h += mergedHomeHtml(home);
+  return h;
+}
+
+// ---------------- Loads ----------------
+function setLoadPeriod(p){
+  currentPeriod = p;
+  document.querySelectorAll('#dp-page-loads .dp-chip').forEach(c=>c.classList.toggle('active', c.dataset.period===p));
+  document.getElementById('dp-custom-range').classList.toggle('active', p==='custom');
+  if (p !== 'custom') loadLoads();
+}
+async function loadLoads(){
+  const list = document.getElementById('dp-loads-list');
+  list.innerHTML = '<div class="dp-empty">Loading…</div>';
+  let q = '?period=' + currentPeriod;
+  if (currentPeriod === 'custom') {
+    const from = document.getElementById('dp-range-from').value, to = document.getElementById('dp-range-to').value;
+    if (from) q += '&from=' + from; if (to) q += '&to=' + to;
+  }
+  try {
+    const data = await api('/api/driver/loads' + q);
+    ALL_LOADS_CACHE = data.loads;
+    const done = data.loads.filter(l => l.driverProgress === 'AT_DELIVERY').length;
+    document.getElementById('dp-loads-sub').textContent = data.loads.length + ' loads · ' + done + ' delivered';
+    renderLoadsList();
+  } catch(e){ list.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+}
+function renderLoadsList(){
+  const list = document.getElementById('dp-loads-list');
+  const q = (document.getElementById('dp-loads-search').value || '').trim().toLowerCase();
+  const filtered = !q ? ALL_LOADS_CACHE : ALL_LOADS_CACHE.filter(l =>
+    (l.loadNumber||'').toLowerCase().includes(q) ||
+    (l.pickup||'').toLowerCase().includes(q) ||
+    (l.dropoff||'').toLowerCase().includes(q) ||
+    (l.brokerName||'').toLowerCase().includes(q)
+  );
+  if (!filtered.length){ list.innerHTML = '<div class="dp-empty">No loads match your search.</div>'; return; }
+  list.innerHTML = filtered.map(loadCardHtml).join('');
+}
+function loadCardHtml(l){
+  const pickupCity = (l.pickup||'—').split(',')[0];
+  const dropCity = (l.dropoff||'—').split(',')[0];
+  return '<button class="dp-job-card" onclick="openLoadDetails(\'' + l.id + '\')">' +
+    '<div class="dp-job-top"><div><div class="dp-job-num">' + escapeHtml(l.loadNumber||l.id) + '</div>' +
+    '<div class="dp-job-broker"><svg style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V7l6-4 6 4v14"/></svg>' + escapeHtml(l.brokerName||'—') + '</div></div>' +
+    '<span class="dp-badge ' + statusClass(l.driverProgress||'assigned') + '">' + (CHECKPOINT_LABEL[l.driverProgress] || 'Assigned') + '</span></div>' +
+    '<div class="dp-job-route"><span class="dp-route-dot pickup"></span><span>' + escapeHtml(pickupCity) + '</span><span class="dp-route-arrow">→</span><span class="dp-route-dot dropoff"></span><span>' + escapeHtml(dropCity) + '</span></div>' +
+    '<div class="dp-job-foot"><span class="dp-job-meta">' + escapeHtml(l.pickupDate||'—') + (l.miles?(' · '+l.miles+' mi'):'') + '</span><span class="dp-job-rate">' + money(l.driverPay) + '</span></div>' +
+    '</button>';
+}
+async function openLoadDetails(id){
+  const modal = document.getElementById('dp-job-modal');
+  document.getElementById('dp-jd-num').textContent = 'Load';
+  document.getElementById('dp-jd-body').innerHTML = 'Loading…';
+  modal.classList.add('active');
+  try {
+    const { load: l } = await api('/api/driver/loads/' + id);
+    document.getElementById('dp-jd-num').textContent = l.loadNumber || l.id;
+    document.getElementById('dp-jd-body').innerHTML = loadDetailHtml(l);
+  } catch(e){ document.getElementById('dp-jd-body').innerHTML = e.message; }
+}
+async function loadDetailHtml(l){
+  let h = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+    '<div><div style="font-size:11px;color:var(--muted);">' + escapeHtml(l.brokerName||'—') + '</div>' +
+    '<div style="font-size:16px;font-weight:800;color:var(--brand-strong);">' + money(l.driverPay) + '</div>' +
+    '<div style="font-size:11px;color:var(--muted);">' + (l.miles||'—') + ' mi</div></div>' +
+    '<span class="dp-badge ' + statusClass(l.driverProgress||'assigned') + '">' + (CHECKPOINT_LABEL[l.driverProgress] || 'Assigned') + '</span></div>';
+  h += stopBlockHtml(l);
+  h += docsBlockHtml(l);
+  h += photoBlockHtml('Pickup Photos', l, 'PhotosPU');
+  h += photoBlockHtml('Delivery Photos', l, 'PhotosDO');
+  if (l.notes) h += '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg></span>Notes</div></div><div style="font-size:13px;color:var(--muted);line-height:1.5;">' + escapeHtml(l.notes) + '</div></div>';
+  // Payment history for this load
+  try {
+    const { transaction: t } = await api('/api/driver/transactions/' + l.id);
+    document.getElementById('dp-jd-body').innerHTML = h + paymentHistoryBlockHtml(t);
+  } catch(e){
+    document.getElementById('dp-jd-body').innerHTML = h;
+  }
+  return h;
+}
+function paymentHistoryBlockHtml(t){
+  const cls = t.status === 'PAID' ? 'paid' : 'pending';
+  return '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></span>Payment History</div></div>' +
+    '<div class="dp-pay-row" style="margin-bottom:0;"><div class="dp-pay-row-top"><div class="dp-pay-icn ' + cls + '"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>' +
+    '<div style="flex:1;"><div class="dp-pay-amount">' + money(t.amount) + '</div><div class="dp-pay-meta">' + (t.paidDate||t.date||'—') + '</div></div>' +
+    '<span class="dp-badge ' + (t.status==='PAID'?'st-delivered':'st-at-pickup') + '">' + t.status + '</span></div>' +
+    (t.status==='PAID' && !t.accepted ? '<button class="dp-pay-accept-btn" onclick="acceptPayment(\''+t.loadId+'\');closeModal(\'dp-job-modal\')">Accept Payment</button>' : '') +
+    '</div></div>';
+}
+
+// ---------------- Document / photo actions (shared: Current + Loads) ----------------
+let currentPhotoCtx = null;
+async function viewLoadPhoto(loadId, key, index){
+  try {
+    const data = await api('/api/driver/doc', {method:'POST', body: JSON.stringify({loadId, key, index})});
+    currentPhotoCtx = { loadId, key, index };
+    document.getElementById('dp-photo-title').textContent = data.name || 'Photo';
+    document.getElementById('dp-photo-img').src = data.data;
+    document.getElementById('dp-photo-modal').classList.add('active');
+  } catch(e){ toast(e.message); }
+}
+async function deleteCurrentPhoto(){
+  if (!currentPhotoCtx) return;
+  closeModal('dp-photo-modal');
+  await deleteLoadPhoto(currentPhotoCtx.loadId, currentPhotoCtx.key, currentPhotoCtx.index);
+}
+async function deleteLoadPhoto(loadId, key, index){
+  if (!confirm('Delete this photo?')) return;
+  try {
+    await api('/api/driver/upload-doc', {method:'DELETE', body: JSON.stringify({loadId, key, index})});
+    toast('Photo deleted');
+    if (document.getElementById('dp-job-modal').classList.contains('active')) openLoadDetails(loadId);
+    loadCurrent();
+  } catch(e){ toast(e.message); }
+}
+async function viewLoadDoc(loadId, key, index){
+  try { const data = await api('/api/driver/doc', {method:'POST', body: JSON.stringify({loadId, key, index})}); window.open(data.data, '_blank'); }
+  catch(e){ toast(e.message); }
+}
+function startUploadDoc(loadId, key){
+  pendingUpload = { loadId, key };
+  document.getElementById('dp-file-input').click();
+}
+document.getElementById('dp-file-input').addEventListener('change', async function(){
+  const file = this.files[0]; this.value = '';
+  if (!file || !pendingUpload) return;
+  const reader = new FileReader();
+  reader.onload = async function(){
+    try {
+      if (pendingUpload.profile) {
+        await api('/api/driver/documents', {method:'POST', body: JSON.stringify({ key: pendingUpload.key, fileName: file.name, data: reader.result, expiryDate: pendingUpload.expiryDate||null, category: pendingUpload.category||null, index: pendingUpload.index })});
+        toast('Uploaded'); loadProfile();
+      } else {
+        await api('/api/driver/upload-doc', {method:'POST', body: JSON.stringify({ loadId: pendingUpload.loadId, key: pendingUpload.key, fileName: file.name, mimeType: file.type, data: reader.result })});
+        toast('Uploaded');
+        if (document.getElementById('dp-job-modal').classList.contains('active')) openLoadDetails(pendingUpload.loadId);
+        loadCurrent();
+      }
+    } catch(e){ toast(e.message); }
+    pendingUpload = null;
+  };
+  reader.readAsDataURL(file);
+});
+
+// ---------------- Payments ----------------
+async function loadPayments(){
+  const list = document.getElementById('dp-payments-list');
+  list.innerHTML = '<div class="dp-empty">Loading…</div>';
+  try {
+    const data = await api('/api/driver/transactions');
+    PAYMENT_TXNS = data.transactions;
+    document.getElementById('pay-hero-total').textContent = money(data.summary.totalEarnings);
+    document.getElementById('pay-hero-stats').innerHTML =
+      '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg><div class="dp-pay-hero-stat-val">' + money(data.summary.paid) + '</div><div class="dp-pay-hero-stat-label">Paid</div></div>' +
+      '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><div class="dp-pay-hero-stat-val">' + money(data.summary.pending) + '</div><div class="dp-pay-hero-stat-label">Pending</div></div>' +
+      '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div class="dp-pay-hero-stat-val">' + data.summary.totalPaymentsReceived + '</div><div class="dp-pay-hero-stat-label">Loads Paid</div></div>';
+
+    renderChart();
+
+    if (!data.transactions.length){ list.innerHTML = '<div class="dp-empty">No payment records yet.</div>'; return; }
+    list.innerHTML = data.transactions.map(paymentRowHtml).join('');
+  } catch(e){ list.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+}
+function paymentRowHtml(t){
+  const paid = t.status === 'PAID';
+  return '<div class="dp-pay-row"><div class="dp-pay-row-top">' +
+    '<div class="dp-pay-icn ' + (paid?'paid':'pending') + '">' +
+    (paid ? '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>' : '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>') +
+    '</div><div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;"><span class="dp-pay-amount">' + money(t.amount) + '</span><span class="dp-badge ' + (paid?'st-delivered':'st-at-pickup') + '">' + t.status + '</span></div>' +
+    '<div class="dp-pay-meta">' + escapeHtml(t.loadNumber||t.loadId) + ' · ' + (t.paidDate||t.date||'—') + '</div></div></div>' +
+    (paid && t.accepted ? '<div class="dp-pay-confirmed"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>Confirmed by you' + (t.acceptedAt ? ' · ' + fmtDate(t.acceptedAt) : '') + '</div>' : '') +
+    (paid && !t.accepted ? '<button class="dp-pay-accept-btn" onclick="acceptPayment(\''+t.loadId+'\')">Accept Payment</button>' : '') +
+    '</div>';
+}
+async function acceptPayment(loadId){
+  try { await api('/api/driver/transactions/' + loadId + '/accept', {method:'POST'}); toast('Payment accepted'); loadPayments(); }
+  catch(e){ toast(e.message); }
+}
+function setPayChartPeriod(p){
+  currentPayPeriod = p;
+  document.querySelectorAll('[data-payperiod]').forEach(c=>c.classList.toggle('brand-active', c.dataset.payperiod===p));
+  renderChart();
+}
+// Client-side bucketing over already-fetched transactions — no new backend
+// endpoint required (Section 6 of the mapping report noted this can be
+// computed entirely on the frontend).
+function renderChart(){
+  const titleEl = document.getElementById('dp-chart-title');
+  const totalEl = document.getElementById('dp-chart-total');
+  const barsEl = document.getElementById('dp-chart-bars');
+  const now = new Date();
+  let buckets = [];
+  if (currentPayPeriod === 'weekly') {
+    titleEl.textContent = 'Weekly Earnings';
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    buckets = Array.from({length:7}, (_,i)=>{
+      const d = new Date(now); d.setDate(now.getDate() - (6-i));
+      return { label: days[d.getDay()], key: d.toISOString().slice(0,10), value: 0 };
+    });
+    PAYMENT_TXNS.filter(t=>t.status==='PAID').forEach(t=>{
+      const d = (t.paidDate||t.date||'').slice(0,10);
+      const b = buckets.find(x=>x.key===d);
+      if (b) b.value += t.amount;
+    });
+  } else if (currentPayPeriod === 'monthly') {
+    titleEl.textContent = 'Monthly Earnings';
+    buckets = Array.from({length:4}, (_,i)=>({ label:'Wk '+(i+1), value:0, from: null, to: null }));
+    const start = new Date(now); start.setDate(now.getDate() - 28);
+    PAYMENT_TXNS.filter(t=>t.status==='PAID').forEach(t=>{
+      const d = new Date(t.paidDate||t.date);
+      if (isNaN(d.getTime()) || d < start) return;
+      const idx = Math.min(3, Math.floor((d-start)/(7*86400000)));
+      buckets[idx].value += t.amount;
+    });
+  } else {
+    titleEl.textContent = 'Yearly Earnings';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    buckets = Array.from({length:12}, (_,i)=>{
+      const d = new Date(now.getFullYear(), now.getMonth()-11+i, 1);
+      return { label: months[d.getMonth()], key: d.getFullYear()+'-'+d.getMonth(), value: 0 };
+    });
+    PAYMENT_TXNS.filter(t=>t.status==='PAID').forEach(t=>{
+      const d = new Date(t.paidDate||t.date);
+      if (isNaN(d.getTime())) return;
+      const key = d.getFullYear()+'-'+d.getMonth();
+      const b = buckets.find(x=>x.key===key);
+      if (b) b.value += t.amount;
+    });
+  }
+  const max = Math.max(1, ...buckets.map(b=>b.value));
+  totalEl.textContent = money(buckets.reduce((s,b)=>s+b.value,0));
+  barsEl.innerHTML = buckets.map(b =>
+    '<div class="dp-chart-col"><div class="dp-chart-bar" style="height:' + Math.max(3, Math.round((b.value/max)*100)) + '%;" title="' + money(b.value) + '"></div><div class="dp-chart-label">' + b.label + '</div></div>'
+  ).join('');
+}
+
+// ---------------- Chat ----------------
+async function loadChats(){
+  const list = document.getElementById('dp-chat-list');
+  list.innerHTML = '<div class="dp-empty">Loading…</div>';
+  try {
+    const data = await api('/api/driver/chats');
+    updateChatNavBadge(data.chats.reduce((s, c) => s + (c.unreadCount || 0), 0));
+    if (!data.chats.length){ list.innerHTML = '<div class="dp-empty">No conversations yet.</div>'; return; }
+    list.innerHTML = data.chats.map(chatRowHtml).join('');
+  } catch(e){ list.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+}
+function roleLabel(type){ if (type==='admin') return 'Owner'; if (type==='dispatcher') return 'Dispatcher'; if (type==='driver') return 'Driver'; return 'Owner'; }
+function roleClass(type){ return 'dp-role-' + (type==='admin' ? 'admin' : (type||'driver')); }
+function chatRowHtml(c){
+  if (c.isGroup){
+    return '<button class="dp-chat-row" data-chattype="group" style="width:100%;text-align:left;border:1px solid var(--border-soft);" onclick="openThread(' + c.id + ', \'' + escapeHtml(c.groupName||'Group').replace(/'/g,"") + '\', true)">' +
+      '<div class="dp-chat-avatar dp-role-group"><svg style="width:19px;height:19px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div>' +
+      '<div class="dp-chat-body"><div class="dp-chat-name">' + escapeHtml(c.groupName||'Group Chat') + '</div>' +
+      '<div class="dp-chat-preview">' + escapeHtml(c.lastMessage||'No messages yet') + '</div></div>' +
+      (c.unreadCount ? '<div class="dp-chat-badge">' + c.unreadCount + '</div>' : '') + '</button>';
+  }
+  const label = roleLabel(c.with.type);
+  return '<button class="dp-chat-row" data-chattype="direct" style="width:100%;text-align:left;border:1px solid var(--border-soft);" onclick="openThread(' + c.id + ', \'' + label + '\', false)">' +
+    '<div class="dp-chat-avatar ' + roleClass(c.with.type) + '">' + initials(label) + '</div>' +
+    '<div class="dp-chat-body"><div class="dp-chat-name">' + label + '</div>' +
+    '<div class="dp-chat-preview">' + escapeHtml(c.lastMessage||'No messages yet') + '</div></div>' +
+    (c.unreadCount ? '<div class="dp-chat-badge">' + c.unreadCount + '</div>' : '') + '</button>';
+}
+
+function setChatFilter(type, btn) {
+  document.querySelectorAll('.chat-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.dp-chat-row').forEach(row => {
+    if (type === 'all') row.style.display = 'flex';
+    else if (type === 'group' && row.dataset.chattype === 'group') row.style.display = 'flex';
+    else if (type === 'direct' && row.dataset.chattype === 'direct') row.style.display = 'flex';
+    else row.style.display = 'none';
+  });
+}
+async function openThread(id, title, isGroup){
+  currentThreadId = id;
+  document.getElementById('dp-thread-title').textContent = title;
+  document.getElementById('dp-thread-avatar').className = 'dp-chat-avatar ' + (isGroup ? 'dp-role-group' : roleClass(title==='Owner'?'admin':'dispatcher'));
+  document.getElementById('dp-thread-avatar').textContent = isGroup ? 'GC' : initials(title);
+  document.getElementById('dp-thread').classList.add('active');
+  await loadThreadMessages();
+}
+function closeThread(){ document.getElementById('dp-thread').classList.remove('active'); currentThreadId = null; loadChats(); }
+async function loadThreadMessages(){
+  const box = document.getElementById('dp-thread-msgs');
+  box.innerHTML = '<div class="dp-empty">Loading…</div>';
+  try {
+    const data = await api('/api/driver/chats/' + currentThreadId + '/messages');
+    box.innerHTML = data.messages.map(msgHtml).join('') || '<div class="dp-empty">Say hello 👋</div>';
+    box.scrollTop = box.scrollHeight;
+  } catch(e){ box.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+}
+function roleColorVar(type){ if (type==='admin') return 'role-owner'; if (type==='dispatcher') return 'role-dispatcher'; if (type==='driver') return 'role-driver'; return 'role-admin'; }
+function msgHtml(m){
+  const mine = m.senderType === 'driver';
+  const cls = mine ? 'dp-msg-mine' : 'dp-msg-them';
+  const senderLine = !mine ? '<div class="dp-msg-sender" style="color:var(--' + roleColorVar(m.senderType) + ');">' + roleLabel(m.senderType) + (m.senderName?(' · '+escapeHtml(m.senderName)):'') + '</div>' : '';
+  return '<div class="dp-msg ' + cls + '">' + senderLine + escapeHtml(m.body) + '<div class="dp-msg-time">' + new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '</div></div>';
+}
+async function sendThreadMessage(){
+  const box = document.getElementById('dp-thread-input-box');
+  const text = box.value.trim();
+  if (!text || !currentThreadId) return;
+  box.value = '';
+  try { await api('/api/driver/chats/' + currentThreadId + '/messages', {method:'POST', body: JSON.stringify({body:text})}); await loadThreadMessages(); }
+  catch(e){ toast(e.message); }
+}
+
+// ---------------- Profile ----------------
+const PROFILE_DOC_LABELS = { cdl:'CDL', license:'Driver License', insurance:'Insurance', medicalCard:'Medical Card', registration:'Truck Registration' };
+const TRUCK_DOC_LABELS = { truckRegistration:'Registration', truckInsurance:'Insurance', truckInspection:'Inspection', truckIfta:'IFTA', truckPermits:'Permits' };
+function vaultBadge(doc){
+  if (!doc || !doc.hasFile) return '<span class="dp-vault-badge" style="background:rgba(255,255,255,.06);color:var(--muted);">Missing</span>';
+  if (doc.flag === 'EXPIRED') return '<span class="dp-vault-badge dp-vault-expired">Expired</span>';
+  if (doc.flag === 'EXPIRES_SOON') return '<span class="dp-vault-badge dp-vault-expiring">Expiring</span>';
+  return '<span class="dp-vault-badge dp-vault-valid">Valid</span>';
+}
+function vaultRow(label, key, doc, canEdit, isTruck){
+  return '<div class="dp-vault-row"><div class="dp-doc-icn ' + (doc&&doc.hasFile?'ready':'empty') + '" style="width:36px;height:36px;"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div>' +
+    '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;"><span class="dp-doc-name">' + label + '</span>' + vaultBadge(doc) + '</div>' +
+    '<div class="dp-doc-meta">' + (doc && doc.expiryDate ? fmtDate(doc.expiryDate) : 'On file') + '</div></div>' +
+    '<div style="display:flex;gap:6px;">' +
+    (doc && doc.hasFile ? '<button class="dp-btn-sm" onclick="viewProfileDoc(\''+key+'\')">View</button>' : '') +
+    (canEdit ? '<button class="dp-btn-sm primary" onclick="startUploadProfile(\''+key+'\')">' + (doc&&doc.hasFile?'Replace':'Upload') + '</button>' : '') +
+    (canEdit && isTruck && doc && doc.hasFile ? '<button class="dp-btn-sm" onclick="deleteProfileDoc(\''+key+'\')">Del</button>' : '') +
+    '</div></div>';
+}
+async function loadProfile(){
+  const el = document.getElementById('dp-profile-content');
+  el.innerHTML = '<div class="dp-empty">Loading…</div>';
+  try {
+    const [me, docs, truckRes] = await Promise.all([ api('/api/driver/me'), api('/api/driver/documents'), api('/api/driver/truck') ]);
+    const d = me.driver, docData = docs.documents, truck = truckRes.truck;
+
+    let h = '<div class="dp-card" style="padding:0;overflow:hidden;margin-bottom:16px;">' +
+      '<div class="dp-profile-head"><div class="dp-profile-avatar">' + initials(d.name) + '</div>' +
+      '<div><div class="dp-profile-name">' + escapeHtml(d.name) + '</div><div class="dp-profile-sub">' + escapeHtml(d.truck||'—') + ' · ' + escapeHtml(d.company||'') + '</div>' +
+      '<div class="dp-profile-verified"><svg style="width:12px;height:12px;color:var(--brand);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>' + (d.status||'Active') + ' Driver</div></div></div>';
+    h += '<div class="dp-info-block">';
+    h += '<div class="dp-info-row"><span class="k">Phone</span><span class="v">' + escapeHtml(d.phone||'—') + '</span></div>';
+    if (d.email) h += '<div class="dp-info-row"><span class="k">Email</span><span class="v">' + escapeHtml(d.email) + '</span></div>';
+    h += '<div class="dp-info-row"><span class="k">Company</span><span class="v">' + escapeHtml(d.company||'—') + '</span></div>';
+    h += '</div></div>';
+
+    const alerts = [];
+    PROFILE_DOC_KEYS_LIST().forEach(k=>{ const doc = docData[k]; if (doc && (doc.flag==='EXPIRED'||doc.flag==='EXPIRES_SOON')) alerts.push({label: (PROFILE_DOC_LABELS[k]||TRUCK_DOC_LABELS[k]||k), doc}); });
+    if (alerts.length){
+      h += '<div class="dp-alert-card dp-block"><div style="display:flex;gap:10px;">' +
+        '<div class="dp-doc-icn" style="background:var(--warning-soft);color:var(--warning);width:34px;height:34px;flex-shrink:0;"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>' +
+        '<div style="flex:1;"><div style="font-size:13px;font-weight:700;">' + alerts.length + ' document' + (alerts.length>1?'s':'') + ' need attention</div>' +
+        '<div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Renew soon to stay compliant.</div>' +
+        alerts.map(a=>'<div class="dp-alert-item"><span>' + a.label + '</span><span style="color:var(--warning);font-weight:700;">' + (a.doc.flag==='EXPIRED'?'Expired':'Expiring soon') + '</span></div>').join('') +
+        '</div></div></div>';
+    }
+
+    h += '<div class="dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>Document Vault</div></div>';
+    Object.keys(PROFILE_DOC_LABELS).forEach(k=>{ h += vaultRow(PROFILE_DOC_LABELS[k], k, docData[k], docs.canEdit, false); });
+    h += '</div>';
+
+    h += '<div class="dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>Truck Information</div>' +
+      (truckRes.canEdit ? '<button class="dp-btn-sm ghost" onclick="editTruckInfo()">Edit</button>' : '') + '</div>';
+    h += '<div class="dp-card"><div class="dp-info-row"><span class="k">Truck #</span><span class="v">' + escapeHtml(truck.number||'—') + '</span></div>' +
+      '<div class="dp-info-row"><span class="k">Make</span><span class="v">' + escapeHtml(truck.make||'—') + '</span></div>' +
+      '<div class="dp-info-row"><span class="k">Model</span><span class="v">' + escapeHtml(truck.model||'—') + '</span></div>' +
+      '<div class="dp-info-row"><span class="k">Year</span><span class="v">' + escapeHtml(truck.year||'—') + '</span></div>' +
+      '<div class="dp-info-row"><span class="k">VIN</span><span class="v" style="font-family:monospace;font-size:11px;">' + escapeHtml(truck.vin||'—') + '</span></div></div></div>';
+
+    h += '<div class="dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>Truck Documents</div></div>';
+    Object.keys(TRUCK_DOC_LABELS).forEach(k=>{ h += vaultRow(TRUCK_DOC_LABELS[k], k, docData[k], docs.canEdit, true); });
+    h += '</div>';
+
+    const photos = docData.truckPhotos || [];
+    h += '<div class="dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>Truck Gallery</div><span style="font-size:11px;color:var(--muted);">' + photos.length + ' photos</span></div>';
+    h += '<div class="dp-photo-grid">';
+    photos.forEach(p=>{
+      h += '<div class="dp-photo-thumb" onclick="viewProfileDoc(\'truckPhotos\','+p.index+')">' + escapeHtml(p.category||p.name||'Photo') +
+        (docs.canEdit ? '<button class="dp-photo-del" onclick="event.stopPropagation();deleteProfileDoc(\'truckPhotos\','+p.index+')">✕</button>' : '') + '</div>';
+    });
+    if (docs.canEdit && photos.length < 8) h += '<button class="dp-photo-add" onclick="startUploadProfile(\'truckPhotos\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add</button>';
+    h += '</div></div>';
+
+    h += '<button class="dp-logout-btn" onclick="logout()">Sign Out</button>';
+    el.innerHTML = h;
+  } catch(e){ el.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+}
+function PROFILE_DOC_KEYS_LIST(){ return Object.keys(PROFILE_DOC_LABELS).concat(Object.keys(TRUCK_DOC_LABELS)); }
+async function viewProfileDoc(key, index){
+  try { const data = await api('/api/driver/documents/file', {method:'POST', body: JSON.stringify({key, index})}); window.open(data.data, '_blank'); }
+  catch(e){ toast(e.message); }
+}
+function startUploadProfile(key, index){
+  pendingUpload = { profile:true, key, index: (index!==undefined ? index : null) };
+  if (key === 'truckPhotos') pendingUpload.category = prompt('Photo type (optional): Front View, Rear View, Left Side, Right Side, Interior, Trailer') || null;
+  document.getElementById('dp-file-input').click();
+}
+async function deleteProfileDoc(key, index){
+  if (!confirm('Delete this file?')) return;
+  try { await api('/api/driver/documents', {method:'DELETE', body: JSON.stringify({key, index})}); toast('Deleted'); loadProfile(); }
+  catch(e){ toast(e.message); }
+}
+function editTruckInfo(){
+  document.getElementById('dp-jd-num').textContent = 'Edit Truck Info';
+  document.getElementById('dp-jd-body').innerHTML =
+    '<div class="login-field"><label>Truck #</label><input id="ti-number"></div>' +
+    '<div class="login-field"><label>Make</label><input id="ti-make"></div>' +
+    '<div class="login-field"><label>Model</label><input id="ti-model"></div>' +
+    '<div class="login-field"><label>Year</label><input id="ti-year"></div>' +
+    '<div class="login-field"><label>VIN</label><input id="ti-vin"></div>' +
+    '<button class="dp-btn-sm primary" style="width:100%;padding:12px;margin-top:6px;" onclick="saveTruckInfo()">Save</button>';
+  api('/api/driver/truck').then(r=>{
+    document.getElementById('ti-number').value = r.truck.number||'';
+    document.getElementById('ti-make').value = r.truck.make||'';
+    document.getElementById('ti-model').value = r.truck.model||'';
+    document.getElementById('ti-year').value = r.truck.year||'';
+    document.getElementById('ti-vin').value = r.truck.vin||'';
+  });
+  document.getElementById('dp-job-modal').classList.add('active');
+}
+async function saveTruckInfo(){
+  try {
+    await api('/api/driver/truck', {method:'POST', body: JSON.stringify({
+      number: document.getElementById('ti-number').value.trim(),
+      make: document.getElementById('ti-make').value.trim(),
+      model: document.getElementById('ti-model').value.trim(),
+      year: document.getElementById('ti-year').value.trim(),
+      vin: document.getElementById('ti-vin').value.trim(),
+    })});
+    toast('Truck info saved'); closeModal('dp-job-modal'); loadProfile();
+  } catch(e){ toast(e.message); }
+}
+</script>
+</body>
+</html>

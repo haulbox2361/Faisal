@@ -1,0 +1,23 @@
+{
+  "name": "haulbox-backend",
+  "version": "1.0.0",
+  "description": "Backend for HaulBoX Dispatch Command — Google OAuth login, Gmail send/reply, Drive upload.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "google-auth-library": "^9.11.0",
+    "googleapis": "^140.0.1",
+    "dotenv": "^16.4.5",
+    "nodemailer": "^6.9.14",
+    "pg": "^8.12.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
