@@ -890,7 +890,7 @@ router.get('/api/driver/chats', async (req, res) => {
     res.json({ chats: convos });
   } catch (e) {
     console.error('driver chats fetch failed:', e);
-    res.status(500).json({ error: 'Failed to load chats' });
+    res.status(500).json({ error: 'Failed to load chats: ' + (e.message || String(e)) });
   }
 });
 
@@ -921,7 +921,7 @@ router.post('/api/driver/chats/start', async (req, res) => {
     res.json({ ok: true, conversationId: id });
   } catch (e) {
     console.error('driver chat start failed:', e);
-    res.status(500).json({ error: 'Failed to start chat' });
+    res.status(500).json({ error: 'Failed to start chat: ' + (e.message || String(e)) });
   }
 });
 
