@@ -920,6 +920,10 @@ table.data tbody td{padding:13px 13px;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 6l-10 7L2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="12" cy="12" r="0"/></svg>
         My Account
       </div>
+      <div class="nav-item" data-view="chat" id="nav-chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat <span class="badge" id="chat-sidebar-badge" style="display:none;margin-left:auto;background:var(--accent);color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;">0</span>
+      </div>
       <div class="nav-item" data-view="settings" data-role-view="admin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/></svg>
         Settings
@@ -1769,6 +1773,69 @@ table.data tbody td{padding:13px 13px;}
         </div>
       </section>
 
+      <!-- ============ DEDICATED CHAT ============ -->
+      <section class="view" id="view-chat" style="padding:0;">
+        <div class="dedicated-chat-layout" style="display:flex;height:calc(100vh - 70px);background:var(--bg-card);border-radius:12px;overflow:hidden;border:1px solid var(--border-soft);">
+          
+          <!-- LEFT PANEL -->
+          <div class="chat-sidebar-panel" style="width:340px;min-width:280px;border-right:1px solid var(--border-soft);display:flex;flex-direction:column;background:var(--bg-main);">
+            <div style="padding:16px;border-bottom:1px solid var(--border-soft);">
+              <h3 style="margin:0 0 12px;font-size:18px;font-weight:700;">💬 Messages</h3>
+              <div class="search-box" style="width:100%;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input id="main-chat-search" placeholder="Search conversations & contacts..." oninput="filterMainChatList()">
+              </div>
+              <div class="tab-row" style="margin-top:10px;margin-bottom:0;gap:4px;">
+                <button class="tab-btn active" id="chat-tab-all" onclick="setMainChatFilter('all')">All</button>
+                <button class="tab-btn" id="chat-tab-dispatchers" onclick="setMainChatFilter('dispatcher')">Dispatchers</button>
+                <button class="tab-btn" id="chat-tab-drivers" onclick="setMainChatFilter('driver')">Drivers</button>
+                <button class="tab-btn" id="chat-tab-groups" onclick="setMainChatFilter('group')">Groups</button>
+              </div>
+            </div>
+
+            <div style="flex:1;overflow-y:auto;padding:12px;">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-faint);margin-bottom:8px;">Start New Chat</div>
+              <div id="main-chat-contacts-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;"></div>
+
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-faint);margin-bottom:8px;">Recent Conversations</div>
+              <div id="main-chat-convos-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+            </div>
+          </div>
+
+          <!-- RIGHT PANEL -->
+          <div class="chat-main-panel" style="flex:1;display:flex;flex-direction:column;background:var(--bg-card);">
+            <div id="main-chat-header" style="padding:14px 20px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;background:var(--bg-main);">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div id="main-chat-avatar" class="avatar-circle" style="width:38px;height:38px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">?</div>
+                <div>
+                  <div id="main-chat-title" style="font-weight:700;font-size:15px;">Select a Conversation</div>
+                  <div id="main-chat-subtitle" style="font-size:12px;color:var(--text-faint);">Choose a contact from the left list to start messaging</div>
+                </div>
+              </div>
+              <div id="main-chat-header-actions" style="display:flex;align-items:center;gap:8px;"></div>
+            </div>
+
+            <!-- Messages Area -->
+            <div id="main-chat-body" style="flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+              <div class="chat-empty" style="margin:auto;color:var(--text-faint);text-align:center;">Select a conversation to start chatting.</div>
+            </div>
+
+            <!-- Input Area -->
+            <div id="main-chat-input-area" style="padding:14px 20px;border-top:1px solid var(--border-soft);background:var(--bg-main);display:none;flex-direction:column;gap:8px;">
+              <div id="main-chat-load-tag-bar" style="display:none;align-items:center;gap:8px;font-size:12px;background:var(--panel-hi);padding:4px 10px;border-radius:6px;width:fit-content;">
+                <span>Attached Load: <strong id="main-chat-load-tag-name"></strong></span>
+                <button type="button" style="background:none;border:none;color:var(--text-faint);cursor:pointer;" onclick="clearMainChatLoadTag()">✕</button>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <input id="main-chat-input" placeholder="Type a message..." style="flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border-soft);background:var(--bg-card);color:var(--text-main);" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMainChatMessage();}">
+                <button class="btn btn-accent" onclick="sendMainChatMessage()">Send</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
     </div>
   </div>
 </div>
@@ -2483,11 +2550,12 @@ function setTheme(t){
 }
 
 /* ---------------- Navigation ---------------- */
-const VIEW_TITLES = {dashboard:'Dashboard', addload:'Add Load', loadboard:'Load Board', drivers:'Drivers', driverpay:'Driver Pay', brokers:'Brokers', dispatchers:'Dispatchers', statistics:'Statistics', documents:'Documents', emaillogs:'Email Logs', myaccount:'My Account', settings:'Settings'};
+const VIEW_TITLES = {dashboard:'Dashboard', addload:'Add Load', loadboard:'Load Board', drivers:'Drivers', driverpay:'Driver Pay', brokers:'Brokers', dispatchers:'Dispatchers', statistics:'Statistics', documents:'Documents', emaillogs:'Email Logs', myaccount:'My Account', settings:'Settings', chat:'💬 Chat'};
 function switchView(view){
   if(view==='dispatchers' && STATE.role!=='admin'){ return toast('Admin only', 'Only Admin can manage dispatchers.'); }
   if(view==='driverpay' && STATE.role!=='admin'){ return toast('Admin only', 'Driver pay and settlements are visible to Admin only.'); }
   if(view==='myaccount' && STATE.role==='viewonly'){ return toast('Not available', 'Google account connections aren\'t available on a view-only link.'); }
+  if(view==='chat' && STATE.role==='viewonly'){ return toast('Not available', 'Chat is not available on a view-only link.'); }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+view).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===view));
@@ -2503,6 +2571,7 @@ function switchView(view){
   if(view==='emaillogs') renderEmailLogs();
   if(view==='myaccount') renderMyAccount();
   if(view==='settings') renderSettings();
+  if(view==='chat') loadMainChat();
   if(view==='addload') showLoadStep(1);
 }
 document.getElementById('mainnav').addEventListener('click', e=>{
@@ -5745,23 +5814,249 @@ async function sendChat(){
 function updateChatBadge(){
   const launcher = document.getElementById('chat-launcher');
   const badge = document.getElementById('chat-badge');
+  const sideBadge = document.getElementById('chat-sidebar-badge');
+  
+  let unread = chatConvs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
+  if(sideBadge) {
+    sideBadge.style.display = unread > 0 ? 'inline-block' : 'none';
+    sideBadge.textContent = unread > 99 ? '99+' : String(unread);
+  }
+
   if(!launcher || !badge) return;
   if(STATE.role==='viewonly'){ launcher.style.display='none'; return; }
   launcher.style.display='flex';
   
-  let unread = chatConvs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
   const panelOpen = document.getElementById('chat-panel').classList.contains('open');
   badge.style.display = (unread>0 && !panelOpen) ? 'flex' : 'none';
   badge.textContent = unread>9 ? '9+' : String(unread);
 }
 
+/* ================= DEDICATED MAIN CHAT PAGE ================= */
+let mainChatContacts = [];
+let currentMainConvoId = null;
+let currentMainFilter = 'all';
+let mainChatLoadTag = null;
+
+async function loadMainChat() {
+  if (STATE.role === 'viewonly') return;
+  await Promise.all([fetchChatConvs(), fetchMainChatContacts()]);
+  renderMainChatSidebar();
+  updateChatBadge();
+  if (currentMainConvoId) loadMainChatMessages();
+}
+
+async function fetchMainChatContacts() {
+  try {
+    const accountId = STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId);
+    const res = await fetch(`/api/chat/contacts?accountId=${encodeURIComponent(accountId)}&role=${encodeURIComponent(STATE.role)}`);
+    if (res.ok) {
+      const data = await res.json();
+      mainChatContacts = data.contacts || [];
+    }
+  } catch (e) { console.error('Failed to fetch contacts:', e); }
+}
+
+function setMainChatFilter(filter) {
+  currentMainFilter = filter;
+  ['all', 'dispatcher', 'driver', 'group'].forEach(f => {
+    const btn = document.getElementById('chat-tab-' + (f === 'group' ? 'groups' : f + 's'));
+    if (btn) btn.classList.toggle('active', f === filter);
+  });
+  const allBtn = document.getElementById('chat-tab-all');
+  if (allBtn && filter === 'all') allBtn.classList.add('active');
+  renderMainChatSidebar();
+}
+
+function renderMainChatSidebar() {
+  const searchQ = (document.getElementById('main-chat-search')?.value || '').toLowerCase();
+  const contactsContainer = document.getElementById('main-chat-contacts-list');
+  const convosContainer = document.getElementById('main-chat-convos-list');
+
+  // Filter contacts
+  const filteredContacts = mainChatContacts.filter(c => {
+    if (currentMainFilter === 'dispatcher' && c.type !== 'dispatcher') return false;
+    if (currentMainFilter === 'driver' && c.type !== 'driver') return false;
+    if (currentMainFilter === 'group' && c.type !== 'ops') return false;
+    if (searchQ && !c.name.toLowerCase().includes(searchQ)) return false;
+    return true;
+  });
+
+  if (contactsContainer) {
+    contactsContainer.innerHTML = filteredContacts.map(c => `
+      <div class="contact-row" onclick="startMainChat('${c.type}', '${c.id}', '${escapeChat(c.name)}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;background:var(--bg-card);border:1px solid var(--border-soft);">
+        <div class="avatar-circle" style="width:30px;height:30px;background:var(--panel-hi);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">${initials(c.name)}</div>
+        <div style="flex:1;overflow:hidden;">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeChat(c.name)}</div>
+          <div style="font-size:11px;color:var(--text-faint);">${c.role}</div>
+        </div>
+      </div>
+    `).join('') || '<div style="font-size:12px;color:var(--text-faint);padding:6px;">No contacts found</div>';
+  }
+
+  // Filter convos
+  const accountId = String(STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+  const filteredConvos = chatConvs.filter(c => {
+    let name = c.groupName;
+    if (!name) {
+      const other = (c.members || []).find(m => String(m.id) !== accountId);
+      name = other ? (other.name || other.id) : 'Chat';
+    }
+    if (searchQ && !name.toLowerCase().includes(searchQ)) return false;
+    return true;
+  });
+
+  if (convosContainer) {
+    convosContainer.innerHTML = filteredConvos.map(c => {
+      let name = c.groupName;
+      if (!name) {
+        const other = (c.members || []).find(m => String(m.id) !== accountId);
+        name = other ? (other.name || other.id) : 'Chat';
+      }
+      const isActive = String(c.id) === String(currentMainConvoId);
+      const unreadBadge = c.unreadCount ? `<span style="background:var(--accent);color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;margin-left:auto;">${c.unreadCount}</span>` : '';
+      return `
+        <div class="convo-row ${isActive ? 'active' : ''}" onclick="selectMainChat('${c.id}', '${escapeChat(name)}', ${c.isGroup})" style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;cursor:pointer;background:${isActive ? 'var(--panel-hi)' : 'var(--bg-card)'};border:1px solid var(--border-soft);">
+          <div class="avatar-circle" style="width:34px;height:34px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">${initials(name)}</div>
+          <div style="flex:1;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeChat(name)}</span>
+              ${unreadBadge}
+            </div>
+            <div style="font-size:12px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeChat(c.lastMessage || 'No messages')}</div>
+          </div>
+        </div>
+      `;
+    }).join('') || '<div style="font-size:12px;color:var(--text-faint);padding:6px;">No recent conversations</div>';
+  }
+}
+
+function filterMainChatList() {
+  renderMainChatSidebar();
+}
+
+async function startMainChat(type, id, name) {
+  const accountId = STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId);
+  try {
+    const res = await fetch('/api/chat/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId, role: STATE.role, withType: type, withId: id })
+    });
+    if (res.ok) {
+      const d = await res.json();
+      await fetchChatConvs();
+      selectMainChat(d.conversationId, name, type === 'ops');
+    }
+  } catch (e) { toast('Error', 'Failed to start chat'); }
+}
+
+async function selectMainChat(id, title, isGroup) {
+  currentMainConvoId = id;
+  document.getElementById('main-chat-title').textContent = title;
+  document.getElementById('main-chat-subtitle').textContent = isGroup ? 'Group Conversation' : 'Direct Conversation';
+  document.getElementById('main-chat-avatar').textContent = initials(title);
+  document.getElementById('main-chat-input-area').style.display = 'flex';
+  
+  renderMainChatSidebar();
+  await loadMainChatMessages();
+}
+
+async function loadMainChatMessages() {
+  if (!currentMainConvoId) return;
+  const accountId = String(STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+  const body = document.getElementById('main-chat-body');
+  try {
+    const res = await fetch(`/api/chat/conversations/${currentMainConvoId}/messages?accountId=${encodeURIComponent(accountId)}&role=${encodeURIComponent(STATE.role)}`);
+    if (res.ok) {
+      const d = await res.json();
+      const msgs = d.messages || [];
+      const wasAtBottom = body.scrollHeight - body.scrollTop <= body.clientHeight + 40;
+
+      body.innerHTML = msgs.length ? msgs.map(m => {
+        const isMine = String(m.senderId) === accountId;
+        const loadTagHtml = m.loadNumber ? `<div style="font-size:11px;background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:4px;margin-bottom:4px;display:inline-block;">📦 Load #${escapeChat(m.loadNumber)}</div>` : '';
+        return `
+          <div style="display:flex;flex-direction:column;align-items:${isMine ? 'flex-end' : 'flex-start'};">
+            <div style="font-size:11px;color:var(--text-faint);margin-bottom:2px;">${escapeChat(m.senderName || m.senderId)}</div>
+            <div style="background:${isMine ? 'var(--accent)' : 'var(--panel-hi)'};color:${isMine ? '#fff' : 'var(--text-main)'};padding:8px 12px;border-radius:12px;max-width:70%;font-size:14px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+              ${loadTagHtml}
+              <div>${escapeChat(m.body)}</div>
+            </div>
+            <div style="font-size:10px;color:var(--text-faint);margin-top:2px;">${new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+        `;
+      }).join('') : '<div class="chat-empty" style="margin:auto;color:var(--text-faint);">Say hello 👋</div>';
+
+      if (wasAtBottom) body.scrollTop = body.scrollHeight;
+    }
+  } catch (e) { console.error('Failed to load main chat messages:', e); }
+}
+
+async function sendMainChatMessage() {
+  const input = document.getElementById('main-chat-input');
+  const text = (input.value || '').trim();
+  if (!text || !currentMainConvoId) return;
+
+  const accountId = String(STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+  const senderName = STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'Dispatcher');
+
+  const payload = {
+    accountId,
+    role: STATE.role,
+    name: senderName,
+    body: text
+  };
+
+  if (mainChatLoadTag) {
+    payload.loadId = mainChatLoadTag.id;
+    payload.loadNumber = mainChatLoadTag.number;
+  }
+
+  input.value = '';
+  clearMainChatLoadTag();
+
+  try {
+    const res = await fetch(`/api/chat/conversations/${currentMainConvoId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      await loadMainChatMessages();
+      await fetchChatConvs();
+      renderMainChatSidebar();
+    }
+  } catch (e) { toast('Error', 'Failed to send message'); }
+}
+
+function attachLoadToChat(loadId, loadNumber) {
+  mainChatLoadTag = { id: loadId, number: loadNumber };
+  const bar = document.getElementById('main-chat-load-tag-bar');
+  const name = document.getElementById('main-chat-load-tag-name');
+  if (bar && name) {
+    name.textContent = '#' + loadNumber;
+    bar.style.display = 'flex';
+  }
+}
+
+function clearMainChatLoadTag() {
+  mainChatLoadTag = null;
+  const bar = document.getElementById('main-chat-load-tag-bar');
+  if (bar) bar.style.display = 'none';
+}
+
 setInterval(async () => {
   const panel = document.getElementById('chat-panel');
-  if(panel && !panel.classList.contains('open') && STATE.role !== 'viewonly') {
+  if(STATE.role !== 'viewonly') {
     await fetchChatConvs();
     updateChatBadge();
+    if (document.getElementById('view-chat')?.classList.contains('active')) {
+      renderMainChatSidebar();
+      if (currentMainConvoId) loadMainChatMessages();
+    }
   }
-}, 10000);
+}, 5000);
 
 /* ---- Live chat polling ----------------------------------------------
    STATE is loaded from the server once at page load, so without this a

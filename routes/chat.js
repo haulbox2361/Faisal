@@ -22,6 +22,8 @@ function requireParty(req, res) {
   return { type, id };
 }
 
+const kv = require('../lib/kvstore');
+
 // GET /api/chat/conversations?accountId=...&role=admin|dispatcher
 router.get('/api/chat/conversations', async (req, res) => {
   const me = requireParty(req, res);
@@ -35,15 +37,57 @@ router.get('/api/chat/conversations', async (req, res) => {
   }
 });
 
+// GET /api/chat/contacts?accountId=...&role=admin|dispatcher
+router.get('/api/chat/contacts', async (req, res) => {
+  const me = requireParty(req, res);
+  if (!me) return;
+  try {
+    const raw = await kv.get('haulline:state');
+    let state = {};
+    try { if (raw) state = JSON.parse(raw); } catch (e) {}
+    
+    const contacts = [];
+    if (me.type === 'admin') {
+      (state.dispatchers || []).forEach(d => {
+        contacts.push({ type: 'dispatcher', id: String(d.id), name: d.name || 'Dispatcher', role: 'Dispatcher' });
+      });
+      (state.drivers || []).forEach(d => {
+        contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
+        contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
+      });
+    } else {
+      contacts.push({ type: 'admin', id: 'admin', name: (state.settings && state.settings.companyName) ? 'Owner/Admin' : 'Admin', role: 'Owner' });
+      const assigned = (state.drivers || []).filter(d => String(d.dispatcherId) === String(me.id));
+      assigned.forEach(d => {
+        contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
+        contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
+      });
+    }
+    res.json({ contacts });
+  } catch (e) {
+    console.error('chat contacts failed:', e);
+    res.status(500).json({ error: 'Failed to load contacts' });
+  }
+});
+
 // POST /api/chat/start  { accountId, role, withType, withId }
-// e.g. Admin/Dispatcher starting a conversation with a given driver id.
 router.post('/api/chat/start', async (req, res) => {
   const me = requireParty(req, res);
   if (!me) return;
   const { withType, withId } = req.body || {};
   if (!withType || !withId) return res.status(400).json({ error: 'Missing withType/withId' });
   try {
-    const id = await chat.getOrCreateConversation(me, { type: withType, id: String(withId) });
+    let id;
+    if (withType === 'ops') {
+      const raw = await kv.get('haulline:state');
+      let state = {};
+      try { if (raw) state = JSON.parse(raw); } catch (e) {}
+      const driver = (state.drivers || []).find(d => String(d.id) === String(withId));
+      const disp = driver && driver.dispatcherId ? (state.dispatchers || []).find(d => String(d.id) === String(driver.dispatcherId)) : null;
+      id = await chat.getOrCreateOpsGroup(driver ? driver.id : withId, driver ? driver.name : 'Driver', driver ? driver.dispatcherId : null, disp ? disp.name : 'Dispatcher');
+    } else {
+      id = await chat.getOrCreateConversation(me, { type: withType, id: String(withId) });
+    }
     res.json({ ok: true, conversationId: id });
   } catch (e) {
     console.error('chat start failed:', e);
@@ -71,7 +115,7 @@ router.post('/api/chat/group', async (req, res) => {
 });
 
 // GET /api/chat/conversations/:id/messages?accountId=...&role=...
-router.get('/api/chat/conversations/:id/messages', async (req, res) => {
+async function getMessagesHandler(req, res) {
   const me = requireParty(req, res);
   if (!me) return;
   const conversationId = Number(req.params.id);
@@ -86,13 +130,15 @@ router.get('/api/chat/conversations/:id/messages', async (req, res) => {
     console.error('chat messages fetch failed:', e);
     res.status(500).json({ error: 'Failed to load messages' });
   }
-});
+}
+router.get('/api/chat/conversations/:id/messages', getMessagesHandler);
+router.get('/api/chat/messages/:id', getMessagesHandler);
 
-// POST /api/chat/conversations/:id/messages  { accountId, role, name, body }
-router.post('/api/chat/conversations/:id/messages', async (req, res) => {
+// POST /api/chat/conversations/:id/messages  { accountId, role, name, body, loadId, loadNumber }
+async function postMessageHandler(req, res) {
   const me = requireParty(req, res);
   if (!me) return;
-  const { name, body } = req.body || {};
+  const { name, body, loadId, loadNumber } = req.body || {};
   const text = String(body || '').trim();
   if (!text) return res.status(400).json({ error: 'Message cannot be empty' });
 
@@ -101,11 +147,28 @@ router.post('/api/chat/conversations/:id/messages', async (req, res) => {
     if (!(await chat.isParticipant(conversationId, me))) {
       return res.status(404).json({ error: 'Chat not found' });
     }
-    const sent = await chat.sendMessage(conversationId, { ...me, name }, text);
-    res.json({ ok: true, message: { id: sent.id, createdAt: sent.createdAt, senderType: me.type, senderId: me.id, body: text } });
+    const sent = await chat.sendMessage(conversationId, { ...me, name }, text, loadId, loadNumber);
+    res.json({ ok: true, message: { id: sent.id, createdAt: sent.createdAt, senderType: me.type, senderId: me.id, body: text, loadId, loadNumber } });
   } catch (e) {
     console.error('chat send failed:', e);
     res.status(500).json({ error: 'Failed to send message' });
+  }
+}
+router.post('/api/chat/conversations/:id/messages', postMessageHandler);
+router.post('/api/chat/messages/:id', postMessageHandler);
+
+// POST /api/chat/read/:id
+router.post('/api/chat/read/:id', async (req, res) => {
+  const me = requireParty(req, res);
+  if (!me) return;
+  const conversationId = Number(req.params.id);
+  try {
+    if (await chat.isParticipant(conversationId, me)) {
+      await chat.markConversationRead(conversationId, me);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.json({ ok: true });
   }
 });
 
