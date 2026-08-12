@@ -845,12 +845,16 @@ router.post('/api/driver/notifications/:id/read', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 function allowedContactsFor(driver) {
-  const configured = Array.isArray(driver.allowedContacts) ? driver.allowedContacts : null;
-  return configured && configured.length ? configured : [{ type: 'admin', id: 'admin' }];
+  const contacts = [{ type: 'admin', id: 'admin' }];
+  if (driver.dispatcherId) {
+    contacts.push({ type: 'dispatcher', id: String(driver.dispatcherId) });
+  }
+  contacts.push({ type: 'group', id: 'ops' });
+  return contacts;
 }
 
 function isAllowedContact(driver, party) {
-  return allowedContactsFor(driver).some((c) => c.type === party.type && c.id === party.id);
+  return allowedContactsFor(driver).some((c) => c.type === party.type && String(c.id) === String(party.id));
 }
 
 // GET /api/driver/chats/contacts — names/roles for the driver's allowed
@@ -861,11 +865,18 @@ router.get('/api/driver/chats/contacts', async (req, res) => {
   if (!ctx) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   const { state, driver } = ctx;
-  const contacts = allowedContactsFor(driver).map((c) => {
-    if (c.type === 'admin') return { type: 'admin', id: 'admin', name: (state.settings && state.settings.companyName) ? 'Owner/Admin' : 'Admin', role: 'Owner' };
-    const d = (state.dispatchers || []).find((x) => x.id === c.id);
-    return { type: 'dispatcher', id: c.id, name: (d && d.name) || 'Dispatcher', role: 'Dispatcher' };
-  });
+  const contacts = [];
+  
+  for (const c of allowedContactsFor(driver)) {
+    if (c.type === 'admin') {
+      contacts.push({ type: 'admin', id: 'admin', name: (state.settings && state.settings.companyName) ? 'Owner/Admin' : 'Admin', role: 'Owner' });
+    } else if (c.type === 'dispatcher') {
+      const d = (state.dispatchers || []).find((x) => String(x.id) === String(c.id));
+      if (d) contacts.push({ type: 'dispatcher', id: c.id, name: d.name || 'Dispatcher', role: 'Dispatcher' });
+    } else if (c.type === 'group' && c.id === 'ops') {
+      contacts.push({ type: 'group', id: 'ops', name: 'Operations Group', role: 'Group' });
+    }
+  }
   res.json({ contacts });
 });
 
@@ -890,12 +901,23 @@ router.post('/api/driver/chats/start', async (req, res) => {
   if (!ctx) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   const { withType, withId } = req.body || {};
-  const party = { type: withType, id: withId };
+  const party = { type: withType, id: String(withId) };
   if (!isAllowedContact(ctx.driver, party)) {
     return res.status(403).json({ error: 'You are not able to message this contact.' });
   }
   try {
-    const id = await chat.getOrCreateConversation({ type: 'driver', id: ctx.driver.id }, party);
+    let id;
+    if (withType === 'group' && String(withId) === 'ops') {
+      const { state, driver } = ctx;
+      let dispatcherName = null;
+      if (driver.dispatcherId) {
+        const disp = (state.dispatchers || []).find(d => String(d.id) === String(driver.dispatcherId));
+        dispatcherName = disp ? disp.name : 'Dispatcher';
+      }
+      id = await chat.getOrCreateOpsGroup(driver.id, driver.name, driver.dispatcherId, dispatcherName);
+    } else {
+      id = await chat.getOrCreateConversation({ type: 'driver', id: ctx.driver.id }, party);
+    }
     res.json({ ok: true, conversationId: id });
   } catch (e) {
     console.error('driver chat start failed:', e);
