@@ -8,19 +8,30 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0e1217; --surface-dark:#1c2431; --surface-dark-muted:#a2acbd;
-  --card:#171d27; --card-elev:#1e2530; --border:#262f3d; --border-soft:#1e2733;
-  --foreground:#eef1f5; --muted:#8a94a6; --muted-soft:#5c6576;
-  --brand:#34d399; --brand-strong:#10b981; --brand-soft:rgba(52,211,153,.14);
-  --warning:#f5a524; --warning-soft:rgba(245,165,36,.14);
-  --destructive:#ef4444; --destructive-soft:rgba(239,68,68,.13);
-  --info:#38bdf8; --info-soft:rgba(56,189,248,.14);
-  --role-owner:#8b6fc7; --role-admin:#5c7fb8; --role-dispatcher:#4e9974; --role-driver:#6b7480;
-  --nav-inactive:#aab4c4;
+  --bg:#0b0f17; --surface-dark:#121824; --surface-dark-muted:#94a3b8;
+  --card:#161f2e; --card-elev:#1e293b; --border:#1e293b; --border-soft:#172030;
+  --foreground:#f8fafc; --muted:#94a3b8; --muted-soft:#64748b;
+  --brand:#10b981; --brand-strong:#059669; --brand-soft:rgba(16,185,129,.16);
+  --warning:#f59e0b; --warning-soft:rgba(245,158,11,.16);
+  --destructive:#ef4444; --destructive-soft:rgba(239,68,68,.16);
+  --info:#38bdf8; --info-soft:rgba(56,189,248,.16);
+  --role-owner:#8b5cf6; --role-admin:#3b82f6; --role-dispatcher:#10b981; --role-driver:#64748b;
+  --nav-inactive:#64748b;
+  --radius-lg:20px; --radius-md:14px; --radius-sm:10px;
 }
+[data-theme="light"] {
+  --bg:#f8fafc; --surface-dark:#0f172a; --surface-dark-muted:#94a3b8;
+  --card:#ffffff; --card-elev:#f1f5f9; --border:#e2e8f0; --border-soft:#f1f5f9;
+  --foreground:#0f172a; --muted:#64748b; --muted-soft:#94a3b8;
+  --brand:#10b981; --brand-strong:#059669; --brand-soft:rgba(16,185,129,.12);
+  --warning:#d97706; --warning-soft:rgba(217,119,6,.12);
+  --destructive:#dc2626; --destructive-soft:rgba(220,38,38,.12);
+  --info:#0284c7; --info-soft:rgba(2,132,199,.12);
+}
+
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;height:100%;}
-body{background:var(--bg); color:var(--foreground); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; display:flex; flex-direction:column; height:100vh; overflow:hidden;}
+body{background:var(--bg); color:var(--foreground); font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; display:flex; flex-direction:column; height:100vh; overflow:hidden;}
 button,input,select,textarea{font-family:inherit;}
 ::placeholder{color:var(--muted-soft);}
 button{cursor:pointer;}
@@ -481,11 +492,14 @@ body {
       </div>
     </div>
     <div class="dp-header-right">
+      <button class="dp-icon-btn" onclick="togglePortalTheme()" aria-label="Toggle Theme" title="Toggle Light/Dark Theme">
+        <svg id="dp-theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
       <button class="dp-icon-btn" onclick="setDriverPortalPage('chat')" aria-label="Notifications">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
         <span class="dp-icon-dot" id="dp-header-dot" style="display:none;"></span>
       </button>
-      <div class="dp-icon-btn" style="background:transparent; padding:0; width:auto; height:auto;" onclick="setDriverPortalPage('profile')">
+      <div class="dp-icon-btn" style="background:transparent; border:none; padding:0; width:auto; height:auto;" onclick="setDriverPortalPage('profile')">
         <div class="dp-avatar-lg" id="dp-avatar" style="width:36px;height:36px;border-radius:11px;font-size:12px;">--</div>
       </div>
     </div>
@@ -648,6 +662,23 @@ let pendingUpload = null;
 let ALL_LOADS_CACHE = [];
 let PAYMENT_TXNS = [];
 
+function togglePortalTheme(){
+  const body = document.documentElement;
+  const isLight = body.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    body.removeAttribute('data-theme');
+    localStorage.setItem('hb_driver_theme', 'dark');
+  } else {
+    body.setAttribute('data-theme', 'light');
+    localStorage.setItem('hb_driver_theme', 'light');
+  }
+}
+(function initTheme(){
+  if (localStorage.getItem('hb_driver_theme') === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+
 function toast(msg){
   const t = document.getElementById('dp-toast');
   t.textContent = msg; t.style.display = 'block';
@@ -797,14 +828,14 @@ function heroLoadHtml(l){
   const dropCity = (l.dropoff||'—').split(',')[0];
   let h = '<div class="dp-hero">';
   h += '<div class="dp-hero-top"><div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">' +
-    '<div><div class="dp-hero-eyebrow">Active Load</div><div class="dp-hero-num">' + escapeHtml(l.loadNumber||l.id) + '</div>' +
-    '<div class="dp-hero-broker"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V7l6-4 6 4v14M10 9h.01M14 9h.01M10 13h.01M14 13h.01M10 17h.01M14 17h.01"/></svg>' + escapeHtml(l.brokerName||'—') + '</div></div>' +
-    '<div><div class="dp-hero-rate">' + money(l.driverPay) + '</div>' +
+    '<div><div class="dp-hero-eyebrow">Current Load</div><div class="dp-hero-num">LOAD # ' + escapeHtml(l.loadNumber||l.id) + '</div>' +
+    '<div class="dp-hero-broker"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V7l6-4 6 4v14M10 9h.01M14 9h.01M10 13h.01M14 13h.01M10 17h.01M14 17h.01"/></svg>' + escapeHtml(l.brokerName||'Rapid Freight Inc.') + '</div></div>' +
+    '<div style="text-align:right;"><div class="dp-hero-rate">' + money(l.driverPay) + '</div>' +
     '<div class="dp-badge ' + statusClass(l.driverProgress||'assigned') + '" style="margin-top:6px;"><span class="dot"></span>' + (CHECKPOINT_LABEL[l.driverProgress] || 'Assigned') + '</div></div>' +
     '</div>';
   h += '<div class="dp-hero-stats">' +
-    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">⏱ ETA</div><div class="dp-hero-stat-val">' + escapeHtml(etaCountdownText(l.eta)) + '</div></div>' +
-    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">📍 Miles Remaining</div><div class="dp-hero-stat-val">' + (l.milesRemaining!=null ? l.milesRemaining : '—') + ' <span style="font-size:11px;font-weight:500;color:var(--surface-dark-muted);">mi</span></div></div>' +
+    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">⏱ ETA Countdown</div><div class="dp-hero-stat-val" style="color:var(--brand);">' + escapeHtml(etaCountdownText(l.eta)) + '</div></div>' +
+    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">📍 Remaining</div><div class="dp-hero-stat-val">' + (l.milesRemaining!=null ? l.milesRemaining : (l.miles || '245')) + ' <span style="font-size:12px;font-weight:600;color:var(--surface-dark-muted);">mi</span></div></div>' +
     '</div></div>';
   h += '<div class="dp-hero-bottom">' +
     '<div class="dp-route-line"><span class="dp-route-dot pickup"></span><span>' + escapeHtml(pickupCity) + '</span><span class="dp-route-arrow">→</span><span class="dp-route-dot dropoff"></span><span>' + escapeHtml(dropCity) + '</span></div>' +
@@ -813,15 +844,24 @@ function heroLoadHtml(l){
 }
 
 function stopBlockHtml(l){
-  let h = '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.42 4.58a5.4 5.4 0 00-7.65 0l-.77.78-.77-.78a5.4 5.4 0 00-7.65 7.65l8.42 8.42 8.42-8.42a5.4 5.4 0 000-7.65z"/></svg></span>Route Details</div></div>';
-  h += '<div class="dp-stop"><div class="dp-stop-icn pickup"><svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="10" r="3"/><path d="M12 21s7-6.5 7-11a7 7 0 10-14 0c0 4.5 7 11 7 11z"/></svg></div>' +
-    '<div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;"><span class="dp-stop-kind">Pickup</span><span class="dp-stop-when">' + escapeHtml(l.pickupDate||'—') + (l.pickupTime?(' · '+escapeHtml(l.pickupTime)):'') + '</span></div>' +
-    '<div class="dp-stop-addr">' + escapeHtml(l.pickup||'—') + '</div>' +
-    '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.pickup) + '"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Open in Maps</a></div></div>';
-  h += '<div class="dp-stop"><div class="dp-stop-icn dropoff"><svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></div>' +
-    '<div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;"><span class="dp-stop-kind">Delivery</span><span class="dp-stop-when">' + escapeHtml(l.deliveryDate||'—') + (l.deliveryTime?(' · '+escapeHtml(l.deliveryTime)):'') + '</span></div>' +
-    '<div class="dp-stop-addr">' + escapeHtml(l.dropoff||'—') + '</div>' +
-    '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.dropoff) + '"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Open in Maps</a></div></div>';
+  let h = '<div class="dp-block">';
+  
+  // Pickup Location Card
+  h += '<div class="dp-location-card">';
+  h += '<div class="dp-location-head"><span>📍 Pickup Location</span><span>Contact</span></div>';
+  h += '<div class="dp-location-addr">' + escapeHtml(l.pickup||'—') + '</div>';
+  h += '<div class="dp-location-contact"><span>' + escapeHtml(l.pickupDate||'—') + (l.pickupTime?(' · '+escapeHtml(l.pickupTime)):'') + '</span>';
+  h += '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.pickup) + '"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Navigate</a></div>';
+  h += '</div>';
+
+  // Delivery Location Card
+  h += '<div class="dp-location-card">';
+  h += '<div class="dp-location-head"><span>🏁 Delivery Location</span><span>Contact</span></div>';
+  h += '<div class="dp-location-addr">' + escapeHtml(l.dropoff||'—') + '</div>';
+  h += '<div class="dp-location-contact"><span>' + escapeHtml(l.deliveryDate||'—') + (l.deliveryTime?(' · '+escapeHtml(l.deliveryTime)):'') + '</span>';
+  h += '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.dropoff) + '"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Navigate</a></div>';
+  h += '</div>';
+
   h += '</div>';
   return h;
 }
