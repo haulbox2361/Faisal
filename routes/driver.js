@@ -886,10 +886,8 @@ router.get('/api/driver/chats', async (req, res) => {
   if (!ctx) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   try {
-    const { getPool } = require('../lib/db');
-    const cols = await getPool().query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'conversations'`);
-    const colNames = cols.rows.map(r => r.column_name).join(', ');
-    throw new Error('Table conversations columns: ' + colNames);
+    const convos = await chat.listConversationsFor({ type: 'driver', id: ctx.driver.id });
+    res.json({ chats: convos });
   } catch (e) {
     console.error('driver chats fetch failed:', e);
     res.status(500).json({ error: 'Failed to load chats: ' + (e.message || String(e)) });
