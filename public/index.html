@@ -3397,33 +3397,81 @@ async function extractRcWithAI(file){
 // already typed by hand. Returns the list of field labels that were actually filled.
 function applyExtractedRcData(d){
   const filled = [];
-  const setIfEmpty = (id, val, label)=>{
+  const setIfEmpty = (id, val, label, confKey)=>{
     if(val===undefined || val===null || val==='') return;
     const el = document.getElementById(id);
     if(!el) return;
-    if((el.value||'').trim()==='' ){ el.value = val; filled.push(label); }
+    if((el.value||'').trim()===''){
+      el.value = val;
+      filled.push(label);
+      if (confScores && confScores[confKey]) {
+        const c = confScores[confKey];
+        if (c.score === 'Low') {
+          el.style.border = '2px solid var(--warning,#f59e0b)';
+          el.title = 'Low confidence extraction — please review!';
+        } else if (c.score === 'High') {
+          el.style.border = '1px solid var(--green,#10b981)';
+        }
+      }
+    }
   };
-  setIfEmpty('f-loadnumber', (d.load_number||'').trim(), 'Load #');
-  if(d.pickup_date){ setIfEmpty('f-pickupdate', d.pickup_date, 'Pickup date'); }
-  if(d.delivery_date){ setIfEmpty('f-deliverydate', d.delivery_date, 'Delivery date'); }
-  const pu = [d.pickup_city, d.pickup_state].filter(Boolean).join(', ');
-  const doo = [d.dropoff_city, d.dropoff_state].filter(Boolean).join(', ');
-  setIfEmpty('f-pickup', pu, 'Pickup location');
-  setIfEmpty('f-dropoff', doo, 'Drop-off location');
-  // Miles: prefer whatever the RC itself states. If the RC didn't have a miles figure,
-  // fall back to calculating driving distance between the pickup/drop-off cities below.
-  if(d.miles!=null && d.miles!==''){ setIfEmpty('f-miles', Math.round(Number(d.miles))||'', 'Miles'); }
-  if(d.rate!=null && d.rate!==''){ setIfEmpty('f-rate', Number(d.rate)||'', 'Rate'); }
-  if(d.notes){ setIfEmpty('f-notes', d.notes, 'Notes'); }
-  // Broker is left alone on purpose — the dispatcher picks/confirms that manually.
+
+  setIfEmpty('f-loadnumber', (d.load_number||'').trim(), 'Load #', 'load_number');
+  if(d.pickup_date){ setIfEmpty('f-pickupdate', d.pickup_date, 'Pickup date', 'pickup_date'); }
+  if(d.delivery_date){ setIfEmpty('f-deliverydate', d.delivery_date, 'Delivery date', 'delivery_date'); }
+  
+  const puParts = [d.pickup_address, d.pickup_city, d.pickup_state, d.pickup_zip].filter(Boolean);
+  const pu = puParts.length ? puParts.join(', ') : [d.pickup_city, d.pickup_state].filter(Boolean).join(', ');
+  const doParts = [d.delivery_address, d.delivery_city, d.delivery_state, d.delivery_zip].filter(Boolean);
+  const doo = doParts.length ? doParts.join(', ') : [d.dropoff_city, d.dropoff_state].filter(Boolean).join(', ');
+
+  setIfEmpty('f-pickup', pu, 'Pickup location', 'pickup');
+  setIfEmpty('f-dropoff', doo, 'Drop-off location', 'dropoff');
+
+  if(d.broker_mc && document.getElementById('f-brokermc')){
+    setIfEmpty('f-brokermc', d.broker_mc, 'Broker MC', 'broker_mc');
+  }
+
+  if(d.miles!=null && d.miles!==''){ setIfEmpty('f-miles', Math.round(Number(d.miles))||'', 'Miles', 'miles'); }
+  if(d.rate!=null && d.rate!==''){ setIfEmpty('f-rate', Number(d.rate)||'', 'Rate', 'rate'); }
+  if(d.notes){ setIfEmpty('f-notes', d.notes, 'Notes', 'notes'); }
+
   validateLoadDates();
   recalcRevenue();
-  // RC didn't give us miles — try calculating driving distance from the pickup/drop-off cities instead.
   if(!(document.getElementById('f-miles').value||'').trim()) calcMilesFromRoute();
   return filled;
 }
-// Shared call to whichever AI provider is configured (Claude by default, or Gemini via
-// an aistudio.google.com key) for any single-document-in, JSON-out extraction task.
+
+/**
+ * Calculates field confidence scores (High, Medium, Low) for extracted OCR data
+ */
+function computeFieldConfidence(data) {
+  if (!data) return {};
+  const scores = {};
+
+  const evalField = (key, val, validator) => {
+    if (val == null || val === '') {
+      scores[key] = { score: 'Low', pct: 30, text: 'Low Confidence (Missing)' };
+    } else if (validator && !validator(val)) {
+      scores[key] = { score: 'Medium', pct: 70, text: 'Medium Confidence (Review format)' };
+    } else {
+      scores[key] = { score: 'High', pct: 95, text: 'High Confidence' };
+    }
+  };
+
+  evalField('load_number', data.load_number, v => String(v).trim().length >= 3);
+  evalField('pickup_date', data.pickup_date, v => /^\d{4}-\d{2}-\d{2}$/.test(v));
+  evalField('delivery_date', data.delivery_date, v => /^\d{4}-\d{2}-\d{2}$/.test(v));
+  evalField('pickup', data.pickup_city || data.pickup_address, v => String(v).length > 2);
+  evalField('dropoff', data.delivery_city || data.dropoff_city || data.delivery_address, v => String(v).length > 2);
+  evalField('rate', data.rate, v => Number(v) > 0);
+  evalField('miles', data.miles, v => Number(v) > 0);
+  evalField('broker_mc', data.broker_mc, v => /^\d{4,8}$/.test(String(v).replace(/\D/g, '')));
+
+  return scores;
+}
+
+// Shared call to whichever AI provider is configured for single-document JSON extraction.
 async function callClaudeForDoc(base64, mediaType, isPdf, prompt, kind){
   const provider = ['gemini','ocrspace','mistral'].includes(STATE.settings.aiProvider) ? STATE.settings.aiProvider : 'claude';
   if(provider==='gemini') return callGeminiForDoc(base64, mediaType, isPdf, prompt);
@@ -3466,9 +3514,6 @@ async function callGeminiForDoc(base64, mediaType, isPdf, prompt){
   if(!key) throw new Error('No Google AI Studio API key set — add one in Settings → AI RC Extraction.');
   const model = (STATE.settings.aiGeminiModel||'').trim() || 'gemini-2.5-flash';
   const mime = isPdf ? 'application/pdf' : (mediaType || 'image/jpeg');
-  // Note: the key goes in the x-goog-api-key header, not a ?key= query param.
-  // Google's newer "AQ." auth-type keys are rejected by the ?key= param (401
-  // ACCESS_TOKEN_TYPE_UNSUPPORTED) — the header works for both AQ. and legacy AIza keys.
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
   const resp = await fetch(url, {
     method:'POST',
@@ -3514,10 +3559,6 @@ async function callMistralForDoc(base64, mediaType, isPdf, prompt){
   const clean = (typeof content==='string' ? content : JSON.stringify(content)).trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
   return JSON.parse(clean);
 }
-// Claude/Gemini paths, this can't just hand the document a prompt and get structured JSON
-// back. Instead it OCRs the file to raw text, then pattern-matches the fields out of that
-// text below. Meaningfully less reliable than the AI providers; every field should be
-// checked by the dispatcher before booking.
 async function callOcrSpaceForDoc(base64, mediaType, isPdf, kind){
   const key = (STATE.settings.aiOcrSpaceKey||'').trim();
   if(!key) throw new Error('No OCR.space API key set — add one in Settings → AI RC Extraction.');
@@ -3548,27 +3589,29 @@ async function callOcrSpaceForDoc(base64, mediaType, isPdf, kind){
   if(!text) throw new Error('OCR.space returned no readable text for this document');
   return kind==='address' ? extractAddressFieldsFromText(text) : extractRcFieldsFromText(text);
 }
-// Best-effort pattern matching over raw OCR text for the RC extraction fields.
 function extractRcFieldsFromText(text){
-  const out = { load_number:'', pickup_date:'', delivery_date:'', pickup_city:'', pickup_state:'', dropoff_city:'', dropoff_state:'', miles:null, rate:null, notes:'' };
+  const out = { load_number:'', broker_name:'', broker_mc:'', broker_phone:'', broker_email:'', pickup_address:'', pickup_city:'', pickup_state:'', pickup_zip:'', delivery_address:'', delivery_city:'', delivery_state:'', delivery_zip:'', pickup_date:'', delivery_date:'', miles:null, rate:null, notes:'' };
   const loadM = text.match(/(?:load|ref(?:erence)?|order|po)\s*#?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-]{2,})/i);
   if(loadM) out.load_number = loadM[1];
+  const mcM = text.match(/\b(?:mc|dot)\s*#?\s*[:\-]?\s*(\d{4,8})\b/i);
+  if(mcM) out.broker_mc = mcM[1];
+  const emailM = text.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i);
+  if(emailM) out.broker_email = emailM[0];
+  const phoneM = text.match(/\b(?:\+?1[-. ]?)?\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}\b/);
+  if(phoneM) out.broker_phone = phoneM[0];
+
   const dateMatches = [...text.matchAll(/\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/g)]
     .map(m=>normalizeOcrDate(m[1])).filter(Boolean);
   if(dateMatches[0]) out.pickup_date = dateMatches[0];
   if(dateMatches[1]) out.delivery_date = dateMatches[1];
-  const cityStateMatches = [...text.matchAll(/([A-Za-z][A-Za-z .]{1,24}),\s*([A-Z]{2})\b/g)];
-  if(cityStateMatches[0]){ out.pickup_city = cityStateMatches[0][1].trim(); out.pickup_state = cityStateMatches[0][2]; }
-  if(cityStateMatches[1]){ out.dropoff_city = cityStateMatches[1][1].trim(); out.dropoff_state = cityStateMatches[1][2]; }
+  const cityStateMatches = [...text.matchAll(/([A-Za-z][A-Za-z .]{1,24}),\s*([A-Z]{2})\s*(\d{5})?\b/g)];
+  if(cityStateMatches[0]){ out.pickup_city = cityStateMatches[0][1].trim(); out.pickup_state = cityStateMatches[0][2]; out.pickup_zip = cityStateMatches[0][3]||''; }
+  if(cityStateMatches[1]){ out.delivery_city = cityStateMatches[1][1].trim(); out.delivery_state = cityStateMatches[1][2]; out.delivery_zip = cityStateMatches[1][3]||''; out.dropoff_city = out.delivery_city; out.dropoff_state = out.delivery_state; }
   out.miles = extractMilesFromText(text);
   const rateM = text.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
   if(rateM) out.rate = parseFloat(rateM[1].replace(/,/g,''));
   return out;
 }
-// Miles is the field OCR text trips up on most, since RCs almost always print it as a
-// label followed by a bare number ("Miles: 453", "Total Miles   453") rather than a number
-// glued to a unit. Try the label-first pattern (most common) before falling back to a
-// number-immediately-before-"mi/miles" pattern.
 function extractMilesFromText(text){
   const labelFirst = text.match(/\b(?:total\s+|trip\s+|loaded\s+|billing\s+|est\.?\s+|estimated\s+)?(?:miles?|mileage|distance|dist)\b\s*[:\-]?\s*([\d,]+(?:\.\d+)?)/i);
   if(labelFirst) return parseFloat(labelFirst[1].replace(/,/g,''));
@@ -3576,10 +3619,13 @@ function extractMilesFromText(text){
   if(numFirst) return parseFloat(numFirst[1].replace(/,/g,''));
   return null;
 }
-// Best-effort pattern matching over raw OCR text for a single city/state (BOL/POD check).
 function extractAddressFieldsFromText(text){
-  const m = text.match(/([A-Za-z][A-Za-z .]{1,24}),\s*([A-Z]{2})\b/);
-  return { city: m ? m[1].trim() : '', state: m ? m[2] : '' };
+  const m = text.match(/([A-Za-z0-9 .]{3,40}),?\s*([A-Za-z][A-Za-z .]{1,24}),\s*([A-Z]{2})\s*(\d{5})?\b/);
+  if (m) {
+    return { street: m[1].trim(), city: m[2].trim(), state: m[3], zip: m[4] || '' };
+  }
+  const m2 = text.match(/([A-Za-z][A-Za-z .]{1,24}),\s*([A-Z]{2})\s*(\d{5})?\b/);
+  return { street: '', city: m2 ? m2[1].trim() : '', state: m2 ? m2[2] : '', zip: m2 ? m2[3] || '' : '' };
 }
 function normalizeOcrDate(s){
   const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
@@ -3588,8 +3634,6 @@ function normalizeOcrDate(s){
   if(y.length===2) y = (parseInt(y,10)<70 ? '20' : '19') + y;
   return y+'-'+a.padStart(2,'0')+'-'+b.padStart(2,'0');
 }
-// Reads a BOL or POD and pulls out the location shown on it, so it can be compared
-// against the load's pickup/drop-off. Best-effort only — errors are swallowed by the caller.
 async function verifyDocAddress(file, dataUrl, key){
   const isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name);
   const isImg = /^image\//.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name);
@@ -3599,7 +3643,7 @@ async function verifyDocAddress(file, dataUrl, key){
   const docLabel = key==='BOL' ? 'Bill of Lading' : 'Proof of Delivery';
   const whichLoc = key==='BOL' ? 'pickup/origin' : 'delivery/destination';
   const prompt = 'This is a freight '+docLabel+'. Return ONLY a raw JSON object (no markdown, no commentary) '+
-    'with exactly these keys: {"city":"","state":"2-letter US state code or empty"} for the '+whichLoc+' location shown on the document. '+
+    'with exactly these keys: {"street":"","city":"","state":"2-letter US state code","zip":""} for the '+whichLoc+' location shown on the document. '+
     'Leave a field empty if it cannot be found — never guess.';
   return await callClaudeForDoc(base64, mediaType, isPdf, prompt, 'address');
 }
@@ -3754,6 +3798,17 @@ function inDateRange(dateStr, from, to){
   if(to && d > new Date(to+'T23:59:59')) return false;
   return true;
 }
+function ocrStatusPlacard(l){
+  const ocr = l.ocrValidation || {};
+  if (ocr.adminApproved || (ocr.pickupMatch !== false && ocr.deliveryMatch !== false)) {
+    return '<span class="placard pl-green" style="font-size:10.5px;padding:2px 6px;" title="OCR verification passed"><span class="dot"></span>Processed</span>';
+  }
+  if (ocr.pickupMatch === false || ocr.deliveryMatch === false) {
+    return '<span class="placard pl-yellow" style="font-size:10.5px;padding:2px 6px;" title="Address mismatch detected"><span class="dot"></span>Needs Review</span>';
+  }
+  return '<span class="placard pl-gray" style="font-size:10.5px;padding:2px 6px;"><span class="dot"></span>Processed</span>';
+}
+
 function renderLoadBoard(){
   renderLoadBoardTabs();
   const q = (document.getElementById('loadboard-search').value||'').toLowerCase();
@@ -3779,7 +3834,7 @@ function renderLoadBoard(){
   body.innerHTML = rows.map(l=>
     '<tr onclick="openLoadModal(\''+l.id+'\')">'+
     '<td class="cell-mono cell-strong">'+l.loadNumber+'</td>'+
-    '<td>'+placard(l.status)+'</td>'+
+    '<td><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">'+placard(l.status)+ocrStatusPlacard(l)+'</div></td>'+
     (isAdmin? '<td data-role-view="admin">'+(paymentOf(l)? placard(paymentOf(l)) : '<span class="cell-dim">—</span>')+'</td>' : '<td data-role-view="admin" style="display:none;"></td>')+
     '<td>'+l.driverName+'</td>'+
     '<td>'+l.brokerName+'</td>'+
@@ -3861,6 +3916,85 @@ function renderModalTrackingSection(l){
   </div>`;
 }
 
+function renderSideBySideValidationPanel(l) {
+  const ocrVal = l.ocrValidation || {};
+  const isApproved = ocrVal.adminApproved;
+  const isPickupMatch = ocrVal.pickupMatch !== false;
+  const isDeliveryMatch = ocrVal.deliveryMatch !== false;
+
+  const puStatusBadge = isPickupMatch
+    ? '<span style="font-weight:700;color:var(--green,#10b981);">✅ Match</span>'
+    : '<span style="font-weight:700;color:var(--red,#ef4444);">⚠️ Pickup Address Mismatch</span>';
+
+  const doStatusBadge = isDeliveryMatch
+    ? '<span style="font-weight:700;color:var(--green,#10b981);">✅ Match</span>'
+    : '<span style="font-weight:700;color:var(--red,#ef4444);">⚠️ Delivery Address Mismatch</span>';
+
+  const overallBadge = isApproved
+    ? '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:12px;">✅ Admin Approved</span>'
+    : (isPickupMatch && isDeliveryMatch)
+    ? '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:12px;">✅ Processed</span>'
+    : '<span style="font-weight:700;color:var(--warning,#f59e0b);background:rgba(245,158,11,0.1);padding:3px 10px;border-radius:12px;">⚠️ Needs Review</span>';
+
+  const rcPu = l.pickup || '—';
+  const bolPu = (ocrVal.bolAddress && ocrVal.bolAddress.city) ? [ocrVal.bolAddress.street, ocrVal.bolAddress.city, ocrVal.bolAddress.state, ocrVal.bolAddress.zip].filter(Boolean).join(', ') : (l.docs && l.docs.BOL && l.docs.BOL.hasFile ? 'Uploaded (Awaiting verification)' : 'BOL Not Uploaded');
+
+  const rcDo = l.dropoff || '—';
+  const podDo = (ocrVal.podAddress && ocrVal.podAddress.city) ? [ocrVal.podAddress.street, ocrVal.podAddress.city, ocrVal.podAddress.state, ocrVal.podAddress.zip].filter(Boolean).join(', ') : (l.docs && l.docs.POD && l.docs.POD.hasFile ? 'Uploaded (Awaiting verification)' : 'POD Not Uploaded');
+
+  let h = `<div style="margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;font-size:13px;font-weight:700;">🔍 OCR Validation & Address Matching</h3>
+      <div>${overallBadge}</div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;">
+          <b>📍 Pickup Address Comparison</b>
+          <div>${puStatusBadge}</div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);">
+          <div style="margin-bottom:4px;"><b>RC Pickup:</b> ${escapeAttr(rcPu)}</div>
+          <div><b>BOL Pickup:</b> ${escapeAttr(bolPu)}</div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg-card);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;">
+          <b>🏁 Delivery Address Comparison</b>
+          <div>${doStatusBadge}</div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);">
+          <div style="margin-bottom:4px;"><b>RC Delivery:</b> ${escapeAttr(rcDo)}</div>
+          <div><b>POD Delivery:</b> ${escapeAttr(podDo)}</div>
+        </div>
+      </div>
+    </div>`;
+
+  if (STATE.role === 'admin' && (!isPickupMatch || !isDeliveryMatch) && !isApproved) {
+    h += `<div style="display:flex;justify-content:flex-end;">
+      <button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:700;" onclick="approveOcrMismatch('${l.id}')">Approve & Override Mismatch</button>
+    </div>`;
+  }
+
+  h += `</div>`;
+  return h;
+}
+
+function approveOcrMismatch(loadId) {
+  const l = STATE.loads.find(x => x.id === loadId);
+  if (!l) return;
+  if (!l.ocrValidation) l.ocrValidation = {};
+  l.ocrValidation.adminApproved = true;
+  l.ocrValidation.approvedBy = STATE.currentUser ? STATE.currentUser.name : 'Admin';
+  l.ocrValidation.approvedAt = new Date().toISOString();
+  persist();
+  toast('OCR Mismatch Approved', 'Admin manually approved address match for Load #' + l.loadNumber);
+  openLoadModal(loadId);
+  renderLoadBoard();
+}
+
 function openLoadModal(id){
   const l = STATE.loads.find(x=>x.id===id);
   if(!l) return;
@@ -3923,6 +4057,7 @@ function openLoadModal(id){
   document.getElementById('load-modal-body').innerHTML = `
     ${renderModalTimelineHtml(l)}
     ${renderModalTrackingSection(l)}
+    ${renderSideBySideValidationPanel(l)}
     <div class="form-grid" style="margin-bottom:6px;">
       <div class="field"><label>Status</label><div style="padding-top:4px;">${placard(l.status)} <span class="hint" style="display:block;margin-top:5px;">${nextHint}</span></div></div>
       <div class="field"><label>Dispatcher</label><input value="${l.dispatcherName||'—'}" readonly></div>
@@ -4058,6 +4193,8 @@ async function handleDocUpload(loadId, key, input){
 
   // BOL should reflect the load's pickup address, POD the drop-off address — check with AI
   // where possible. This never blocks the upload; it's just a heads-up either way.
+  if (!l.ocrValidation) l.ocrValidation = { pickupMatch: true, deliveryMatch: true, adminApproved: false };
+
   let addressNote = '';
   if((key==='BOL' || key==='POD') && dataUrl){
     const against = key==='BOL' ? l.pickup : l.dropoff;
@@ -4065,14 +4202,25 @@ async function handleDocUpload(loadId, key, input){
     try{
       const result = await verifyDocAddress(file, dataUrl, key);
       if(result && (result.city || result.state)){
-        const found = [result.city, result.state].filter(Boolean).join(', ');
+        const found = [result.street, result.city, result.state, result.zip].filter(Boolean).join(', ');
         const norm = s => (s||'').toLowerCase().replace(/[^a-z]/g,'');
         const isMatch = against && (norm(against).includes(norm(result.city)) || norm(against).includes(norm(result.state)));
+
+        if (key === 'BOL') {
+          l.ocrValidation.bolAddress = result;
+          l.ocrValidation.pickupMatch = isMatch;
+        } else {
+          l.ocrValidation.podAddress = result;
+          l.ocrValidation.deliveryMatch = isMatch;
+        }
+
         addressNote = isMatch
           ? ' — address checks out against the load\'s '+label+' ('+against+').'
-          : ' — heads up: this document shows "'+found+'", but the load\'s '+label+' is "'+(against||'not set')+'". Accepted anyway — please double-check.';
+          : ' — heads up: document shows "'+found+'", but load '+label+' is "'+(against||'not set')+'".';
       }
-    } catch(err){ /* verification is best-effort only; never blocks the upload */ }
+    } catch(err){
+      console.warn('OCR verification note:', err.message);
+    }
   }
 
   l.docs[key] = rec;
