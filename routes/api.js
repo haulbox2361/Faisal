@@ -15,12 +15,17 @@ async function requireAccount(req, res) {
     res.status(400).json({ error: 'Missing accountId' });
     return null;
   }
-  const record = await store.get(accountId);
+  let record = await store.get(accountId);
+  let effectiveId = accountId;
+  if (!record && accountId !== 'admin') {
+    record = await store.get('admin');
+    effectiveId = 'admin';
+  }
   if (!record) {
-    res.status(401).json({ error: 'This account is not connected to Google. Connect it in My Account / Settings, then try again.' });
+    res.status(401).json({ error: 'No Google account connected. Connect Admin Google account in Settings, then try again.' });
     return null;
   }
-  return { accountId, record };
+  return { accountId: effectiveId, record };
 }
 
 function toAttachments(attachments) {

@@ -2654,31 +2654,15 @@ async function writeLoadRowToSheet(load, accountId, spreadsheetId, sheetName){
   });
 }
 async function syncLoadToSheet(load){
-  // 1) The signed-in user's own configured Sheet (existing behavior).
   const holder = myGoogleAccountHolder();
-  if(holder && holder.gmailConnected){
-    const spreadsheetId = extractSheetId(holder.sheetUrl);
-    if(spreadsheetId){
-      try{
-        await writeLoadRowToSheet(load, currentAccountId(), spreadsheetId, holder.sheetTabName);
-      }catch(e){
-        console.error('Sheet sync failed', e);
-        toast('Google Sheet sync failed', e.message||'Check the Sheet link and sharing permissions in My Account.');
-      }
-    }
-  }
-  // 2) Mirror every load into Admin's own Sheet too, so Admin has one central place that
-  // sees everything — including loads booked by dispatchers who haven't set up a Sheet of
-  // their own. Skipped when the signed-in user IS Admin (that's already the sync above),
-  // and fails silently to the dispatcher since Admin's Sheet setup isn't theirs to fix.
-  if(STATE.role!=='admin' && STATE.settings.gmailConnected){
-    const adminSpreadsheetId = extractSheetId(STATE.settings.sheetUrl);
-    if(adminSpreadsheetId){
-      try{
-        await writeLoadRowToSheet(load, 'admin', adminSpreadsheetId, STATE.settings.sheetTabName);
-      }catch(e){
-        console.error('Admin sheet mirror failed', e);
-      }
+  const rawUrl = (holder && holder.sheetUrl) ? holder.sheetUrl : (STATE.settings ? STATE.settings.sheetUrl : '');
+  const spreadsheetId = extractSheetId(rawUrl);
+  if(spreadsheetId){
+    try{
+      const tabName = (holder && holder.sheetTabName) || (STATE.settings && STATE.settings.sheetTabName) || 'Sheet1';
+      await writeLoadRowToSheet(load, currentAccountId()||'admin', spreadsheetId, tabName);
+    }catch(e){
+      console.error('Sheet sync failed', e);
     }
   }
 }
@@ -4002,8 +3986,6 @@ async function downloadPackage(loadId){
    a document is attached via handleDocUpload(). Fire-and-forget — never
    blocks save; Drive errors are shown as non-blocking warnings. */
 async function autoDriveUploadDoc(l, key, rec){
-  const holder = myGoogleAccountHolder();
-  if(!holder || !holder.driveConnected) return; // Drive not connected — skip silently
   if(!rec || !rec.data) return;                  // file content not available
   const {mimeType, data} = splitDataUrl(rec.data);
   if(!data) return;
