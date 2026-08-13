@@ -1454,19 +1454,26 @@ table.data tbody td{padding:13px 13px;}
 
       <!-- ============ DRIVERS ============ -->
       <section class="view" id="view-drivers">
-        <div class="toolbar">
-          <div></div>
+        <div class="toolbar" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:18px;font-weight:700;color:#0f172a;">Fleet Drivers</div>
           <div class="toolbar-right">
-            <button class="btn btn-accent" onclick="openDriverModal()" data-role-view="admin">
+            <button class="btn btn-accent" onclick="openDriverModal()" data-role-view="admin" style="background:#2563eb;color:#fff;font-weight:700;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
               Add Driver
             </button>
           </div>
         </div>
-        <div class="panel">
+        <div class="panel" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);">
           <div class="table-wrap">
             <table class="data">
-              <thead><tr><th>Driver</th><th>Company</th><th>Fee %</th><th data-role-view="admin">Driver Pay %</th><th>Status</th><th>Availability</th><th></th></tr></thead>
+              <thead><tr>
+                <th style="padding:12px 16px;">Driver Name</th>
+                <th style="padding:12px 16px;">Truck #</th>
+                <th style="padding:12px 16px;">Phone #</th>
+                <th style="padding:12px 16px;">Company</th>
+                <th style="padding:12px 16px;">Status</th>
+                <th style="padding:12px 16px;">Availability</th>
+              </tr></thead>
               <tbody id="drivers-body"></tbody>
             </table>
           </div>
@@ -5088,21 +5095,17 @@ function downloadStoredFile(rec){
 
 /* ================= DRIVERS ================= */
 function renderDrivers(){
-  const isAdmin = STATE.role==='admin';
-  document.getElementById('drivers-body').innerHTML = visibleDrivers().map(d=>
-    '<tr onclick="openDriverContactPopup(\''+d.id+'\')" style="cursor:pointer;">'+
-    '<td class="cell-strong">'+d.name+'</td><td>'+d.company+'</td><td class="cell-mono">'+d.feePct+'%</td>'+
-    (isAdmin ? '<td class="cell-mono" style="color:var(--yellow);" data-role-view="admin">'+(d.payPct!=null? d.payPct : defaultDriverPayPct())+'%</td>' : '<td data-role-view="admin" style="display:none;"></td>')+
-    '<td>'+(d.active? '<span class="placard pl-green"><span class="dot"></span>Active</span>' : '<span class="placard pl-gray"><span class="dot"></span>Inactive</span>')+'</td>'+
-    '<td>'+availabilityBadge(d.id)+'</td>'+
-    '<td onclick="event.stopPropagation()"><div class="row-actions">'+
-    (isAdmin ? (
-    '<button class="icon-mini" onclick="openDriverModal(\''+d.id+'\')" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>'+
-    '<button class="icon-mini" onclick="toggleDriverActive(\''+d.id+'\')" title="'+(d.active?'Deactivate':'Activate')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg></button>'
-    ) : (
-    '<button class="icon-mini" onclick="openDriverModal(\''+d.id+'\')" title="View driver details &amp; documents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>'
-    ))+
-    '</div></td></tr>'
+  const body = document.getElementById('drivers-body');
+  if(!body) return;
+  body.innerHTML = visibleDrivers().map(d=>
+    '<tr onclick="openDriverModal(\''+d.id+'\')" style="cursor:pointer;">'+
+    '<td class="cell-strong" style="padding:12px 16px;font-weight:700;color:#0f172a;">'+escapeAttr(d.name)+'</td>'+
+    '<td style="padding:12px 16px;font-weight:600;color:#334155;">'+escapeAttr(d.truck||'—')+'</td>'+
+    '<td style="padding:12px 16px;font-weight:600;color:#334155;">'+escapeAttr(d.phone||'—')+'</td>'+
+    '<td style="padding:12px 16px;color:#64748b;">'+escapeAttr(d.company||'—')+'</td>'+
+    '<td style="padding:12px 16px;">'+(d.active? '<span class="placard pl-green"><span class="dot"></span>Active</span>' : '<span class="placard pl-gray"><span class="dot"></span>Inactive</span>')+'</td>'+
+    '<td style="padding:12px 16px;">'+availabilityBadge(d.id)+'</td>'+
+    '</tr>'
   ).join('');
 }
 // Small popup for a driver row's contact details (Truck #, Phone, Email) —
