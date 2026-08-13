@@ -4725,25 +4725,19 @@ async function callMistralForDoc(base64, mediaType, isPdf, prompt){
   if(!key) throw new Error('No Mistral AI API key set — add one in Settings → AI RC Extraction.');
   let model = (STATE.settings.aiMistralModel||'').trim();
   if(!model || model==='mistral-small-latest' || model==='mistral-tiny' || model==='mistral-medium'){
-    model = 'pixtral-12b-2409'; // Automatically upgrade text-only model to vision-capable Pixtral
+    model = 'pixtral-12b-2409';
   }
-  const dataUrl = 'data:'+(mediaType||'image/jpeg')+';base64,'+base64;
-  const imageBlock = { type:'image_url', image_url: { url: dataUrl } };
-  const resp = await fetch('https://api.mistral.ai/v1/chat/completions', {
+  const resp = await fetch('/api/ai/mistral-extract', {
     method:'POST',
-    headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+key},
-    body: JSON.stringify({
-      model: model,
-      messages:[{ role:'user', content:[ { type:'text', text: prompt }, imageBlock ] }],
-      response_format: { type:'json_object' }
-    })
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ apiKey: key, model, prompt, base64, mediaType, isPdf })
   });
+  let data = {};
+  try { data = await resp.json(); } catch(e){}
   if(!resp.ok){
-    const errText = await resp.text().catch(()=> '');
-    throw new Error('Mistral API error '+resp.status+(errText? ': '+errText.slice(0,200) : ''));
+    throw new Error(data.error || ('Mistral API error ' + resp.status));
   }
-  const data = await resp.json();
-  const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  const content = data.content;
   if(!content) throw new Error('No response text from Mistral');
   const clean = (typeof content==='string' ? content : JSON.stringify(content)).trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
   return JSON.parse(clean);

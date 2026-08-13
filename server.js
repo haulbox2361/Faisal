@@ -8,6 +8,7 @@ const storageRoutes = require('./routes/storage');
 const driverRoutes = require('./routes/driver');
 const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
+const mistralRoutes = require('./routes/mistral');
 const { ensureSchema } = require('./lib/db');
 
 // The ONLY Google account allowed to sign in as Admin. Everyone else who
@@ -26,6 +27,7 @@ app.use(storageRoutes);
 app.use(driverRoutes);
 app.use(chatRoutes);
 app.use(notificationRoutes);
+app.use(mistralRoutes);
 
 // Frontend fetches this on load to know which Google account is allowed to
 // become Admin — kept server-side so it can't be tampered with client-side.
