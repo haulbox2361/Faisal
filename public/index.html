@@ -2669,16 +2669,17 @@ async function syncLoadToSheet(load){
 async function testSheetSync(){
   const statusEl = document.getElementById('my-sheet-status');
   const holder = myGoogleAccountHolder();
-  if(!holder || !holder.gmailConnected){ if(statusEl) statusEl.textContent = 'Connect your Google account above first — Sheets sync uses that same connection.'; return; }
-  const spreadsheetId = extractSheetId(holder.sheetUrl);
+  const rawUrl = (holder && holder.sheetUrl) ? holder.sheetUrl : (STATE.settings ? STATE.settings.sheetUrl : '');
+  const spreadsheetId = extractSheetId(rawUrl);
   if(!spreadsheetId){ if(statusEl) statusEl.textContent = 'Paste a valid Google Sheet link above first.'; return; }
-  const accountId = currentAccountId();
+  const accountId = currentAccountId() || 'admin';
   if(statusEl) statusEl.textContent = 'Testing…';
-  const testLoad = STATE.loads[0] || {systemDate: new Date().toLocaleDateString('en-US'), loadNumber:'TEST-'+Date.now(), brokerName:'Test Broker', brokerMC:'000000', driverName:'Test Driver', pickup:'Test Pickup, TX', dropoff:'Test Dropoff, IL', pickupDate:'', deliveryDate:'', brokerRate:0, dispatcherName: STATE.currentUser?STATE.currentUser.name:'Test Dispatcher'};
+  const testLoad = STATE.loads[0] || {systemDate: new Date().toISOString().slice(0,10), loadNumber:'TEST-'+Date.now(), brokerName:'Test Broker', brokerMC:'000000', driverName:'Test Driver', pickup:'Test Pickup, TX', dropoff:'Test Dropoff, IL', pickupDate:'', deliveryDate:'', brokerRate:0, dispatcherName: STATE.currentUser?STATE.currentUser.name:'Test Dispatcher'};
   try{
-    await writeLoadRowToSheet(testLoad, accountId, spreadsheetId, holder.sheetTabName);
-    if(statusEl) statusEl.textContent = '✓ Synced successfully — check your Sheet.';
-    toast('Sheet sync test passed', 'Row written successfully.', true);
+    const tabName = (holder && holder.sheetTabName) || (STATE.settings && STATE.settings.sheetTabName) || 'Sheet1';
+    const res = await writeLoadRowToSheet(testLoad, accountId, spreadsheetId, tabName);
+    if(statusEl) statusEl.textContent = '✓ Synced successfully' + (res.sheetTab ? ' (tab: '+res.sheetTab+')' : '') + ' — check your Sheet.';
+    toast('Sheet sync test passed', 'Row written successfully to Google Sheet.', true);
   }catch(e){
     if(statusEl) statusEl.textContent = '✗ '+(e.message||'Sync failed');
     toast('Sheet sync test failed', e.message||'Check the Sheet link and sharing permissions.');

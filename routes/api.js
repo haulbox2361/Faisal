@@ -508,13 +508,6 @@ router.post('/api/drive/archive', async (req, res) => {
 });
 
 // POST /api/sheet-sync  { accountId, spreadsheetId, sheetName, row }
-// Keeps a shared Google Sheet live-updated with load data. row[1] is the
-// Load # (column B — see SHEET_KEY_INDEX in the frontend) — used as the key
-// to find and update an existing row instead of creating a duplicate every
-// time a load's status changes. If no matching row exists yet, appends a new
-// one. Requires the connected account to have Editor access on the target
-// Sheet — sharing is done by the user directly in Google Sheets, not through
-// this app.
 router.post('/api/sheet-sync', async (req, res) => {
   const ctx = await requireAccount(req, res);
   if (!ctx) return;
@@ -522,41 +515,84 @@ router.post('/api/sheet-sync', async (req, res) => {
   if (!spreadsheetId) return res.status(400).json({ error: 'Missing spreadsheetId' });
   if (!Array.isArray(row) || !row.length) return res.status(400).json({ error: 'Missing row data' });
 
-  const tab = (sheetName || 'Sheet1').trim() || 'Sheet1';
-  const KEY_COLUMN = 'B'; // Load Number column — must match SHEET_KEY_INDEX (1) in the frontend's buildSheetRow()
-  const key = String(row[1] || '').trim();
-
   try {
     const auth = clientForAccount(ctx.record, store, ctx.accountId);
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Look for an existing row with this Load # in the key column.
-    const { data: existing } = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${tab}!${KEY_COLUMN}:${KEY_COLUMN}`,
-    });
-    const colB = existing.values || [];
-    let rowNumber = -1; // 1-indexed sheet row
-    for (let i = 0; i < colB.length; i++) {
-      if (String((colB[i] || [])[0] || '').trim() === key) { rowNumber = i + 1; break; }
+    // Determine the actual tab title to use in Google Sheets ranges
+    let actualTabName = (sheetName || '').trim();
+    if (!actualTabName) {
+      try {
+        const { data: meta } = await sheets.spreadsheets.get({ spreadsheetId });
+        if (meta.sheets && meta.sheets.length > 0 && meta.sheets[0].properties) {
+          actualTabName = meta.sheets[0].properties.title;
+        }
+      } catch (metaErr) {
+        console.warn('Could not fetch spreadsheet metadata:', metaErr.message);
+      }
+    }
+    if (!actualTabName) actualTabName = 'Sheet1';
+
+    // Quote the tab name for Sheets API range safety
+    const safeTab = `'${actualTabName.replace(/'/g, "''")}'`;
+    const KEY_COLUMN = 'B';
+    const key = String(row[1] || '').trim();
+
+    // Look for an existing row with this Load # in the key column (Column B)
+    let colB = [];
+    try {
+      const { data: existing } = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${safeTab}!${KEY_COLUMN}:${KEY_COLUMN}`,
+      });
+      colB = existing.values || [];
+    } catch (rangeErr) {
+      console.warn(`Values get failed for range ${safeTab}!B:B, attempting sheet tab fallback:`, rangeErr.message);
+      // Fallback: try reading first tab directly
+      try {
+        const { data: meta } = await sheets.spreadsheets.get({ spreadsheetId });
+        if (meta.sheets && meta.sheets.length > 0 && meta.sheets[0].properties) {
+          const fallbackTab = `'${meta.sheets[0].properties.title.replace(/'/g, "''")}'`;
+          const { data: fallbackExisting } = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: `${fallbackTab}!${KEY_COLUMN}:${KEY_COLUMN}`,
+          });
+          colB = fallbackExisting.values || [];
+          actualTabName = meta.sheets[0].properties.title;
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback sheet lookup failed:', fallbackErr.message);
+      }
     }
 
-    // First-ever sync to an empty sheet — write the header row your columns expect.
+    const finalTab = `'${actualTabName.replace(/'/g, "''")}'`;
+    let rowNumber = -1; // 1-indexed sheet row
+    for (let i = 0; i < colB.length; i++) {
+      if (String((colB[i] || [])[0] || '').trim() === key) {
+        rowNumber = i + 1;
+        break;
+      }
+    }
+
+    // First-ever sync to an empty sheet — write header row
     if (colB.length === 0) {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: `${tab}!A1`,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: [['Date', 'Load Number', 'Broker', 'MC #', 'Driver Name', 'Pickup', 'Drop-off', 'PU Date', 'DO Date', 'Broker Rate', 'Dispatcher Name']] },
-      });
+      try {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: `${finalTab}!A1`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: [['Date', 'Load Number', 'Broker', 'MC #', 'Driver Name', 'Pickup', 'Drop-off', 'PU Date', 'DO Date', 'Broker Rate', 'Dispatcher Name']] },
+        });
+      } catch (hdrErr) {
+        console.warn('Header append warning:', hdrErr.message);
+      }
     }
 
     if (rowNumber === -1) {
-      // No header row assumption needed — append just adds after the last used row.
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `${tab}!A1`,
+        range: `${finalTab}!A1`,
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         requestBody: { values: [row] },
@@ -564,13 +600,13 @@ router.post('/api/sheet-sync', async (req, res) => {
     } else {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${tab}!A${rowNumber}`,
+        range: `${finalTab}!A${rowNumber}`,
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: [row] },
       });
     }
 
-    res.json({ ok: true, updatedExisting: rowNumber !== -1 });
+    res.json({ ok: true, updatedExisting: rowNumber !== -1, sheetTab: actualTabName });
   } catch (e) {
     console.error('sheet-sync failed:', e);
     res.status(500).json({ error: e.message || 'Failed to sync to Google Sheet' });
