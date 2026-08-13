@@ -638,20 +638,26 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
 
   try {
     await saveFullState(state);
-    await history.record(load.id, `STATUS_${checkpoint}`, `Driver updated status to ${checkpoint.replace(/_/g, ' ')}` + (note ? `: ${note}` : ''), { type: 'driver', id: driver.id, name: driver.name });
-
-    const notifPayload = {
-      type: 'load_status_changed',
-      title: `${driver.name || 'Driver'} — ${load.loadNumber || load.id}`,
-      body: `Status updated to: ${checkpoint.replace(/_/g, ' ')}` + (note ? ` (${note})` : ''),
-      data: { loadId: load.id, checkpoint },
-    };
-    await notifications.create('admin', 'admin', notifPayload);
-    if (load.dispatcherId) {
-      await notifications.create('dispatcher', load.dispatcherId, notifPayload);
-    }
-
     res.json({ ok: true, load: shapeLoadForDriver(load) });
+
+    // Background notifications & history logging (non-blocking for ultra-fast response)
+    (async () => {
+      try {
+        await history.record(load.id, `STATUS_${checkpoint}`, `Driver updated status to ${checkpoint.replace(/_/g, ' ')}` + (note ? `: ${note}` : ''), { type: 'driver', id: driver.id, name: driver.name });
+        const notifPayload = {
+          type: 'load_status_changed',
+          title: `${driver.name || 'Driver'} — ${load.loadNumber || load.id}`,
+          body: `Status updated to: ${checkpoint.replace(/_/g, ' ')}` + (note ? ` (${note})` : ''),
+          data: { loadId: load.id, checkpoint },
+        };
+        await notifications.create('admin', 'admin', notifPayload);
+        if (load.dispatcherId) {
+          await notifications.create('dispatcher', load.dispatcherId, notifPayload);
+        }
+      } catch(bgErr) {
+        console.warn('Background notification error:', bgErr.message);
+      }
+    })();
   } catch (e) {
     console.error('driver status update failed:', e);
     res.status(500).json({ error: 'Failed to update status' });

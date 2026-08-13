@@ -881,15 +881,23 @@ function updateChatNavBadge(count){
   }
 }
 
-// ---------------- Current Load (+ merged Home summary) ----------------
-async function loadCurrent(){
+let LAST_DASH_CACHE = null;
+let LAST_HOME_CACHE = null;
+
+async function loadCurrent(silent = false){
   const el = document.getElementById('dp-current-content');
-  el.innerHTML = '<div class="dp-empty">Loading…</div>';
+  if (!silent && !LAST_DASH_CACHE) {
+    el.innerHTML = '<div class="dp-empty">Loading…</div>';
+  }
   try {
     const [dash, home] = await Promise.all([ api('/api/driver/dashboard'), api('/api/driver/home') ]);
+    LAST_DASH_CACHE = dash;
+    LAST_HOME_CACHE = home;
     updateChatNavBadge(home.unreadMessages);
     el.innerHTML = currentContentHtml(dash, home);
-  } catch(e){ el.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+  } catch(e){
+    if (!silent && !LAST_DASH_CACHE) el.innerHTML = '<div class="dp-empty">' + e.message + '</div>';
+  }
 }
 
 function identityHtml(driver){
@@ -1224,12 +1232,28 @@ function photosSectionHtml(l) {
 async function advanceCheckpoint(loadId, status){
   const btns = document.querySelectorAll('.dp-checkpoint-btn');
   btns.forEach(b => { b.disabled = true; b.textContent = 'Updating…'; });
+
+  // Optimistic UI Update: update checkpoint status instantly!
+  if (LAST_DASH_CACHE && LAST_DASH_CACHE.currentLoad) {
+    LAST_DASH_CACHE.currentLoad.driverProgress = status;
+    const el = document.getElementById('dp-current-content');
+    if (el && LAST_HOME_CACHE) el.innerHTML = currentContentHtml(LAST_DASH_CACHE, LAST_HOME_CACHE);
+  }
+
   try {
-    await api('/api/driver/loads/' + loadId + '/status', { method:'POST', body: JSON.stringify({ status }) });
+    const res = await api('/api/driver/loads/' + loadId + '/status', { method:'POST', body: JSON.stringify({ status }) });
     toast('Status updated: ' + (CHECKPOINT_LABEL[status] || status));
-    loadCurrent();
-    triggerDriverGpsReport(true);
-  } catch(e){ toast(e.message); btns.forEach(b => b.disabled = false); }
+    if (res.load && LAST_DASH_CACHE) {
+      LAST_DASH_CACHE.currentLoad = res.load;
+      const el = document.getElementById('dp-current-content');
+      if (el && LAST_HOME_CACHE) el.innerHTML = currentContentHtml(LAST_DASH_CACHE, LAST_HOME_CACHE);
+    }
+    loadCurrent(true); // Silent background refresh
+    setTimeout(() => triggerDriverGpsReport(), 50);
+  } catch(e){
+    toast(e.message || 'Update failed');
+    loadCurrent(false);
+  }
 }
 
 const NOTIF_ICON = { load_status_changed:'📦', document_uploaded:'📄', payment_paid:'💰' };
