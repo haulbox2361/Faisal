@@ -242,6 +242,84 @@ a{color:inherit;}
 .dp-chat-list{display:flex; flex-direction:column; gap:9px;}
 .dp-chat-row{display:flex; align-items:center; gap:12px; border-radius:20px; border:1px solid var(--border); background:var(--card); padding:14px; width:100%;}
 .dp-chat-avatar{width:46px; height:46px; border-radius:15px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#fff; flex-shrink:0;}
+
+/* ============ WHATSAPP-STYLE DRIVER CHAT ============ */
+/* Chat list page */
+#dp-wa-chat-page { display:flex; flex-direction:column; height:100%; }
+.dp-wa-search-wrap { padding:8px 12px; background:var(--card); border-bottom:1px solid var(--border-soft); }
+.dp-wa-search-inner { display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:10px; padding:8px 14px; border:1px solid var(--border-soft); }
+.dp-wa-search-inner svg { color:var(--muted); flex-shrink:0; }
+.dp-wa-search-input { flex:1; border:none; background:transparent; outline:none; font-size:13.5px; color:var(--foreground); }
+.dp-wa-search-input::placeholder { color:var(--muted-soft); }
+.dp-wa-filter-tabs { display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid var(--border-soft); overflow-x:auto; }
+.dp-wa-filter-tabs::-webkit-scrollbar { height:0; }
+.dp-wa-filter-tab { border:none; border-radius:20px; padding:4px 14px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; background:var(--card-elev); color:var(--muted); transition:all .15s; }
+.dp-wa-filter-tab.active { background:var(--brand-soft); color:var(--brand); }
+#dp-wa-chat-list { flex:1; overflow-y:auto; overflow-x:hidden; }
+.dp-wa-section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted); padding:10px 16px 4px; background:var(--bg); }
+.dp-wa-chat-item { display:flex; align-items:center; gap:12px; padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border-soft); transition:background .1s; position:relative; }
+.dp-wa-chat-item:active { background:var(--card-elev); }
+.dp-wa-chat-item-body { flex:1; min-width:0; }
+.dp-wa-chat-item-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; }
+.dp-wa-chat-item-name { font-size:14px; font-weight:600; color:var(--foreground); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; }
+.dp-wa-chat-item-time { font-size:11px; color:var(--muted); flex-shrink:0; }
+.dp-wa-chat-item-preview { font-size:12.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dp-wa-badge { background:#25d366; color:#fff; border-radius:50%; font-size:11px; font-weight:700; min-width:18px; height:18px; display:flex; align-items:center; justify-content:center; padding:0 4px; flex-shrink:0; }
+/* WA thread overlay */
+#dp-thread { position:fixed; inset:0; margin:0 auto; max-width:480px; background:#efeae2; display:none; flex-direction:column; z-index:80; }
+#dp-thread.active { display:flex; }
+.dp-thread-head { flex-shrink:0; display:flex; align-items:center; gap:10px; padding:calc(env(safe-area-inset-top) + 10px) 12px 10px; background:#1b2028; color:#fff; min-height:60px; }
+.dp-thread-back { width:34px; height:34px; border-radius:999px; border:none; background:rgba(255,255,255,.09); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.dp-thread-back svg { width:17px; height:17px; }
+.dp-thread-title { font-size:14.5px; font-weight:700; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dp-thread-sub { font-size:11px; color:#8696a0; }
+.dp-thread-msgs { flex:1; overflow-y:auto; padding:12px 5%; display:flex; flex-direction:column; gap:2px; }
+.dp-thread-msgs::-webkit-scrollbar { width:4px; }
+.dp-thread-msgs::-webkit-scrollbar-thumb { background:rgba(0,0,0,.2); border-radius:4px; }
+/* WA-style bubbles */
+.dp-wa-msg-wrap { display:flex; margin:1px 0; }
+.dp-wa-msg-wrap.out { justify-content:flex-end; }
+.dp-wa-msg-wrap.in { justify-content:flex-start; }
+.dp-wa-bubble { max-width:72%; padding:6px 10px 8px; border-radius:8px; font-size:13.5px; line-height:1.45; color:#111b21; box-shadow:0 1px 1px rgba(0,0,0,.13); word-wrap:break-word; word-break:break-word; }
+.dp-wa-msg-wrap.out .dp-wa-bubble { background:#d9fdd3; border-radius:8px 0 8px 8px; }
+.dp-wa-msg-wrap.in .dp-wa-bubble { background:#fff; border-radius:0 8px 8px 8px; }
+.dp-wa-bubble-sender { font-size:12px; font-weight:700; color:#25d366; margin-bottom:2px; }
+.dp-wa-bubble-meta { display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:3px; }
+.dp-wa-bubble-time { font-size:10.5px; color:#8696a0; }
+.dp-wa-bubble-ticks { color:#53bdeb; font-size:13px; }
+.dp-wa-date-sep { display:flex; justify-content:center; margin:10px 0; }
+.dp-wa-date-sep span { background:rgba(255,255,255,.85); font-size:11px; color:#54656f; padding:3px 12px; border-radius:8px; box-shadow:0 1px 2px rgba(0,0,0,.12); }
+.dp-wa-doc-bubble { display:flex; align-items:center; gap:10px; background:rgba(0,0,0,.04); border-radius:6px; padding:8px 10px; margin-bottom:4px; cursor:pointer; }
+.dp-wa-doc-icon { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.dp-wa-doc-icon svg { width:16px; height:16px; }
+.dp-wa-doc-name { font-size:12.5px; font-weight:600; color:#111b21; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px; }
+.dp-wa-doc-size { font-size:10px; color:#8696a0; }
+.dp-wa-img-bubble { max-width:200px; border-radius:6px; overflow:hidden; margin-bottom:4px; cursor:pointer; }
+.dp-wa-img-bubble img { width:100%; display:block; }
+.dp-wa-load-tag { display:inline-flex; align-items:center; gap:5px; background:rgba(0,0,0,.06); border-radius:6px; padding:3px 8px; font-size:11px; font-weight:600; color:#025c4c; margin-bottom:4px; }
+/* Input area */
+.dp-wa-input-area { flex-shrink:0; display:flex; align-items:flex-end; gap:7px; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); background:#f0f2f5; border-top:1px solid #e9edef; position:relative; }
+.dp-wa-input-wrap { flex:1; background:#fff; border-radius:10px; border:1px solid #e9edef; overflow:hidden; }
+.dp-wa-textarea { width:100%; border:none; outline:none; background:transparent; padding:10px 12px; font-size:14px; color:#111b21; font-family:inherit; resize:none; min-height:42px; max-height:120px; line-height:1.4; overflow-y:auto; }
+.dp-wa-textarea::placeholder { color:#8696a0; }
+.dp-wa-icon-btn { background:transparent; border:none; cursor:pointer; color:#54656f; border-radius:50%; width:38px; height:38px; display:flex; align-items:center; justify-content:center; transition:background .15s; flex-shrink:0; align-self:flex-end; margin-bottom:2px; }
+.dp-wa-icon-btn:active { background:#e9edef; }
+.dp-wa-icon-btn svg { width:20px; height:20px; }
+.dp-wa-send-btn { width:44px; height:44px; background:#25d366; color:#fff; border:none; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; align-self:flex-end; transition:background .15s; box-shadow:0 2px 8px rgba(37,211,102,.3); }
+.dp-wa-send-btn:active { background:#1ebe5d; }
+.dp-wa-send-btn svg { width:20px; height:20px; }
+.dp-wa-attach-preview { background:#f0f2f5; border-top:1px solid #e9edef; padding:8px 12px; flex-shrink:0; display:none; }
+.dp-wa-attach-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.dp-wa-attach-chip { display:flex; align-items:center; gap:5px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:4px 8px; font-size:11.5px; color:#111b21; }
+.dp-wa-attach-chip button { background:none; border:none; color:#8696a0; cursor:pointer; font-size:13px; line-height:1; padding:0; }
+.dp-wa-attach-menu { position:absolute; bottom:56px; left:10px; z-index:200; background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.15); border:1px solid #e9edef; padding:8px; display:flex; flex-direction:column; gap:2px; min-width:170px; display:none; }
+.dp-wa-attach-option { display:flex; align-items:center; gap:10px; padding:9px 12px; border:none; background:none; cursor:pointer; border-radius:8px; font-size:13px; color:#111b21; font-family:inherit; }
+.dp-wa-attach-option:active { background:#f0f2f5; }
+.dp-wa-attach-icon { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.dp-wa-attach-icon svg { width:18px; height:18px; }
+.dp-wa-emoji-picker { position:absolute; bottom:60px; right:10px; z-index:200; background:#fff; border:1px solid #e9edef; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.15); padding:10px; width:280px; display:none; }
+.dp-wa-emoji-grid { display:flex; flex-wrap:wrap; gap:4px; font-size:22px; max-height:160px; overflow-y:auto; }
+.dp-wa-emoji-grid span { cursor:pointer; border-radius:6px; padding:2px; }
 .dp-role-driver{background:var(--role-driver);}
 .dp-role-dispatcher{background:var(--role-dispatcher);}
 .dp-role-admin{background:var(--role-owner);}
@@ -355,13 +433,16 @@ a{color:inherit;}
 
 <div id="login-screen">
   <div class="login-card">
-    <img src="assets/haulbox-logo-icon.png" alt="HaulBoX">
-    <h1>Driver Portal</h1>
+    <div style="width:52px;height:52px;margin:0 auto 14px;border-radius:14px;background:#10b981;display:flex;align-items:center;justify-content:center;">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="white"><path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-6 0H10V5h4v2z"/></svg>
+    </div>
+    <h1>HaulBoX Driver</h1>
     <p>Sign in with your Driver ID and PIN</p>
-    <div class="login-field"><label>Driver ID</label><input id="li-driverid" autocomplete="username" placeholder="e.g. DRV-102"></div>
-    <div class="login-field"><label>PIN</label><input id="li-pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••"></div>
+    <div class="login-field"><label>Driver ID</label><input id="li-driverid" autocomplete="username" placeholder="e.g. D1023" onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()"></div>
+    <div class="login-field"><label>PIN</label><input id="li-pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="login-btn" id="li-btn" onclick="doLogin()">Sign In</button>
     <div class="login-err" id="li-err"></div>
+    <div style="margin-top:14px;font-size:11px;color:#64748b;">Contact your dispatcher for your Driver ID and PIN</div>
   </div>
 </div>
 
@@ -445,23 +526,30 @@ a{color:inherit;}
     </section>
 
     <!-- CHAT -->
-    <section class="dp-page" id="dp-page-chat">
-      <h2 class="dp-screen-title">Messages</h2>
-      <p class="dp-screen-sub">Direct messages &amp; team operations chat</p>
-      <div class="dp-search">
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-         <input id="chat-search" oninput="filterChatList()" placeholder="Search conversations...">
+    <section class="dp-page" id="dp-page-chat" style="padding:0;display:none;flex-direction:column;">
+      <!-- WA-style header -->
+      <div style="padding:12px 14px 8px;background:var(--surface-dark);color:#fff;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:17px;font-weight:800;">Messages</div>
+        <button class="dp-icon-btn" style="background:rgba(255,255,255,.08);" title="New chat" onclick="document.getElementById('dp-wa-search').focus()">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v2H4zm0 5h10v2H4zm0 5h7v2H4z"/><path d="M20 15l-5 5v-3h-2v-4h7v2z"/></svg>
+        </button>
       </div>
-      <div style="font-weight: 700; font-size: 13px; color: var(--muted); margin-bottom: 10px;">Start a Chat</div>
-      <div id="dp-chat-contacts-list" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom: 20px;"></div>
-      
-      <div style="font-weight: 700; font-size: 13px; color: var(--muted); margin-bottom: 10px;">Recent Conversations</div>
-      <div class="chat-tabs" style="display:none;">
-        <button class="chat-tab active" onclick="setChatFilter('all', this)">All</button>
-        <button class="chat-tab" onclick="setChatFilter('direct', this)">Direct</button>
-        <button class="chat-tab" onclick="setChatFilter('group', this)">Group</button>
+      <!-- Search -->
+      <div class="dp-wa-search-wrap">
+        <div class="dp-wa-search-inner">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg>
+          <input class="dp-wa-search-input" id="dp-wa-search" placeholder="Search or start new chat" oninput="dpWaFilterList()">
+        </div>
       </div>
-      <div id="dp-chat-list" style="display:flex; flex-direction:column; gap:10px;"><div class="dp-empty">Loading…</div></div>
+      <!-- Filter tabs -->
+      <div class="dp-wa-filter-tabs">
+        <button class="dp-wa-filter-tab active" data-filter="all" onclick="dpWaSetFilter('all')">All</button>
+        <button class="dp-wa-filter-tab" data-filter="unread" onclick="dpWaSetFilter('unread')">Unread</button>
+        <button class="dp-wa-filter-tab" data-filter="group" onclick="dpWaSetFilter('group')">Group</button>
+        <button class="dp-wa-filter-tab" data-filter="direct" onclick="dpWaSetFilter('direct')">Direct</button>
+      </div>
+      <!-- Chat list -->
+      <div id="dp-wa-chat-list"><div class="dp-empty">Loading…</div></div>
     </section>
 
     <!-- PROFILE -->
@@ -516,17 +604,71 @@ a{color:inherit;}
   </div>
 </div>
 
-<!-- Chat thread -->
+<!-- WhatsApp-style Chat thread overlay -->
 <div id="dp-thread">
+  <!-- Thread header -->
   <div class="dp-thread-head">
     <button class="dp-thread-back" onclick="closeThread()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <div class="dp-chat-avatar dp-role-driver" id="dp-thread-avatar" style="width:34px;height:34px;font-size:11px;border-radius:11px;">--</div>
-    <div class="dp-thread-title" id="dp-thread-title">Chat</div>
+    <div id="dp-thread-avatar" style="width:38px;height:38px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;">--</div>
+    <div style="flex:1;min-width:0;">
+      <div class="dp-thread-title" id="dp-thread-title">Chat</div>
+      <div class="dp-thread-sub" id="dp-thread-sub">Driver Portal</div>
+    </div>
+    <button class="dp-wa-icon-btn" style="color:#fff;" title="Search" onclick="dpWaToggleMsgSearch()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg>
+    </button>
   </div>
+
+  <!-- In-thread message search -->
+  <div id="dp-thread-msgsearch" style="display:none;padding:6px 12px;background:#f0f2f5;border-bottom:1px solid #ddd;">
+    <input id="dp-thread-msgsearch-input" placeholder="Search messages…" style="width:100%;padding:6px 10px;border-radius:20px;border:1px solid #ccc;font-size:13px;background:#fff;outline:none;" oninput="dpWaSearchMsgs()">
+  </div>
+
+  <!-- Messages -->
   <div class="dp-thread-msgs" id="dp-thread-msgs"></div>
-  <div class="dp-thread-input">
-    <input id="dp-thread-input-box" placeholder="Message…" onkeydown="if(event.key==='Enter')sendThreadMessage()">
-    <button onclick="sendThreadMessage()" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+
+  <!-- Attachment preview -->
+  <div class="dp-wa-attach-preview" id="dp-wa-attach-preview">
+    <div class="dp-wa-attach-row" id="dp-wa-attach-row"></div>
+  </div>
+
+  <!-- Emoji picker -->
+  <div class="dp-wa-emoji-picker" id="dp-wa-emoji-picker">
+    <div class="dp-wa-emoji-grid" id="dp-wa-emoji-grid"></div>
+  </div>
+
+  <!-- Attach menu -->
+  <div class="dp-wa-attach-menu" id="dp-wa-attach-menu">
+    <button class="dp-wa-attach-option" onclick="document.getElementById('dp-wa-doc-input').click();dpWaCloseMenus();">
+      <div class="dp-wa-attach-icon" style="background:#7c3aed;"><svg viewBox="0 0 24 24" fill="white"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg></div>
+      <span>Document</span>
+    </button>
+    <button class="dp-wa-attach-option" onclick="document.getElementById('dp-wa-img-input').click();dpWaCloseMenus();">
+      <div class="dp-wa-attach-icon" style="background:#0891b2;"><svg viewBox="0 0 24 24" fill="white"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>
+      <span>Photos &amp; Videos</span>
+    </button>
+  </div>
+
+  <!-- Hidden file inputs -->
+  <input type="file" id="dp-wa-doc-input" style="display:none;" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" onchange="dpWaHandleFiles(event)">
+  <input type="file" id="dp-wa-img-input" style="display:none;" multiple accept="image/*,video/*" onchange="dpWaHandleFiles(event)">
+
+  <!-- Input area -->
+  <div class="dp-wa-input-area">
+    <button class="dp-wa-icon-btn" id="dp-wa-emoji-btn" title="Emoji" onclick="dpWaToggleEmoji()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+    </button>
+    <button class="dp-wa-icon-btn" id="dp-wa-attach-btn" title="Attach" onclick="dpWaToggleAttach()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5V6H9v9.5a3.5 3.5 0 0 0 7 0V5c0-2.76-2.24-5-5-5S6 2.24 6 5v12.5c0 3.87 3.13 7 7 7s7-3.13 7-7V6h-3.5z"/></svg>
+    </button>
+    <div class="dp-wa-input-wrap">
+      <textarea class="dp-wa-textarea" id="dp-thread-input-box" placeholder="Type a message" rows="1"
+        oninput="dpWaAutoResize(this)"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendThreadMessage();}"></textarea>
+    </div>
+    <button class="dp-wa-send-btn" onclick="sendThreadMessage()" aria-label="Send">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
   </div>
 </div>
 
@@ -671,7 +813,16 @@ function startChatPolling() {
 function setDriverPortalPage(page){
   document.querySelectorAll('.dp-nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
   document.getElementById('dp-nav-current').classList.toggle('active', page==='current');
-  document.querySelectorAll('.dp-page').forEach(el=>el.classList.toggle('active', el.id==='dp-page-'+page));
+  document.querySelectorAll('.dp-page').forEach(el=>{
+    const isActive = el.id==='dp-page-'+page;
+    el.classList.toggle('active', isActive);
+    if (isActive) {
+      // Chat page uses flex column layout; all others use block
+      el.style.display = (page==='chat' && isActive) ? 'flex' : '';
+    } else {
+      el.style.display = '';
+    }
+  });
   if (page==='current') loadCurrent();
   else if (page==='loads') loadLoads();
   else if (page==='payments') loadPayments();
@@ -1299,129 +1450,341 @@ function renderChart(){
   ).join('');
 }
 
-function updateChatNavBadge(count) {
-  const badge = document.getElementById('dp-chat-nav-badge');
-  if (badge) {
-    badge.textContent = count;
-    badge.style.display = count > 0 ? 'flex' : 'none';
-  }
+/* ================================================================
+   DRIVER PORTAL — WHATSAPP-STYLE CHAT ENGINE
+   ================================================================ */
+let dpWaFilter = 'all';
+let dpWaPendingAttachments = [];
+let dpWaEmojiOpen = false;
+let dpWaAttachOpen = false;
+let dpWaMsgSearchOpen = false;
+let dpWaChatContacts = [];
+let dpWaChatConvos = [];
+
+// Avatar color helper
+const DP_WA_COLORS = ['#2563eb','#7c3aed','#ea580c','#0891b2','#dc2626','#059669','#64748b'];
+function dpWaAvatarColor(str) {
+  let h = 0; for (let i=0;i<str.length;i++) h = str.charCodeAt(i) + ((h<<5)-h);
+  return DP_WA_COLORS[Math.abs(h) % DP_WA_COLORS.length];
 }
 
-async function loadChats(isPolling = false){
-  const list = document.getElementById('dp-chat-list');
-  const contactsList = document.getElementById('dp-chat-contacts-list');
-  if (!isPolling) list.innerHTML = '<div class="dp-empty">Loading…</div>';
-  
-  if (contactsList) {
-    try {
-      const contactsRes = await api('/api/driver/chats/contacts');
-      const newContactsHtml = contactsRes.contacts.map(c => {
-         const avatarClass = c.type === 'group' ? 'dp-role-group' : (c.type === 'dispatcher' ? 'dp-role-dispatcher' : 'dp-role-admin');
-         return '<button class="dp-contact-card" onclick="startNewChat(\'' + c.type + '\', \'' + c.id + '\')">' +
-          '<div class="dp-chat-avatar ' + avatarClass + '" style="margin:0 auto 6px;width:40px;height:40px;font-size:12.5px;border-radius:13px;">' + initials(c.name || c.role) + '</div>' +
-          '<div style="font-size:12px;font-weight:800;color:var(--foreground);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(c.name || c.role) + '</div>' +
-          '<div style="font-size:10.5px;color:var(--brand);text-align:center;margin-top:2px;font-weight:700;">Start</div>' +
-          '</button>';
-      }).join('');
-      if (contactsList.innerHTML !== newContactsHtml) contactsList.innerHTML = newContactsHtml;
-    } catch(e) {
-      if (!isPolling) contactsList.innerHTML = '<div class="dp-empty">Failed to load contacts</div>';
-    }
+function dpWaFmtListTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts), now = new Date();
+  const diff = Math.floor((now-d)/86400000);
+  if (diff===0) return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  if (diff===1) return 'Yesterday';
+  if (diff<7) return d.toLocaleDateString([],{weekday:'short'});
+  return d.toLocaleDateString([],{day:'2-digit',month:'2-digit',year:'2-digit'});
+}
+function dpWaFmtMsgTime(ts) { return ts ? new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''; }
+function dpWaFmtDateSep(ts) {
+  if (!ts) return '';
+  const d = new Date(ts), now = new Date();
+  const diff = Math.floor((now-d)/86400000);
+  if (diff===0) return 'Today';
+  if (diff===1) return 'Yesterday';
+  return d.toLocaleDateString([],{weekday:'long',day:'numeric',month:'long'});
+}
+function dpWaDocColor(name) {
+  const ext = (name.split('.').pop()||'').toLowerCase();
+  if (['pdf'].includes(ext)) return '#dc2626';
+  if (['doc','docx'].includes(ext)) return '#2563eb';
+  if (['xls','xlsx','csv'].includes(ext)) return '#059669';
+  return '#7c3aed';
+}
+function dpWaFmtSize(b) {
+  if (b<1024) return b+' B';
+  if (b<1048576) return (b/1024).toFixed(1)+' KB';
+  return (b/1048576).toFixed(1)+' MB';
+}
+
+// ---- Load chats (contacts + convos) ----
+async function loadChats(isPolling = false) {
+  // Load contacts
+  try {
+    const r = await api('/api/driver/chats/contacts');
+    dpWaChatContacts = r.contacts || [];
+  } catch(e) { if(!isPolling) dpWaChatContacts = []; }
+  // Load convos
+  try {
+    const r = await api('/api/driver/chats');
+    dpWaChatConvos = r.chats || [];
+    const unread = dpWaChatConvos.reduce((s,c)=>s+(c.unreadCount||0),0);
+    updateChatNavBadge(unread);
+  } catch(e) { if(!isPolling) dpWaChatConvos = []; }
+  dpWaRenderList();
+}
+
+// ---- Render list ----
+function dpWaRenderList() {
+  const container = document.getElementById('dp-wa-chat-list');
+  if (!container) return;
+  const q = (document.getElementById('dp-wa-search')?.value||'').toLowerCase().trim();
+  let html = '';
+
+  // Contacts
+  const contacts = dpWaChatContacts.filter(c => {
+    if (dpWaFilter==='group' && c.type!=='group') return false;
+    if (dpWaFilter==='direct' && c.type==='group') return false;
+    if (dpWaFilter==='unread') return false;
+    if (q && !(c.name||c.role||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  if (contacts.length) {
+    html += '<div class="dp-wa-section-label">Start a Chat</div>';
+    html += contacts.map(c => {
+      const bg = c.type==='group' ? '#25d366' : (c.type==='dispatcher' ? '#2563eb' : '#7c3aed');
+      const nm = escapeHtml(c.name||c.role||'Contact');
+      const ini = initials(nm);
+      const role = c.type==='group' ? '👥 Operations' : c.type==='dispatcher' ? '👤 Dispatcher' : '👤 Admin';
+      return `<div class="dp-wa-chat-item" onclick="startNewChat('${c.type}','${c.id||c.type}')">
+        <div style="width:44px;height:44px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">${ini}</div>
+        <div class="dp-wa-chat-item-body">
+          <div class="dp-wa-chat-item-top"><span class="dp-wa-chat-item-name">${nm}</span><span style="font-size:10px;color:#8696a0;">${role}</span></div>
+          <div class="dp-wa-chat-item-preview">Tap to start chat</div>
+        </div>
+      </div>`;
+    }).join('');
   }
 
-  try {
-    const chatsRes = await api('/api/driver/chats');
-    updateChatNavBadge(chatsRes.chats.reduce((s, c) => s + (c.unreadCount || 0), 0));
-    if (!chatsRes.chats.length){ 
-      if (list.innerHTML !== '<div class="dp-empty">No recent conversations.</div>') list.innerHTML = '<div class="dp-empty">No recent conversations.</div>';
-    } else {
-      const newHtml = chatsRes.chats.map(chatRowHtml).join('');
-      if (list.innerHTML !== newHtml) list.innerHTML = newHtml;
-    }
-  } catch(e){ 
-    if (!isPolling) list.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; 
+  // Convos
+  const convos = dpWaChatConvos.filter(c => {
+    const nm = c.isGroup ? (c.groupName||'Group') : dpWaConvoName(c);
+    if (dpWaFilter==='group' && !c.isGroup) return false;
+    if (dpWaFilter==='direct' && c.isGroup) return false;
+    if (dpWaFilter==='unread' && !(c.unreadCount>0)) return false;
+    if (q && !nm.toLowerCase().includes(q) && !(c.lastMessage||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  if (convos.length) {
+    html += '<div class="dp-wa-section-label">Recent</div>';
+    html += convos.map(c => {
+      const nm = c.isGroup ? (c.groupName||'Group Chat') : dpWaConvoName(c);
+      const bg = dpWaAvatarColor(nm);
+      const ini = c.isGroup ? 'GC' : initials(nm);
+      const isActive = String(c.id)===String(currentThreadId);
+      return `<div class="dp-wa-chat-item${isActive?' active':''" onclick="openThread(${c.id},'${escapeHtml(nm).replace(/'/g,'')}',${!!c.isGroup})">
+        <div style="width:44px;height:44px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">${ini}</div>
+        <div class="dp-wa-chat-item-body">
+          <div class="dp-wa-chat-item-top">
+            <span class="dp-wa-chat-item-name">${escapeHtml(nm)}</span>
+            <span class="dp-wa-chat-item-time">${dpWaFmtListTime(c.lastMessageAt)}</span>
+          </div>
+          <div class="dp-wa-chat-item-preview">${escapeHtml(c.lastMessage||'No messages yet')}</div>
+        </div>
+        ${c.unreadCount>0?'<div class="dp-wa-badge">'+c.unreadCount+'</div>':''}
+      </div>`;
+    }).join('');
   }
+
+  if (!html) html = '<div class="dp-empty" style="padding:24px;">No conversations yet</div>';
+  container.innerHTML = html;
+}
+
+function dpWaConvoName(c) {
+  if (!c.with) return 'Chat';
+  const t = c.with.type;
+  return c.with.name || (t==='admin'?'Admin':(t==='dispatcher'?'Dispatcher':'Driver'));
 }
 
 async function startNewChat(type, id) {
   try {
     const data = await api('/api/driver/chats/start', { method: 'POST', body: JSON.stringify({ withType: type, withId: id }) });
-    openThread(data.conversationId, type === 'group' ? 'Operations Group' : (type === 'dispatcher' ? 'Dispatcher' : 'Admin'), type === 'group');
+    const title = type === 'group' ? 'Operations Group' : (type === 'dispatcher' ? 'Dispatcher' : 'Admin');
+    await openThread(data.conversationId, title, type === 'group');
   } catch(e) { toast(e.message); }
 }
 
-function filterChatList() {
-  const q = document.getElementById('chat-search').value.toLowerCase();
-  document.querySelectorAll('#dp-chat-list .dp-chat-row, #dp-chat-contacts-list .dp-chat-row').forEach(row => {
-    const name = row.querySelector('.dp-chat-name').textContent.toLowerCase();
-    row.style.display = name.includes(q) ? 'flex' : 'none';
-  });
+function dpWaSetFilter(f) {
+  dpWaFilter = f;
+  document.querySelectorAll('.dp-wa-filter-tab').forEach(b => b.classList.toggle('active', b.dataset.filter===f));
+  dpWaRenderList();
 }
-function roleLabel(type){ if (type==='admin') return 'Owner'; if (type==='dispatcher') return 'Dispatcher'; if (type==='driver') return 'Driver'; return 'Owner'; }
-function roleClass(type){ return 'dp-role-' + (type==='admin' ? 'admin' : (type||'driver')); }
-function chatRowHtml(c){
-  if (c.isGroup){
-    return '<button class="dp-chat-row" data-chattype="group" style="width:100%;text-align:left;border:1px solid var(--border-soft);" onclick="openThread(' + c.id + ', \'' + escapeHtml(c.groupName||'Group').replace(/'/g,"") + '\', true)">' +
-      '<div class="dp-chat-avatar dp-role-group"><svg style="width:19px;height:19px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div>' +
-      '<div class="dp-chat-body"><div class="dp-chat-name">' + escapeHtml(c.groupName||'Group Chat') + '</div>' +
-      '<div class="dp-chat-preview">' + escapeHtml(c.lastMessage||'No messages yet') + '</div></div>' +
-      (c.unreadCount ? '<div class="dp-chat-badge">' + c.unreadCount + '</div>' : '') + '</button>';
+function dpWaFilterList() { dpWaRenderList(); }
+
+// ---- Open thread ----
+async function openThread(id, title, isGroup) {
+  currentThreadId = id;
+  // Emoji grid
+  const grid = document.getElementById('dp-wa-emoji-grid');
+  if (grid && grid.children.length===0) {
+    const emojis=['😀','😂','😍','🥰','😎','😊','🤔','😮','😢','😡','👍','👎','👏','🙏','🤝','💪','🔥','❤️','✅','⚠️','📦','🚛','📋','📞','💰','📍','⏰','📅','🔔','📷','📎'];
+    grid.innerHTML = emojis.map(e=>`<span onclick="dpWaInsertEmoji('${e}')">${e}</span>`).join('');
   }
-  const label = roleLabel(c.with.type);
-  return '<button class="dp-chat-row" data-chattype="direct" style="width:100%;text-align:left;border:1px solid var(--border-soft);" onclick="openThread(' + c.id + ', \'' + label + '\', false)">' +
-    '<div class="dp-chat-avatar ' + roleClass(c.with.type) + '">' + initials(label) + '</div>' +
-    '<div class="dp-chat-body"><div class="dp-chat-name">' + label + '</div>' +
-    '<div class="dp-chat-preview">' + escapeHtml(c.lastMessage||'No messages yet') + '</div></div>' +
-    (c.unreadCount ? '<div class="dp-chat-badge">' + c.unreadCount + '</div>' : '') + '</button>';
+  const bg = isGroup ? '#25d366' : dpWaAvatarColor(title);
+  const av = document.getElementById('dp-thread-avatar');
+  av.textContent = isGroup ? 'GC' : initials(title);
+  av.style.background = bg;
+  document.getElementById('dp-thread-title').textContent = title;
+  document.getElementById('dp-thread-sub').textContent = isGroup ? 'Group chat' : 'Dispatcher';
+  document.getElementById('dp-thread').classList.add('active');
+  dpWaCloseMenus();
+  dpWaClearAttachments();
+  await loadThreadMessages(false);
+  dpWaRenderList();
+}
+function closeThread() {
+  document.getElementById('dp-thread').classList.remove('active');
+  currentThreadId = null;
+  dpWaClearAttachments();
+  dpWaCloseMenus();
+  loadChats(false);
 }
 
-function setChatFilter(type, btn) {
-  document.querySelectorAll('.chat-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('.dp-chat-row').forEach(row => {
-    if (type === 'all') row.style.display = 'flex';
-    else if (type === 'group' && row.dataset.chattype === 'group') row.style.display = 'flex';
-    else if (type === 'direct' && row.dataset.chattype === 'direct') row.style.display = 'flex';
-    else row.style.display = 'none';
+// ---- Load & render messages ----
+async function loadThreadMessages(isPolling=false) {
+  const box = document.getElementById('dp-thread-msgs');
+  const wasAtBottom = box ? box.scrollHeight-box.scrollTop <= box.clientHeight+60 : true;
+  if (!isPolling && box) box.innerHTML = '<div class="dp-empty">Loading…</div>';
+  try {
+    const data = await api('/api/driver/chats/'+currentThreadId+'/messages');
+    const msgs = data.messages || [];
+    if (!msgs.length) { if(box) box.innerHTML='<div class="dp-empty" style="text-align:center;padding:40px 0;">No messages yet. Say hello! 👋</div>'; return; }
+
+    let html = '', lastDate = null;
+    msgs.forEach(m => {
+      // parse attachment JSON if any
+      let body = m.body || '';
+      let attachment = m.attachment || null;
+      if (body && body.startsWith('{"__wa_msg":')) {
+        try { const p=JSON.parse(body); body=p.body||''; attachment=p.attachment||null; } catch(_){}
+      }
+      const mine = m.senderType==='driver';
+      const dir = mine ? 'out' : 'in';
+      const timeStr = dpWaFmtMsgTime(m.createdAt);
+      const dateStr = dpWaFmtDateSep(m.createdAt);
+      if (dateStr!==lastDate) {
+        html += `<div class="dp-wa-date-sep"><span>${dateStr}</span></div>`;
+        lastDate = dateStr;
+      }
+      let inner = '';
+      if (!mine && m.senderName) inner += `<div class="dp-wa-bubble-sender">${escapeHtml(m.senderName)}</div>`;
+      if (m.loadNumber) inner += `<div class="dp-wa-load-tag">📦 Load #${escapeHtml(m.loadNumber)}</div>`;
+      if (attachment) {
+        if (attachment.type && attachment.type.startsWith('image/')) {
+          inner += `<div class="dp-wa-img-bubble" onclick="dpWaOpenImage('${escapeHtml(attachment.dataUrl||'')}')"><img src="${escapeHtml(attachment.dataUrl||'')}" alt="${escapeHtml(attachment.name||'')}"></div>`;
+          if (attachment.caption) inner += `<div>${escapeHtml(attachment.caption)}</div>`;
+        } else {
+          const bg = dpWaDocColor(attachment.name||'');
+          inner += `<div class="dp-wa-doc-bubble" onclick="dpWaDownload('${escapeHtml(attachment.dataUrl||'')}','${escapeHtml(attachment.name||'file')}')"><div class="dp-wa-doc-icon" style="background:${bg};"><svg viewBox="0 0 24 24" fill="white"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg></div><div><div class="dp-wa-doc-name">${escapeHtml(attachment.name||'Document')}</div><div class="dp-wa-doc-size">${attachment.size?dpWaFmtSize(attachment.size):'Document'}</div></div></div>`;
+        }
+      }
+      if (body.trim()) inner += `<div>${escapeHtml(body)}</div>`;
+      inner += `<div class="dp-wa-bubble-meta"><span class="dp-wa-bubble-time">${timeStr}</span>${mine?'<span class="dp-wa-bubble-ticks">✓✓</span>':''}</div>`;
+      html += `<div class="dp-wa-msg-wrap ${dir}"><div class="dp-wa-bubble">${inner}</div></div>`;
+    });
+    const newHtml = html;
+    if (box && box.innerHTML!==newHtml) {
+      box.innerHTML = newHtml;
+      if (wasAtBottom||!isPolling) box.scrollTop = box.scrollHeight;
+    }
+  } catch(e) { if(!isPolling && box) box.innerHTML='<div class="dp-empty">'+e.message+'</div>'; }
+}
+
+// ---- Send ----
+async function sendThreadMessage() {
+  const inputEl = document.getElementById('dp-thread-input-box');
+  const text = (inputEl?.value||'').trim();
+  if (!text && !dpWaPendingAttachments.length) return;
+  if (!currentThreadId) return;
+
+  const toSend = [...dpWaPendingAttachments];
+  dpWaClearAttachments();
+  if (inputEl) { inputEl.value=''; dpWaAutoResize(inputEl); }
+  dpWaCloseMenus();
+
+  const sendOne = async (payload) => {
+    try { await api('/api/driver/chats/'+currentThreadId+'/messages',{method:'POST',body:JSON.stringify(payload)}); } catch(e){toast(e.message);}
+  };
+  for (const att of toSend) await sendOne({body:'',attachment:{name:att.name,type:att.type,size:att.size,dataUrl:att.dataUrl}});
+  if (text) await sendOne({body:text});
+  await loadThreadMessages(false);
+  loadChats(true);
+}
+
+// ---- File handling ----
+function dpWaHandleFiles(e) {
+  Array.from(e.target.files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      dpWaPendingAttachments.push({name:file.name,type:file.type||'application/octet-stream',size:file.size,dataUrl:ev.target.result});
+      dpWaRenderAttachPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value='';
+}
+function dpWaRenderAttachPreview() {
+  const bar = document.getElementById('dp-wa-attach-preview');
+  const row = document.getElementById('dp-wa-attach-row');
+  if (!bar||!row) return;
+  if (!dpWaPendingAttachments.length) { bar.style.display='none'; return; }
+  bar.style.display='block';
+  row.innerHTML = dpWaPendingAttachments.map((a,i)=>{
+    const ico = a.type.startsWith('image/') ? '🖼️' : '📄';
+    return `<div class="dp-wa-attach-chip"><span>${ico}</span><span style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(a.name)}</span><span style="font-size:10px;color:#8696a0;">${dpWaFmtSize(a.size)}</span><button onclick="dpWaRemoveAttach(${i})">✕</button></div>`;
+  }).join('');
+}
+function dpWaRemoveAttach(i) { dpWaPendingAttachments.splice(i,1); dpWaRenderAttachPreview(); }
+function dpWaClearAttachments() { dpWaPendingAttachments=[]; dpWaRenderAttachPreview(); }
+
+// ---- UI helpers ----
+function dpWaAutoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+function dpWaToggleEmoji() {
+  dpWaEmojiOpen=!dpWaEmojiOpen; dpWaAttachOpen=false;
+  document.getElementById('dp-wa-emoji-picker').style.display=dpWaEmojiOpen?'block':'none';
+  document.getElementById('dp-wa-attach-menu').style.display='none';
+}
+function dpWaInsertEmoji(e) {
+  const el=document.getElementById('dp-thread-input-box'); if(!el) return;
+  const p=el.selectionStart||el.value.length;
+  el.value=el.value.slice(0,p)+e+el.value.slice(p); el.focus(); dpWaAutoResize(el);
+}
+function dpWaToggleAttach() {
+  dpWaAttachOpen=!dpWaAttachOpen; dpWaEmojiOpen=false;
+  document.getElementById('dp-wa-attach-menu').style.display=dpWaAttachOpen?'flex':'none';
+  document.getElementById('dp-wa-emoji-picker').style.display='none';
+}
+function dpWaCloseMenus() {
+  dpWaEmojiOpen=false; dpWaAttachOpen=false;
+  const ep=document.getElementById('dp-wa-emoji-picker'); if(ep) ep.style.display='none';
+  const am=document.getElementById('dp-wa-attach-menu'); if(am) am.style.display='none';
+}
+function dpWaToggleMsgSearch() {
+  dpWaMsgSearchOpen=!dpWaMsgSearchOpen;
+  const b=document.getElementById('dp-thread-msgsearch'); if(b) b.style.display=dpWaMsgSearchOpen?'block':'none';
+  if(dpWaMsgSearchOpen) document.getElementById('dp-thread-msgsearch-input')?.focus();
+}
+function dpWaSearchMsgs() {
+  const q=(document.getElementById('dp-thread-msgsearch-input')?.value||'').toLowerCase();
+  document.querySelectorAll('.dp-wa-bubble').forEach(b=>{
+    b.closest('.dp-wa-msg-wrap').style.opacity=(!q||b.textContent.toLowerCase().includes(q))?'1':'0.2';
   });
 }
-async function openThread(id, title, isGroup){
-  currentThreadId = id;
-  document.getElementById('dp-thread-title').textContent = title;
-  document.getElementById('dp-thread-avatar').className = 'dp-chat-avatar ' + (isGroup ? 'dp-role-group' : roleClass(title==='Owner'?'admin':'dispatcher'));
-  document.getElementById('dp-thread-avatar').textContent = isGroup ? 'GC' : initials(title);
-  document.getElementById('dp-thread').classList.add('active');
-  await loadThreadMessages(false);
+function dpWaOpenImage(src) {
+  if(!src) return;
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  o.innerHTML=`<img src="${src}" style="max-width:92vw;max-height:92vh;border-radius:8px;object-fit:contain;">`;
+  o.onclick=()=>document.body.removeChild(o);
+  document.body.appendChild(o);
 }
-function closeThread(){ document.getElementById('dp-thread').classList.remove('active'); currentThreadId = null; loadChats(); }
-async function loadThreadMessages(isPolling = false){
-  const box = document.getElementById('dp-thread-msgs');
-  if (!isPolling) box.innerHTML = '<div class="dp-empty">Loading…</div>';
-  try {
-    const data = await api('/api/driver/chats/' + currentThreadId + '/messages');
-    const newHtml = data.messages.map(msgHtml).join('') || '<div class="dp-empty">Say hello 👋</div>';
-    if (box.innerHTML !== newHtml) {
-      const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
-      box.innerHTML = newHtml;
-      if (wasAtBottom || !isPolling) box.scrollTop = box.scrollHeight;
-    }
-  } catch(e){ if (!isPolling) box.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+function dpWaDownload(dataUrl, name) {
+  if(!dataUrl) return;
+  const a=document.createElement('a'); a.href=dataUrl; a.download=name||'file';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
-function roleColorVar(type){ if (type==='admin') return 'role-owner'; if (type==='dispatcher') return 'role-dispatcher'; if (type==='driver') return 'role-driver'; return 'role-admin'; }
-function msgHtml(m){
-  const mine = m.senderType === 'driver';
-  const cls = mine ? 'dp-msg-mine' : 'dp-msg-them';
-  const senderLine = !mine ? '<div class="dp-msg-sender" style="color:var(--' + roleColorVar(m.senderType) + ');">' + roleLabel(m.senderType) + (m.senderName?(' · '+escapeHtml(m.senderName)):'') + '</div>' : '';
-  return '<div class="dp-msg ' + cls + '">' + senderLine + escapeHtml(m.body) + '<div class="dp-msg-time">' + new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '</div></div>';
-}
-async function sendThreadMessage(){
-  const box = document.getElementById('dp-thread-input-box');
-  const text = box.value.trim();
-  if (!text || !currentThreadId) return;
-  box.value = '';
-  try { await api('/api/driver/chats/' + currentThreadId + '/messages', {method:'POST', body: JSON.stringify({body:text})}); await loadThreadMessages(); }
-  catch(e){ toast(e.message); }
-}
+
+// Close menus on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#dp-wa-emoji-btn')&&!e.target.closest('#dp-wa-emoji-picker')) {
+    dpWaEmojiOpen=false; const p=document.getElementById('dp-wa-emoji-picker'); if(p) p.style.display='none';
+  }
+  if (!e.target.closest('#dp-wa-attach-btn')&&!e.target.closest('#dp-wa-attach-menu')) {
+    dpWaAttachOpen=false; const m=document.getElementById('dp-wa-attach-menu'); if(m) m.style.display='none';
+  }
+});
 
 // ---------------- Profile ----------------
 const PROFILE_DOC_LABELS = { cdl:'CDL', license:'Driver License', insurance:'Insurance', medicalCard:'Medical Card', registration:'Truck Registration' };
