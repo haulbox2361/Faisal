@@ -2514,6 +2514,12 @@ table.data tbody td{padding:13px 13px;}
                       <option value="off">Off — just attach the file, fill in everything manually</option>
                     </select>
                   </div>
+                  <div class="field span-2" style="margin-top:8px;">
+                    <button class="btn btn-sm" style="background:#2563eb;color:#fff;font-weight:700;" onclick="testAiApiKey()">
+                      ⚡ Test API Key Connection
+                    </button>
+                    <div id="s-ai-test-status" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4597,6 +4603,50 @@ function computeFieldConfidence(data) {
   evalField('broker_mc', data.broker_mc, v => /^\d{4,8}$/.test(String(v).replace(/\D/g, '')));
 
   return scores;
+}
+
+// Tests the configured AI provider API Key
+async function testAiApiKey(){
+  const statusEl = document.getElementById('s-ai-test-status');
+  if(!statusEl) return;
+  statusEl.style.display = 'block';
+  statusEl.style.background = 'var(--panel-hi)';
+  statusEl.style.color = 'var(--text-dim)';
+  statusEl.style.border = '1px solid var(--border)';
+  statusEl.innerHTML = '⚡ Testing API Key connection…';
+
+  const provider = ['gemini','ocrspace','mistral'].includes(STATE.settings.aiProvider) ? STATE.settings.aiProvider : 'claude';
+  const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; // 1x1 png
+
+  try {
+    if(provider === 'mistral'){
+      const key = (STATE.settings.aiMistralKey||'').trim();
+      if(!key) throw new Error('Please enter a Mistral API key above before testing.');
+      await callMistralForDoc(sampleBase64, 'image/png', false, 'Return {"status":"ok"}');
+    } else if(provider === 'gemini'){
+      const key = (STATE.settings.aiGeminiKey||'').trim();
+      if(!key) throw new Error('Please enter a Gemini API key above before testing.');
+      await callGeminiForDoc(sampleBase64, 'image/png', false, 'Return {"status":"ok"}');
+    } else if(provider === 'ocrspace'){
+      const key = (STATE.settings.aiOcrSpaceKey||'').trim();
+      if(!key) throw new Error('Please enter an OCR.space API key above before testing.');
+      await callOcrSpaceForDoc(sampleBase64, 'image/png', false, 'rc');
+    } else {
+      const key = (STATE.settings.aiApiKey||'').trim();
+      if(!key) throw new Error('Please enter an Anthropic API key above before testing.');
+      await callAnthropicForDoc(sampleBase64, 'image/png', false, 'Return {"status":"ok"}');
+    }
+
+    statusEl.style.background = 'rgba(16,185,129,0.12)';
+    statusEl.style.color = '#10b981';
+    statusEl.style.border = '1px solid rgba(16,185,129,0.3)';
+    statusEl.innerHTML = '✅ API Key is working! Connected successfully to ' + provider.toUpperCase() + '.';
+  } catch(err) {
+    statusEl.style.background = 'rgba(239,68,68,0.12)';
+    statusEl.style.color = '#ef4444';
+    statusEl.style.border = '1px solid rgba(239,68,68,0.3)';
+    statusEl.innerHTML = '❌ Connection failed: ' + (err.message || 'Invalid API Key');
+  }
 }
 
 // Shared call to whichever AI provider is configured for single-document JSON extraction.
