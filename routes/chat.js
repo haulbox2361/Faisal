@@ -47,22 +47,18 @@ router.get('/api/chat/contacts', async (req, res) => {
     try { if (raw) state = JSON.parse(raw); } catch (e) {}
     
     const contacts = [];
-    if (me.type === 'admin') {
-      (state.dispatchers || []).forEach(d => {
+    (state.dispatchers || []).forEach(d => {
+      if (String(d.id) !== String(me.id)) {
         contacts.push({ type: 'dispatcher', id: String(d.id), name: d.name || 'Dispatcher', role: 'Dispatcher' });
-      });
-      (state.drivers || []).forEach(d => {
-        contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
-        contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
-      });
-    } else {
-      contacts.push({ type: 'admin', id: 'admin', name: (state.settings && state.settings.companyName) ? 'Owner/Admin' : 'Admin', role: 'Owner' });
-      const assigned = (state.drivers || []).filter(d => String(d.dispatcherId) === String(me.id));
-      assigned.forEach(d => {
-        contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
-        contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
-      });
+      }
+    });
+    if (me.type !== 'admin') {
+      contacts.push({ type: 'admin', id: 'admin', name: (state.settings && state.settings.companyName) ? state.settings.companyName + ' (Admin)' : 'Admin', role: 'Owner / Admin' });
     }
+    (state.drivers || []).forEach(d => {
+      contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
+      contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
+    });
     res.json({ contacts });
   } catch (e) {
     console.error('chat contacts failed:', e);

@@ -984,25 +984,43 @@ table.data tbody td{padding:13px 13px;}
 
       <!-- ============ DASHBOARD ============ -->
       <section class="view active" id="view-dashboard">
-        <div class="stat-grid dash-grid" id="stat-grid"></div>
-        <div class="chart-grid">
-          <div class="chart-card">
-            <h3>Recently Booked Loads</h3>
-            <div class="list-wrap" id="list-recent-booked"></div>
+        <!-- Top Metric Bar (3 Cards) -->
+        <div class="stat-grid cols-3" id="stat-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;"></div>
+
+        <!-- Middle Summary Row (3 Equal Cards) -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;">
+          <div class="panel panel-pad" style="height:190px;overflow-y:auto;">
+            <h3 style="font-size:13px;font-weight:700;margin:0 0 10px;color:var(--text-main);">🔔 Recent Notifications</h3>
+            <div id="list-notifications"></div>
           </div>
-          <div class="chart-card">
-            <h3>Drivers Empty Now</h3>
-            <div class="list-wrap" id="list-drivers-empty"></div>
+          <div class="panel panel-pad" style="height:190px;overflow-y:auto;">
+            <h3 style="font-size:13px;font-weight:700;margin:0 0 10px;color:var(--text-main);">🚚 Recent Drivers Update</h3>
+            <div id="list-driver-updates"></div>
+          </div>
+          <div class="panel panel-pad" style="height:190px;overflow-y:auto;">
+            <h3 style="font-size:13px;font-weight:700;margin:0 0 10px;color:var(--text-main);">🏁 Today's Deliveries &amp; Empty Drivers</h3>
+            <div id="list-today-empty"></div>
           </div>
         </div>
-        <div class="bottom-grid">
-          <div class="chart-card">
-            <h3>Picking Up Today (PU)</h3>
-            <div class="list-wrap small" id="list-pu-today"></div>
+
+        <!-- Bottom Wide Section: Today's Booked Loads (5 Columns, 6 Scrollable Rows) -->
+        <div class="panel panel-pad">
+          <div class="section-head" style="margin-bottom:10px;">
+            <h2 style="font-size:14px;font-weight:700;">📦 Today's Booked Loads</h2>
           </div>
-          <div class="chart-card">
-            <h3>Delivering Today (DO)</h3>
-            <div class="list-wrap small" id="list-do-today"></div>
+          <div class="table-wrap" style="max-height:280px;overflow-y:auto;">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th style="width:15%;">Load No</th>
+                  <th style="width:20%;">Driver Name</th>
+                  <th style="width:35%;">Lane</th>
+                  <th style="width:15%;">Rate</th>
+                  <th style="width:15%;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="dash-today-loads-body"></tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -2838,6 +2856,31 @@ function within(dateStr, range, fromDate, toDate){
   return true;
 }
 
+function placard(status, l){
+  if (l && l.ocrValidation && (l.ocrValidation.pickupMatch === false || l.ocrValidation.deliveryMatch === false) && !l.ocrValidation.adminApproved) {
+    return '<span class="placard pl-red" style="font-weight:700;"><span class="dot"></span>Issue</span>';
+  }
+
+  const st = l ? (l.driverProgress || l.status || status) : status;
+  if (st === 'Booked' || st === 'Pending RC' || st === 'ACCEPTED' || st === 'Accepted') {
+    return '<span class="placard pl-white" style="font-weight:700;"><span class="dot"></span>Booked / Accepted</span>';
+  }
+  if (st === 'AT_PICKUP' || st === 'At Pickup' || st === 'Loaded') {
+    const timeText = (l && l.pickupTime) ? `ETA ${l.pickupTime} / PU` : 'ETA 11AM / PU';
+    return `<span class="placard pl-yellow" style="font-weight:700;"><span class="dot"></span>${timeText}</span>`;
+  }
+  if (st === 'IN_TRANSIT' || st === 'In Transit' || st === 'AT_DELIVERY' || st === 'At Delivery' || st === 'Drop-off') {
+    const timeText = (l && l.deliveryTime) ? `ETA ${l.deliveryTime} / Drop-off` : 'ETA 2PM (Mon) / Drop-off';
+    return `<span class="placard pl-green" style="font-weight:700;"><span class="dot"></span>${timeText}</span>`;
+  }
+  if (st === 'DELIVERED' || st === 'Delivered' || st === 'POD Uploaded') {
+    return '<span class="placard pl-green" style="font-weight:700;"><span class="dot"></span>Delivered</span>';
+  }
+
+  const meta = STATUS_META[st] || STATUS_META[status] || {color:'gray', label:status};
+  return '<span class="placard pl-'+meta.color+'"><span class="dot"></span>'+meta.label+'</span>';
+}
+
 /* ================= DASHBOARD ================= */
 function getHidePref(key){ try{ return localStorage.getItem('haulline-hide-'+key)==='1'; }catch(e){ return false; } }
 function setHidePref(key,val){ try{ localStorage.setItem('haulline-hide-'+key, val?'1':'0'); }catch(e){} }
@@ -2847,74 +2890,99 @@ function eyeIcon(hidden){
     ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 20c-5.5 0-9.5-4-11-8 .7-2 2-3.9 3.6-5.4M9.9 4.2A10.7 10.7 0 0 1 12 4c5.5 0 9.5 4 11 8-.5 1.4-1.3 2.8-2.3 4M3 3l18 18"/><path d="M9.5 9.5a3 3 0 0 0 4.2 4.2"/></svg>'
     : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 }
+
 function renderDashboard(){
   const loads = visibleLoads();
-  const monthLoads = loads.filter(l=>within(l.systemDate,'month'));
-  const gross = monthLoads.reduce((s,l)=>s+Number(l.brokerRate||0),0);
-  const dispatchRev = monthLoads.reduce((s,l)=>s+Number(l.dispatchRevenue||0),0);
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  // 1. TOP METRICS BAR (3 Items)
   const activeDrivers = visibleDrivers().filter(d=>d.active);
   const availableDrivers = activeDrivers.filter(d=>driverAvailability(d.id).available);
-  const busyDrivers = activeDrivers.filter(d=>!driverAvailability(d.id).available);
+  
+  const weekLoads = loads.filter(l=>within(l.systemDate,'week'));
+  const weekGross = weekLoads.reduce((s,l)=>s+Number(l.brokerRate||0),0);
+  
+  const monthLoads = loads.filter(l=>within(l.systemDate,'month'));
+  const monthDispatchRev = monthLoads.reduce((s,l)=>s+Number(l.dispatchRevenue||0),0);
 
   const grossHidden = getHidePref('gross');
   const dispatchHidden = getHidePref('dispatch');
 
-  const driverListHtml = busyDrivers.length
-    ? '<div class="driver-status-list">' + busyDrivers.slice(0,4).map(d=>{
-        const a = driverAvailability(d.id);
-        return '<div class="driver-status-row"><span>'+d.name+'</span><span>until '+(a.until? fmtDate(a.until):'—')+'</span></div>';
-      }).join('') + '</div>'
-    : '<div class="driver-status-list"><div class="driver-status-row"><span style="color:var(--green);">All drivers available</span></div></div>';
-
   document.getElementById('stat-grid').innerHTML = `
     <div class="stat-card" style="--stat-color:var(--blue)">
-      <div class="stat-label"><span>Driver Status</span></div>
+      <div class="stat-label"><span>Available Drivers</span></div>
       <div class="stat-value">${availableDrivers.length} / ${activeDrivers.length} <span style="font-size:12px;color:var(--text-faint);font-family:'Inter';font-weight:500;">available</span></div>
-      ${driverListHtml}
     </div>
     <div class="stat-card" style="--stat-color:var(--green)">
-      <div class="stat-label"><span>Gross Revenue · This Month</span><button class="eye-toggle" onclick="toggleFinancial('gross')" title="${grossHidden?'Show':'Hide'}">${eyeIcon(grossHidden)}</button></div>
-      <div class="stat-value ${grossHidden?'masked':''}">${grossHidden? '••••••' : money(gross)}</div>
+      <div class="stat-label"><span>This Week Gross</span><button class="eye-toggle" onclick="toggleFinancial('gross')" title="${grossHidden?'Show':'Hide'}">${eyeIcon(grossHidden)}</button></div>
+      <div class="stat-value ${grossHidden?'masked':''}">${grossHidden? '••••••' : money(weekGross)}</div>
     </div>
     <div class="stat-card" style="--stat-color:var(--accent)">
-      <div class="stat-label"><span>Dispatch Revenue · This Month</span><button class="eye-toggle" onclick="toggleFinancial('dispatch')" title="${dispatchHidden?'Show':'Hide'}">${eyeIcon(dispatchHidden)}</button></div>
-      <div class="stat-value ${dispatchHidden?'masked':''}">${dispatchHidden? '••••••' : money(dispatchRev)}</div>
+      <div class="stat-label"><span>This Month Dispatch</span><button class="eye-toggle" onclick="toggleFinancial('dispatch')" title="${dispatchHidden?'Show':'Hide'}">${eyeIcon(dispatchHidden)}</button></div>
+      <div class="stat-value ${dispatchHidden?'masked':''}">${dispatchHidden? '••••••' : money(monthDispatchRev)}</div>
     </div>
   `;
 
-  const todayStr = new Date().toISOString().slice(0,10);
+  // 2. MIDDLE ROW (3 Summary Cards)
+  // Card 1: Recent Notifications
+  const notifsList = (STATE.notifications || []).slice(0, 6);
+  const notifEl = document.getElementById('list-notifications');
+  if (notifEl) {
+    notifEl.innerHTML = notifsList.length ? notifsList.map(n => `
+      <div style="padding:6px 0;border-bottom:1px solid var(--border-soft);font-size:12px;">
+        <div style="font-weight:600;color:var(--text-main);">${escapeAttr(n.title||n.type||'Notification')}</div>
+        <div style="font-size:11px;color:var(--text-faint);">${escapeAttr(n.body||'')}</div>
+      </div>
+    `).join('') : '<div class="cell-dim" style="font-size:12px;padding:8px 0;">No recent notifications.</div>';
+  }
 
-  // Recently Booked Loads — newest first
-  const recentBooked = [...loads].sort((a,b)=> new Date(b.systemDate) - new Date(a.systemDate)).slice(0,8);
-  renderListCard('list-recent-booked', recentBooked.map(l=>({
-    dot:'var(--accent)',
-    title: '<b>'+l.loadNumber+'</b> — '+l.driverName,
-    sub: 'Booked '+fmtDate(l.systemDate)+' · '+l.brokerName+' · '+l.pickup+' → '+l.dropoff+' · Load '+l.loadNumber
-  })), 'No loads booked yet.');
+  // Card 2: Recent Drivers Update
+  const busyDrivers = activeDrivers.filter(d=>!driverAvailability(d.id).available);
+  const driverUpdateEl = document.getElementById('list-driver-updates');
+  if (driverUpdateEl) {
+    driverUpdateEl.innerHTML = busyDrivers.length ? busyDrivers.slice(0, 6).map(d => {
+      const a = driverAvailability(d.id);
+      return `
+        <div style="padding:6px 0;border-bottom:1px solid var(--border-soft);font-size:12px;">
+          <div style="font-weight:600;color:var(--text-main);">${escapeAttr(d.name)} — Truck ${escapeAttr(d.truck||'—')}</div>
+          <div style="font-size:11px;color:var(--text-faint);">${a.load ? 'Assigned Load #' + a.load.loadNumber + ' (' + a.load.status + ')' : 'Clocked On'}</div>
+        </div>
+      `;
+    }).join('') : '<div class="cell-dim" style="font-size:12px;padding:8px 0;">All drivers currently available.</div>';
+  }
 
-  // Drivers Empty Now — active drivers with no open load
-  const emptyDrivers = activeDrivers.filter(d=>driverAvailability(d.id).available);
-  renderListCard('list-drivers-empty', emptyDrivers.map(d=>({
-    dot:'var(--green)',
-    title: '<b>'+d.name+'</b> — Available now',
-    sub: (d.truck?d.truck+' · ':'')+(d.company||'No active load')
-  })), 'No drivers are empty right now.');
-
-  // Picking Up Today — booked/active loads whose PU date is today
-  const puToday = loads.filter(l=>l.status!=='Drop-off' && l.pickupDate===todayStr);
-  renderListCard('list-pu-today', puToday.map(l=>({
-    dot:'var(--yellow)',
-    title: '<b>'+l.driverName+'</b> — PU today',
-    sub: l.brokerName+' · '+l.pickup+' · Load '+l.loadNumber
-  })), 'No drivers have a pickup today.');
-
-  // Delivering Today — loads whose DO date is today
+  // Card 3: Today's Deliveries & Empty Drivers
   const doToday = loads.filter(l=>l.deliveryDate===todayStr);
-  renderListCard('list-do-today', doToday.map(l=>({
-    dot:'var(--blue)',
-    title: '<b>'+l.driverName+'</b> — DO today',
-    sub: l.brokerName+' · '+l.dropoff+' · Load '+l.loadNumber+' · '+l.status
-  })), 'No drivers have a delivery today.');
+  const emptyDrivers = activeDrivers.filter(d=>driverAvailability(d.id).available);
+  const todayEmptyEl = document.getElementById('list-today-empty');
+  if (todayEmptyEl) {
+    let h = '';
+    if (doToday.length) {
+      h += doToday.map(l => `<div style="padding:4px 0;font-size:12px;"><b>ETA Today:</b> Load #${escapeAttr(l.loadNumber)} — ${escapeAttr(l.driverName)} (${escapeAttr(l.dropoff)})</div>`).join('');
+    }
+    if (emptyDrivers.length) {
+      h += `<div style="margin-top:6px;font-size:11.5px;color:var(--green,#10b981);font-weight:600;">Available: ${emptyDrivers.map(d=>escapeAttr(d.name)).join(', ')}</div>`;
+    }
+    todayEmptyEl.innerHTML = h || '<div class="cell-dim" style="font-size:12px;padding:8px 0;">No deliveries scheduled today.</div>';
+  }
+
+  // 3. BOTTOM SECTION: TODAY'S BOOKED LOADS (WIDE TABLE, EXACTLY 5 COLUMNS, 6 SCROLLABLE ROWS)
+  const todayLoads = loads.filter(l => l.systemDate === todayStr || l.pickupDate === todayStr || l.status !== 'Drop-off').slice(0, 30);
+  const tableBody = document.getElementById('dash-today-loads-body');
+  if (tableBody) {
+    tableBody.innerHTML = todayLoads.map(l => {
+      const lane = [l.pickup, l.dropoff].filter(Boolean).join(' → ') || '—';
+      return `
+        <tr onclick="openLoadModal('${l.id}')">
+          <td class="cell-mono cell-strong">${escapeAttr(l.loadNumber)}</td>
+          <td>${escapeAttr(l.driverName || '—')}</td>
+          <td class="cell-dim">${escapeAttr(lane)}</td>
+          <td class="cell-mono">${money(l.brokerRate)}</td>
+          <td>${placard(l.status, l)}</td>
+        </tr>
+      `;
+    }).join('') || '<tr><td colspan="5" class="cell-dim" style="text-align:center;padding:16px;">No loads booked for today.</td></tr>';
+  }
 }
 
 async function renderLiveTrackingDashboardSection(){
