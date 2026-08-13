@@ -1594,7 +1594,7 @@ function dpWaRenderList() {
       const bg = dpWaAvatarColor(nm);
       const ini = c.isGroup ? 'GC' : initials(nm);
       const isActive = String(c.id)===String(currentThreadId);
-      return `<div class="dp-wa-chat-item${isActive?' active':''" onclick="openThread(${c.id},'${escapeHtml(nm).replace(/'/g,'')}',${!!c.isGroup})">
+      return `<div class="dp-wa-chat-item${isActive?' active':''}" onclick="openThread(${c.id},'${escapeHtml(nm).replace(/'/g,'')}',${!!c.isGroup})">
         <div style="width:44px;height:44px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">${ini}</div>
         <div class="dp-wa-chat-item-body">
           <div class="dp-wa-chat-item-top">
@@ -1960,6 +1960,13 @@ async function saveTruckInfo(){
       make: document.getElementById('ti-make').value.trim(),
       model: document.getElementById('ti-model').value.trim(),
       year: document.getElementById('ti-year').value.trim(),
+      vin: document.getElementById('ti-vin').value.trim()
+    })});
+    toast('Truck info updated');
+    closeModal('dp-job-modal');
+    loadProfile();
+  } catch(e){ toast(e.message); }
+}
 function startUploadDoc(loadId, key) {
   pendingUpload = { profile: false, loadId, key };
   const input = document.getElementById('dp-file-input');
