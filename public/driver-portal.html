@@ -788,14 +788,24 @@ function logout(){
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
+
 async function boot(){
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('dp-avatar').textContent = initials(ME.name);
+  const name = (ME && ME.name) || 'Driver';
+  const av = document.getElementById('dp-avatar');
+  if (av) av.textContent = initials(name);
   setDriverPortalPage('current');
   startChatPolling();
 }
-(async function init(){ if (await tryResumeSession()) boot(); })();
+
+// Always start on login screen on refresh — requires complete fresh login every time
+(function init(){
+  TOKEN = null;
+  localStorage.removeItem('hb_driver_token');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+})();
 
 let chatPollTimer = null;
 function startChatPolling() {
@@ -834,9 +844,13 @@ function updateChatNavBadge(count){
   const b = document.getElementById('dp-chat-nav-badge');
   const dot = document.getElementById('dp-header-dot');
   const n = count || 0;
-  b.textContent = n > 9 ? '9+' : String(n);
-  b.style.display = n > 0 ? 'flex' : 'none';
-  dot.style.display = n > 0 ? 'block' : 'none';
+  if (b) {
+    b.textContent = n > 9 ? '9+' : String(n);
+    b.style.display = n > 0 ? 'flex' : 'none';
+  }
+  if (dot) {
+    dot.style.display = n > 0 ? 'block' : 'none';
+  }
 }
 
 // ---------------- Current Load (+ merged Home summary) ----------------
