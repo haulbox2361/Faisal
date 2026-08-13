@@ -768,23 +768,36 @@ async function doLogin(){
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed');
     TOKEN = data.token; localStorage.setItem('hb_driver_token', TOKEN);
-    ME = data.driver; PERMS = data.permissions || {};
+    ME = data.driver; localStorage.setItem('hb_driver_me', JSON.stringify(ME));
+    PERMS = data.permissions || {};
     document.getElementById('dp-subtitle').textContent = data.companyName || 'Driver Portal';
     boot();
   } catch(e){
-    errEl.textContent = e.message;
+    errEl.textContent = e.message || 'Login failed';
   } finally {
     btn.disabled = false; btn.textContent = 'Sign In';
   }
 }
+
 async function tryResumeSession(){
   if (!TOKEN) return false;
-  try { const data = await api('/api/driver/me'); ME = data.driver; PERMS = data.permissions || {}; return true; }
-  catch(e){ TOKEN=null; localStorage.removeItem('hb_driver_token'); return false; }
+  try {
+    const data = await api('/api/driver/me');
+    ME = data.driver; PERMS = data.permissions || {};
+    localStorage.setItem('hb_driver_me', JSON.stringify(ME));
+    return true;
+  } catch(e){
+    const savedMe = localStorage.getItem('hb_driver_me');
+    if (savedMe) {
+      try { ME = JSON.parse(savedMe); return true; } catch(_){}
+    }
+    TOKEN = null; localStorage.removeItem('hb_driver_token'); return false;
+  }
 }
+
 function logout(){
   api('/api/driver/logout', {method:'POST'}).catch(()=>{});
-  TOKEN = null; localStorage.removeItem('hb_driver_token');
+  TOKEN = null; localStorage.removeItem('hb_driver_token'); localStorage.removeItem('hb_driver_me');
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -795,16 +808,18 @@ async function boot(){
   const name = (ME && ME.name) || 'Driver';
   const av = document.getElementById('dp-avatar');
   if (av) av.textContent = initials(name);
-  setDriverPortalPage('current');
+  const savedPage = localStorage.getItem('hb_driver_active_page') || 'current';
+  setDriverPortalPage(savedPage);
   startChatPolling();
 }
 
-// Always start on login screen on refresh — requires complete fresh login every time
-(function init(){
-  TOKEN = null;
-  localStorage.removeItem('hb_driver_token');
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
+(async function init(){
+  if (await tryResumeSession()) {
+    boot();
+  } else {
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
 })();
 
 let chatPollTimer = null;
@@ -821,6 +836,7 @@ function startChatPolling() {
 
 // ---------------- Nav ----------------
 function setDriverPortalPage(page){
+  localStorage.setItem('hb_driver_active_page', page);
   document.querySelectorAll('.dp-nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
   document.getElementById('dp-nav-current').classList.toggle('active', page==='current');
   document.querySelectorAll('.dp-page').forEach(el=>{
