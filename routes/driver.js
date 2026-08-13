@@ -453,7 +453,6 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
   load.driverProgress = checkpoint;
   try {
     await saveFullState(state);
-    await history.record(load.id, checkpoint, note || null, { type: 'driver', id: driver.id, name: driver.name });
     await notifications.create('admin', 'admin', {
       type: 'load_status_changed',
       title: `${driver.name || 'Driver'} — ${load.loadNumber || load.id}`,
@@ -464,6 +463,32 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
   } catch (e) {
     console.error('driver status update failed:', e);
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// POST /api/driver/loads/:id/eta  { eta }
+router.post('/api/driver/loads/:id/eta', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { eta } = req.body || {};
+  if (!eta) return res.status(400).json({ error: 'Missing ETA string' });
+
+  const { state, driver } = ctx;
+  const load = (state.loads || []).find((l) => l.id === req.params.id && l.driverId === driver.id);
+  if (!load) return res.status(404).json({ error: 'Load not found' });
+
+  load.eta = eta;
+  load.driverManualEta = eta;
+  load.etaUpdatedAt = new Date().toISOString();
+  load.etaUpdatedBy = driver.name || 'Driver';
+
+  try {
+    await saveFullState(state);
+    await history.record(load.id, 'ETA_UPDATED', `Driver updated ETA to: ${eta}`, { type: 'driver', id: driver.id, name: driver.name });
+    res.json({ ok: true, load: shapeLoadForDriver(load) });
+  } catch (e) {
+    console.error('driver eta update failed:', e);
+    res.status(500).json({ error: 'Failed to save ETA' });
   }
 });
 

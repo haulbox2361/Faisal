@@ -744,6 +744,67 @@ function progressTimelineHtml(l){
   return h;
 }
 
+function todayLoadBannerHtml(l){
+  const todayStr = new Date().toISOString().slice(0,10);
+  const isToday = (l.pickupDate && l.pickupDate.includes(todayStr)) || (l.driverProgress && l.driverProgress !== 'DELIVERED');
+  if (!isToday && !l) return '';
+
+  const puCity = (l.pickup || '—').split(',')[0];
+  const doCity = (l.dropoff || '—').split(',')[0];
+
+  return `<div class="dp-card dp-block" style="background:linear-gradient(135deg, rgba(37,99,235,0.12), rgba(16,185,129,0.08));border:1px solid var(--brand);margin-top:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <span style="font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.05em;">🚚 Today's Scheduled Load</span>
+      <span style="font-size:11px;font-weight:700;background:var(--brand);color:#fff;padding:2px 8px;border-radius:10px;">Active</span>
+    </div>
+    <div style="font-size:14px;font-weight:800;color:var(--foreground);">${escapeHtml(puCity)} → ${escapeHtml(doCity)}</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Pickup: <b>${escapeHtml(l.pickupDate||'Today')} ${escapeHtml(l.pickupTime||'')}</b> · Load #${escapeHtml(l.loadNumber||l.id)}</div>
+  </div>`;
+}
+
+function driverEtaCardHtml(l){
+  const trk = l.tracking || {};
+  const milesPu = trk.milesToPickup != null ? trk.milesToPickup : '—';
+  const milesDo = trk.milesToDelivery != null ? trk.milesToDelivery : (l.miles || '—');
+  const driverEtaVal = l.driverManualEta || l.eta || '';
+
+  return `<div class="dp-card dp-block" style="margin-top:14px;">
+    <div class="dp-section-title"><div class="t"><span class="icn">📍</span>Distance & ETA Calculator</div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid var(--border-soft);">
+        <span>📍 You are from Pickup:</span>
+        <b style="color:var(--brand);font-size:13.5px;">${milesPu} miles away</b>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid var(--border-soft);">
+        <span>🏁 Pickup to Delivery:</span>
+        <b style="font-size:13.5px;">${milesDo} miles</b>
+      </div>
+      <div style="margin-top:6px;">
+        <label style="font-weight:700;font-size:11.5px;display:block;margin-bottom:6px;color:var(--foreground);">What is your estimated ETA?</label>
+        <div style="display:flex;gap:8px;">
+          <input id="dp-driver-eta-input" type="text" placeholder="e.g. Today 4:30 PM or 2 hours" value="${escapeHtml(driverEtaVal)}" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--foreground);font-size:13px;">
+          <button class="dp-btn-sm primary" style="padding:0 14px;font-weight:700;" onclick="updateDriverEta('${l.id}')">Save ETA</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Updates system tracking and notifies dispatch of your ETA.</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function updateDriverEta(loadId){
+  const input = document.getElementById('dp-driver-eta-input');
+  const val = input ? input.value.trim() : '';
+  if (!val) return toast('Please enter an ETA');
+  try {
+    await api('/api/driver/loads/' + loadId + '/eta', {
+      method: 'POST',
+      body: JSON.stringify({ eta: val })
+    });
+    toast('ETA saved: ' + val);
+    loadCurrent();
+  } catch(e){ toast(e.message); }
+}
+
 function locationSharingCardHtml(){
   const mode = localStorage.getItem('hb_driver_sharing_mode') || 'ACTIVE_LOAD';
   const statusText = window.driverGpsStatus || 'Ready (Auto-updates every 5m)';
@@ -1434,9 +1495,36 @@ async function loadProfile(){
     if (docs.canEdit && photos.length < 8) h += '<button class="dp-photo-add" onclick="startUploadProfile(\'truckPhotos\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add</button>';
     h += '</div></div>';
 
+    h += profileLocationToggleHtml();
     h += '<button class="dp-logout-btn" onclick="logout()">Sign Out</button>';
     el.innerHTML = h;
   } catch(e){ el.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
+}
+
+function profileLocationToggleHtml(){
+  const isOff = localStorage.getItem('hb_driver_sharing_mode') === 'OFF';
+  const isLocOn = !isOff;
+
+  return `<div class="dp-block">
+    <div class="dp-section-title"><div class="t">📍 Location Sharing Settings</div></div>
+    <div class="dp-card" style="display:flex;align-items:center;justify-content:space-between;padding:14px;">
+      <div>
+        <div style="font-weight:700;font-size:13.5px;color:var(--foreground);">GPS Location Sharing</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Allows Dispatch & Admin to view live load position</div>
+      </div>
+      <button class="dp-btn-sm ${isLocOn ? 'primary' : 'ghost'}" onclick="toggleProfileLocationSharing(${!isLocOn})" style="font-weight:800;padding:6px 16px;">
+        ${isLocOn ? '🟢 ON' : '⚪ OFF'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function toggleProfileLocationSharing(turnOn){
+  const val = turnOn ? 'ACTIVE_LOAD' : 'OFF';
+  localStorage.setItem('hb_driver_sharing_mode', val);
+  toast('Location sharing turned ' + (turnOn ? 'ON' : 'OFF'));
+  triggerDriverGpsReport(true);
+  loadProfile();
 }
 function PROFILE_DOC_KEYS_LIST(){ return Object.keys(PROFILE_DOC_LABELS).concat(Object.keys(TRUCK_DOC_LABELS)); }
 async function viewProfileDoc(key, index){
