@@ -2153,16 +2153,48 @@ document.getElementById('dp-file-input').addEventListener('change', async functi
         })
       });
       toast('✅ ' + docName + ' uploaded!');
+      const uploadedKey = pendingUpload.key;
+      const uploadedLoadId = pendingUpload.loadId;
+      pendingUpload = null;
       loadCurrent();
       if (document.getElementById('dp-job-modal').classList.contains('active')) {
-        openLoadDetails(pendingUpload.loadId);
+        openLoadDetails(uploadedLoadId);
+      }
+      if (uploadedKey === 'BOL') {
+        setTimeout(() => promptUploadFreightPictures(uploadedLoadId, 'PhotosPU'), 300);
+      } else if (uploadedKey === 'POD') {
+        setTimeout(() => promptUploadFreightPictures(uploadedLoadId, 'PhotosDO'), 300);
       }
     } catch (e) {
       toast('Upload error: ' + (e.message || 'Failed'));
+      pendingUpload = null;
     }
+  } else {
+    pendingUpload = null;
   }
-  pendingUpload = null;
 });
+
+function promptUploadFreightPictures(loadId, key) {
+  const isPu = key === 'PhotosPU';
+  const title = isPu ? '📷 Upload Loading Photos' : '📷 Upload Unloading Photos';
+  const sub = isPu ? 'BOL uploaded successfully! Would you like to upload photos of the loaded freight?' : 'POD uploaded successfully! Would you like to upload photos of the unloaded freight?';
+  
+  const numEl = document.getElementById('dp-jd-num');
+  const bodyEl = document.getElementById('dp-jd-body');
+  if (numEl) numEl.textContent = title;
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div style="text-align:center;padding:10px 0;">
+        <div style="font-size:13.5px;color:var(--muted);margin-bottom:20px;line-height:1.5;">${sub}</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <button class="dp-btn-sm primary" style="padding:14px;font-size:14px;font-weight:800;width:100%;" onclick="closeModal('dp-job-modal'); startUploadDoc('${loadId}', '${key}')">📷 Upload ${isPu ? 'Loading' : 'Unloading'} Pictures</button>
+          <button class="dp-btn-sm ghost" style="padding:12px;font-size:13px;width:100%;" onclick="closeModal('dp-job-modal')">Skip for Now</button>
+        </div>
+      </div>
+    `;
+  }
+  openModal('dp-job-modal');
+}
 </script>
 </body>
 </html>
