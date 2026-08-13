@@ -604,22 +604,7 @@ a{color:inherit;}
   </div>
 </div>
 
-<!-- Accept Load ETA Modal (Required) -->
-<div class="dp-modal-overlay" id="dp-accept-eta-modal">
-  <div class="dp-modal">
-    <div class="dp-modal-head">
-      <div><div class="dp-modal-head-sub">Load Acceptance</div><h3>Enter Pickup ETA</h3></div>
-      <button class="dp-modal-close" onclick="closeModal('dp-accept-eta-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-    </div>
-    <div class="dp-modal-body">
-      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Please specify your estimated pickup date and time before accepting this load.</p>
-      <div class="login-field"><label>Pickup Date *</label><input type="date" id="accept-eta-date" required></div>
-      <div class="login-field"><label>Pickup Time *</label><input type="time" id="accept-eta-time" required></div>
-      <div class="login-field"><label>Optional Notes</label><input type="text" id="accept-eta-notes" placeholder="e.g. Fuel stop required, traffic normal"></div>
-      <button class="dp-btn-sm primary" style="width:100%;padding:14px;font-weight:800;margin-top:10px;font-size:14px;" id="accept-eta-btn" onclick="submitAcceptEta()">Confirm &amp; Accept Load →</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- WhatsApp-style Chat thread overlay -->
 <div id="dp-thread">
@@ -1190,7 +1175,7 @@ function checkpointBlockHtml(l, suffix = '') {
   }
 
   if (cp === 'ASSIGNED') {
-    return `<button class="dp-checkpoint-btn" style="background:#10b981;" onclick="openAcceptEtaModal('${l.id}')">Accept Load (ETA Required) →</button>`;
+    return `<button class="dp-checkpoint-btn" style="background:#10b981;" onclick="advanceCheckpoint('${l.id}','ACCEPTED')">Accept Load →</button>`;
   }
   if (cp === 'ACCEPTED') {
     return `<button class="dp-checkpoint-btn" onclick="advanceCheckpoint('${l.id}','EN_ROUTE_PU')">Start Trip to Pickup →</button>`;
@@ -1214,47 +1199,26 @@ function checkpointBlockHtml(l, suffix = '') {
   return '';
 }
 
-let pendingAcceptLoadId = null;
+function photosSectionHtml(l) {
+  const docs = l.docs || l.documents || {};
+  const hasBol = !!(docs.BOL && (docs.BOL.hasFile || docs.BOL.name || docs.BOL.data));
+  const cp = (l.driverProgress || 'ASSIGNED').toUpperCase();
 
-function openAcceptEtaModal(loadId) {
-  pendingAcceptLoadId = loadId;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  document.getElementById('accept-eta-date').value = todayStr;
-  document.getElementById('accept-eta-time').value = '08:00';
-  document.getElementById('accept-eta-notes').value = '';
-  openModal('dp-accept-eta-modal');
-}
+  const showLoading = hasBol || ['LOADED', 'IN_TRANSIT', 'AT_DELIVERY', 'POD_UPLOADED', 'COMPLETED'].includes(cp);
+  const showUnloading = ['AT_DELIVERY', 'POD_UPLOADED', 'COMPLETED'].includes(cp);
 
-async function submitAcceptEta() {
-  if (!pendingAcceptLoadId) return;
-  const dateVal = document.getElementById('accept-eta-date').value.trim();
-  const timeVal = document.getElementById('accept-eta-time').value.trim();
-  const notes = document.getElementById('accept-eta-notes').value.trim();
+  if (!showLoading && !showUnloading) return '';
 
-  if (!dateVal || !timeVal) {
-    return toast('Pickup ETA Date and Time are required.');
+  let h = '<div class="dp-card dp-block" style="margin-top:12px;padding:14px;"><div class="dp-section-title"><div class="t"><span class="icn">📷</span>Freight Photos</div></div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;">';
+  if (showLoading) {
+    h += '<div>' + photoBlockHtml('Loading Photos (PU)', l, 'PhotosPU') + '</div>';
   }
-
-  const btn = document.getElementById('accept-eta-btn');
-  btn.disabled = true;
-  btn.textContent = 'Accepting Load…';
-
-  try {
-    const res = await api('/api/driver/loads/' + pendingAcceptLoadId + '/accept', {
-      method: 'POST',
-      body: JSON.stringify({ etaDate: dateVal, etaTime: timeVal, notes })
-    });
-    toast('✅ Load Accepted! Pickup ETA: ' + dateVal + ' ' + timeVal);
-    closeModal('dp-accept-eta-modal');
-    pendingAcceptLoadId = null;
-    loadCurrent();
-    triggerDriverGpsReport(true);
-  } catch (e) {
-    toast('Accept failed: ' + (e.message || 'Error'));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Confirm & Accept Load →';
+  if (showUnloading) {
+    h += '<div>' + photoBlockHtml('Unloading Photos (DO)', l, 'PhotosDO') + '</div>';
   }
+  h += '</div></div>';
+  return h;
 }
 
 async function advanceCheckpoint(loadId, status){
@@ -1326,8 +1290,7 @@ function currentContentHtml(dash, home){
   h += loadTimelineBlockHtml(l);
   h += stopBlockHtml(l);
   h += docsBlockHtml(l);
-  h += photoBlockHtml('Loading Photos', l, 'PhotosPU');
-  h += photoBlockHtml('Unloading Photos', l, 'PhotosDO');
+  h += photosSectionHtml(l);
   if (l.notes) h += '<div class="dp-notes dp-block"><b>Note: </b>' + escapeHtml(l.notes) + '</div>';
   h += mergedHomeHtml(home);
 
