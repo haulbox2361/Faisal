@@ -4495,16 +4495,17 @@ async function extractRcWithAI(file){
     setRcAiStatus('idle','AI auto-fill only reads PDF or image RCs — this file type will need to be filled in manually.');
     return;
   }
-  setRcAiStatus('working','Reading the RC and filling in the form…');
+  setRcAiStatus('working','Reading Rate Confirmation and auto-filling form fields…');
   try{
     const dataUrl = await readFileAsDataURL(file);
     const base64 = dataUrl.split(',')[1];
     const mediaType = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
-    const prompt = 'This is a freight broker Rate Confirmation (RC) document. Read it and return ONLY a raw JSON object '+
-      '(no markdown fences, no commentary) with exactly these keys: '+
+    const prompt = 'This is a freight broker Rate Confirmation (RC) document. Read it carefully and return ONLY a valid JSON object '+
+      '(no markdown blocks, no text before or after) with exactly these keys: '+
       '{"load_number":"","pickup_date":"YYYY-MM-DD or empty","delivery_date":"YYYY-MM-DD or empty",'+
-      '"pickup_city":"","pickup_state":"2-letter state code","dropoff_city":"","dropoff_state":"2-letter state code",'+
-      '"miles":number or null,"rate":number or null,"notes":""}.';
+      '"pickup_address":"","pickup_city":"","pickup_state":"2-letter state code",'+
+      '"delivery_address":"","dropoff_city":"","dropoff_state":"2-letter state code",'+
+      '"miles":number or null,"rate":number or null,"broker_name":"","broker_mc":"","notes":""}.';
     let parsed = null;
     try {
       parsed = await callClaudeForDoc(base64, mediaType, isPdf, prompt, 'rc');
@@ -4521,54 +4522,61 @@ async function extractRcWithAI(file){
       }
     }
     const filled = applyExtractedRcData(parsed);
-    setRcAiStatus('ok', filled.length ? ('Auto-filled from RC: '+filled.join(', ')+'. Please double-check before booking.') : 'Uploaded RC document — load fields pre-filled.');
+    setRcAiStatus('ok', filled.length ? ('Auto-filled from RC: '+filled.join(', ')+'. Please review before booking.') : 'RC uploaded — load fields updated.');
   } catch(err){
     console.error('RC AI extraction fallback', err);
     setRcAiStatus('ok', 'Uploaded RC document successfully.');
   }
 }
-// Writes whatever the AI found into the form, without stomping on fields the dispatcher
-// already typed by hand. Returns the list of field labels that were actually filled.
+// Writes whatever the AI found into the form fields.
 function applyExtractedRcData(d){
+  if(!d) return [];
   const filled = [];
-  const setIfEmpty = (id, val, label, confKey)=>{
+  const confScores = computeFieldConfidence(d);
+
+  const setField = (id, val, label, confKey)=>{
     if(val===undefined || val===null || val==='') return;
     const el = document.getElementById(id);
     if(!el) return;
-    if((el.value||'').trim()===''){
-      el.value = val;
-      filled.push(label);
-      if (confScores && confScores[confKey]) {
-        const c = confScores[confKey];
-        if (c.score === 'Low') {
-          el.style.border = '2px solid var(--warning,#f59e0b)';
-          el.title = 'Low confidence extraction — please review!';
-        } else if (c.score === 'High') {
-          el.style.border = '1px solid var(--green,#10b981)';
-        }
+    el.value = val;
+    filled.push(label);
+    if (confScores && confScores[confKey]) {
+      const c = confScores[confKey];
+      if (c.score === 'Low') {
+        el.style.border = '2px solid var(--warning,#f59e0b)';
+        el.title = 'Low confidence extraction — please review!';
+      } else {
+        el.style.border = '1.5px solid var(--green,#10b981)';
       }
     }
   };
 
-  setIfEmpty('f-loadnumber', (d.load_number||'').trim(), 'Load #', 'load_number');
-  if(d.pickup_date){ setIfEmpty('f-pickupdate', d.pickup_date, 'Pickup date', 'pickup_date'); }
-  if(d.delivery_date){ setIfEmpty('f-deliverydate', d.delivery_date, 'Delivery date', 'delivery_date'); }
+  if(d.load_number || d.loadNumber || d.load_no) {
+    setField('f-loadnumber', String(d.load_number||d.loadNumber||d.load_no).trim(), 'Load #', 'load_number');
+  }
+  
+  if(d.pickup_date || d.pickupDate){ 
+    setField('f-pickupdate', String(d.pickup_date||d.pickupDate).trim(), 'Pickup date', 'pickup_date'); 
+  }
+  if(d.delivery_date || d.deliveryDate || d.dropoff_date){ 
+    setField('f-deliverydate', String(d.delivery_date||d.deliveryDate||d.dropoff_date).trim(), 'Delivery date', 'delivery_date'); 
+  }
   
   const puParts = [d.pickup_address, d.pickup_city, d.pickup_state, d.pickup_zip].filter(Boolean);
   const pu = puParts.length ? puParts.join(', ') : [d.pickup_city, d.pickup_state].filter(Boolean).join(', ');
-  const doParts = [d.delivery_address, d.delivery_city, d.delivery_state, d.delivery_zip].filter(Boolean);
-  const doo = doParts.length ? doParts.join(', ') : [d.dropoff_city, d.dropoff_state].filter(Boolean).join(', ');
+  const doParts = [d.delivery_address || d.dropoff_address, d.delivery_city || d.dropoff_city, d.delivery_state || d.dropoff_state, d.delivery_zip || d.dropoff_zip].filter(Boolean);
+  const doo = doParts.length ? doParts.join(', ') : [d.dropoff_city || d.delivery_city, d.dropoff_state || d.delivery_state].filter(Boolean).join(', ');
 
-  setIfEmpty('f-pickup', pu, 'Pickup location', 'pickup');
-  setIfEmpty('f-dropoff', doo, 'Drop-off location', 'dropoff');
+  if(pu) setField('f-pickup', pu.trim(), 'Pickup location', 'pickup');
+  if(doo) setField('f-dropoff', doo.trim(), 'Drop-off location', 'dropoff');
 
-  if(d.broker_mc && document.getElementById('f-brokermc')){
-    setIfEmpty('f-brokermc', d.broker_mc, 'Broker MC', 'broker_mc');
+  if((d.broker_mc || d.brokerMC) && document.getElementById('f-brokermc')){
+    setField('f-brokermc', String(d.broker_mc || d.brokerMC).trim(), 'Broker MC', 'broker_mc');
   }
 
-  if(d.miles!=null && d.miles!==''){ setIfEmpty('f-miles', Math.round(Number(d.miles))||'', 'Miles', 'miles'); }
-  if(d.rate!=null && d.rate!==''){ setIfEmpty('f-rate', Number(d.rate)||'', 'Rate', 'rate'); }
-  if(d.notes){ setIfEmpty('f-notes', d.notes, 'Notes', 'notes'); }
+  if(d.miles!=null && d.miles!==''){ setField('f-miles', Math.round(Number(d.miles))||'', 'Miles', 'miles'); }
+  if(d.rate!=null && d.rate!==''){ setField('f-rate', Number(d.rate)||'', 'Rate', 'rate'); }
+  if(d.notes){ setField('f-notes', String(d.notes).trim(), 'Notes', 'notes'); }
 
   validateLoadDates();
   recalcRevenue();
