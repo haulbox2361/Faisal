@@ -5482,21 +5482,33 @@ function myGoogleAccountHolder(){
   return null; // view-only links don't get a Google connection
 }
 function renderMyAccount(){
-  const nameEl = document.getElementById('myaccount-username');
-  if(nameEl) nameEl.textContent = STATE.currentUser ? STATE.currentUser.name : 'you';
-  const box = document.getElementById('myaccount-body');
+  const box = document.getElementById('my-account-box');
   if(!box) return;
   const holder = myGoogleAccountHolder();
   if(!holder){
     box.innerHTML = '<p class="cell-dim" style="font-size:12.5px;">Google account connections aren\'t available in this session.</p>';
     return;
   }
+  // Auto-check connection status from backend if not connected locally yet
+  if(!holder.gmailConnected && !holder._checkingStatus){
+    holder._checkingStatus = true;
+    backendFetch('/auth/status?accountId='+encodeURIComponent(currentAccountId()||'admin')).then(st=>{
+      if(st && st.connected){
+        holder.gmailConnected = true;
+        holder.driveConnected = true;
+        holder.gmailEnabled = true;
+        holder.googleAccountEmail = st.email || holder.googleAccountEmail;
+        renderMyAccount();
+      }
+    }).catch(()=>{});
+  }
+
   const connected = !!(holder.gmailConnected && holder.driveConnected);
   box.innerHTML = `
     <div class="field" style="margin-bottom:14px;">
       <label>Google Account Email</label>
       <input type="email" id="my-google-email" placeholder="Signed in via Google's own popup" value="${escapeAttr(holder.googleAccountEmail || '')}" readonly>
-      <div class="hint">${connected? 'Connected — disconnect first to switch to a different Google account.' : 'Click Connect below — you\'ll pick the Google account in Google\'s own sign-in popup, same as any "Sign in with Google" button.'}</div>
+      <div class="hint">${connected? 'Connected — disconnect first to switch to a different Google account.' : 'Click Connect below to link your Google Account.'}</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
       <span class="status-pill ${connected?'connected':'off'}">${connected? 'Connected · '+escapeAttr(holder.googleAccountEmail||'') : 'Not Connected'}</span>
@@ -5507,22 +5519,10 @@ function renderMyAccount(){
         ? '<button type="button" class="btn btn-sm btn-ghost" onclick="disconnectMyGoogleAccount()">Disconnect</button><button type="button" class="btn btn-sm" onclick="testMyGoogleConnection()">Test Connection</button>'
         : '<button type="button" class="btn btn-sm btn-accent" onclick="connectMyGoogleAccount()">Connect Google Account</button>'}
     </div>
-    ${connected ? `
-    <div class="hr"></div>
-    <div class="field" style="margin-bottom:0;">
-      <label>Send a Test Email</label>
-      <div class="hint" style="margin-bottom:8px;">Confirms this connection works before relying on it for a live load.</div>
-      <div style="display:flex;gap:8px;">
-        <input type="email" id="my-google-test-recipient" placeholder="you@company.com" style="flex:1;">
-        <button type="button" class="btn btn-sm" onclick="sendMyTestEmail()">Send Test Email</button>
-      </div>
-    </div>
     <div class="hr"></div>
     <div class="field" style="margin-bottom:0;">
       <label>Google Sheet Sync (Option 1: Direct Link)</label>
-      <div class="hint" style="margin-bottom:8px;">Share a Google Sheet with <b>${escapeAttr(holder.googleAccountEmail||'this account')}</b> as an <b>Editor</b>, paste its link below, and every load you book — plus every status change after — writes or updates a row automatically, matched by Load #. ${STATE.role==='admin'
-        ? 'This is your central Sheet — every dispatcher\u2019s loads mirror here too (once you\u2019ve connected and set a Sheet), each row tagged with the Dispatcher Name column so you can see who booked it.'
-        : 'This is your own personal copy; this only applies to loads booked while signed in as '+escapeAttr(STATE.currentUser?STATE.currentUser.name:'you')+'. Every load also mirrors automatically into Admin\u2019s central Sheet (if Admin has one set up) — no setup needed on your side for that part.'}</div>
+      <div class="hint" style="margin-bottom:8px;">Share a Google Sheet with <b>${escapeAttr(holder.googleAccountEmail||'your account')}</b> as an <b>Editor</b>, paste its link below, and every load you book — plus every status change after — writes or updates a row automatically, matched by Load #.</div>
       <input type="text" id="my-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/..." value="${escapeAttr(holder.sheetUrl||'')}" oninput="saveMySheetField('sheetUrl', this.value)" style="margin-bottom:8px;">
       <div style="display:flex;gap:8px;">
         <input type="text" id="my-sheet-tab" placeholder="Tab name — leave blank for Sheet1" value="${escapeAttr(holder.sheetTabName||'')}" oninput="saveMySheetField('sheetTabName', this.value)" style="flex:1;">
@@ -5544,7 +5544,7 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify({result:"success"})).setMimeType(ContentService.MimeType.JSON);
 }</pre>
       </details>
-    </div>` : ''}
+    </div>
   `;
 }
 function saveMySheetField(key, val){
