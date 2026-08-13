@@ -9060,6 +9060,40 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('click', () => setTimeout(initWaChat, 200));
   });
 });
+
+// Auto-restore session and active feature on page load (F5 refresh)
+(async function bootApp(){
+  try {
+    if (!STATE._loaded) { await loadState(); STATE._loaded = true; }
+    const restored = await restoreSession();
+    if (!restored) {
+      const params = new URLSearchParams(window.location.search);
+      const shareToken = params.get('share');
+      if (shareToken) {
+        const share = (STATE.settings.shares || []).find(x => x.token === shareToken);
+        if (share && share.active) {
+          document.getElementById('login-gate').style.display = 'none';
+          STATE.currentUser = { name: share.name, email: 'view-only link', initials: initials(share.name) };
+          document.getElementById('app').style.display = 'flex';
+          document.getElementById('user-name').textContent = STATE.currentUser.name;
+          document.getElementById('user-email').textContent = STATE.currentUser.email;
+          document.getElementById('user-avatar').textContent = STATE.currentUser.initials;
+          init();
+        }
+      } else if (params.get('view') === 'readonly') {
+        document.getElementById('login-gate').style.display = 'none';
+        STATE.currentUser = { name: 'Guest Viewer', email: 'view-only link', initials: 'VW' };
+        document.getElementById('app').style.display = 'flex';
+        document.getElementById('user-name').textContent = STATE.currentUser.name;
+        document.getElementById('user-email').textContent = STATE.currentUser.email;
+        document.getElementById('user-avatar').textContent = STATE.currentUser.initials;
+        init();
+      }
+    }
+  } catch (e) {
+    console.error('bootApp session restore error:', e);
+  }
+})();
 </script>
 </body>
 </html>
