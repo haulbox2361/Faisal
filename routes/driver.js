@@ -602,17 +602,23 @@ router.delete('/api/driver/upload-doc', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 function toTransaction(l) {
+  const ps = l.paymentStatus || (l.driverPayAccepted ? 'PAID_CONFIRMED' : (l.driverPaid ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID'));
   return {
     loadId: l.id,
     loadNumber: l.loadNumber,
     amount: Number(l.driverPay) || 0,
     date: l.deliveryDate || l.pickupDate || null,
     status: l.driverPaid ? 'PAID' : 'PENDING',
+    paymentStatus: ps,
     paidDate: l.driverPaidDate || null,
-    note: l.driverPaySettlementNote || null,
-    accepted: !!l.driverPayAccepted,
-    acceptedAt: l.driverPayAcceptedAt || null,
-    acceptanceStatus: l.driverPaid ? (l.driverPayAccepted ? 'Accepted' : 'Pending Acceptance') : null,
+    markedPaidAt: l.markedPaidAt || null,
+    markedPaidBy: l.markedPaidBy || null,
+    confirmedAt: l.confirmedAt || l.driverPayAcceptedAt || null,
+    disputedAt: l.disputedAt || null,
+    note: l.driverPayNote || l.driverPaySettlementNote || null,
+    accepted: !!(l.driverPayAccepted || ps === 'PAID_CONFIRMED'),
+    acceptedAt: l.driverPayAcceptedAt || l.confirmedAt || null,
+    acceptanceStatus: ps === 'PAID_CONFIRMED' ? 'Confirmed' : (ps === 'PAYMENT_DISPUTED' ? 'Disputed' : (ps === 'PAYMENT_PENDING_CONFIRMATION' ? 'Pending Confirmation' : 'Unpaid')),
   };
 }
 
@@ -626,7 +632,7 @@ router.get('/api/driver/transactions', async (req, res) => {
     .sort((a, b) => String(b.deliveryDate || b.pickupDate || '').localeCompare(String(a.deliveryDate || a.pickupDate || '')))
     .map(toTransaction);
   const totalEarnings = txns.reduce((s, t) => s + t.amount, 0);
-  const paidTxns = txns.filter((t) => t.status === 'PAID');
+  const paidTxns = txns.filter((t) => t.paymentStatus === 'PAID_CONFIRMED' || t.status === 'PAID');
   const paid = paidTxns.reduce((s, t) => s + t.amount, 0);
   const pending = totalEarnings - paid;
   res.json({ summary: { totalEarnings, paid, pending, totalPaymentsReceived: paidTxns.length, totalAmountReceived: paid }, transactions: txns });
@@ -642,8 +648,7 @@ router.get('/api/driver/transactions/:loadId', async (req, res) => {
   res.json({ transaction: toTransaction(load) });
 });
 
-// POST /api/driver/transactions/:loadId/accept — records the driver's
-// acceptance of a payment/settlement (separate from Admin marking it PAID).
+// POST /api/driver/transactions/:loadId/accept — Confirm Payment Received
 router.post('/api/driver/transactions/:loadId/accept', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
@@ -651,27 +656,71 @@ router.post('/api/driver/transactions/:loadId/accept', async (req, res) => {
   const { state, driver } = ctx;
   const load = (state.loads || []).find((l) => l.id === req.params.loadId && l.driverId === driver.id);
   if (!load) return res.status(404).json({ error: 'Transaction not found' });
-  if (load.driverPayAccepted) return res.json({ ok: true, transaction: toTransaction(load) });
 
+  load.paymentStatus = 'PAID_CONFIRMED';
+  load.confirmedAt = new Date().toISOString();
+  load.confirmedBy = driver.id;
   load.driverPayAccepted = true;
-  load.driverPayAcceptedAt = new Date().toISOString();
+  load.driverPayAcceptedAt = load.confirmedAt;
+  load.driverPaid = true;
+
   try {
     await saveFullState(state);
-    await history.record(load.id, 'PAYMENT_ACCEPTED', null, { type: 'driver', id: driver.id, name: driver.name });
-    // Permanent payment-acceptance record (audit_logs is insert-only/never
-    // overwritten) — captures exactly what's required: date, time, amount,
-    // load number, driver id.
-    await audit.record({ type: 'driver', id: driver.id, name: driver.name }, 'driver.payment_accepted', { type: 'load', id: load.id }, {
+    await history.record(load.id, 'PAYMENT_CONFIRMED', null, { type: 'driver', id: driver.id, name: driver.name });
+    await audit.record({ type: 'driver', id: driver.id, name: driver.name }, 'driver.payment_confirmed', { type: 'load', id: load.id }, {
       loadNumber: load.loadNumber,
       driverId: driver.id,
       amount: Number(load.driverPay) || 0,
-      acceptedDate: load.driverPayAcceptedAt.slice(0, 10),
-      acceptedTime: load.driverPayAcceptedAt.slice(11, 19),
+      confirmedDate: load.confirmedAt.slice(0, 10),
+      confirmedTime: load.confirmedAt.slice(11, 19),
+    });
+    await notifications.create('admin', 'admin', {
+      type: 'payment_confirmed',
+      title: '🟢 Payment Confirmed by Driver',
+      body: `Driver ${driver.name || 'Driver'} confirmed payment receipt for Load #${load.loadNumber || load.id}`,
+      data: { loadId: load.id },
     });
     res.json({ ok: true, transaction: toTransaction(load) });
   } catch (e) {
-    console.error('driver payment accept failed:', e);
-    res.status(500).json({ error: 'Failed to record acceptance' });
+    console.error('driver payment confirm failed:', e);
+    res.status(500).json({ error: 'Failed to confirm payment' });
+  }
+});
+
+// POST /api/driver/transactions/:loadId/dispute — Payment Not Received
+router.post('/api/driver/transactions/:loadId/dispute', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  if (!requirePermission(res, ctx.driver, 'canViewTransactions', 'Transactions')) return;
+  const { state, driver } = ctx;
+  const load = (state.loads || []).find((l) => l.id === req.params.loadId && l.driverId === driver.id);
+  if (!load) return res.status(404).json({ error: 'Transaction not found' });
+
+  load.paymentStatus = 'PAYMENT_DISPUTED';
+  load.disputedAt = new Date().toISOString();
+  load.disputedBy = driver.id;
+  load.driverPayAccepted = false;
+
+  try {
+    await saveFullState(state);
+    await history.record(load.id, 'PAYMENT_DISPUTED', null, { type: 'driver', id: driver.id, name: driver.name });
+    await audit.record({ type: 'driver', id: driver.id, name: driver.name }, 'driver.payment_disputed', { type: 'load', id: load.id }, {
+      loadNumber: load.loadNumber,
+      driverId: driver.id,
+      amount: Number(load.driverPay) || 0,
+      disputedDate: load.disputedAt.slice(0, 10),
+      disputedTime: load.disputedAt.slice(11, 19),
+    });
+    await notifications.create('admin', 'admin', {
+      type: 'payment_disputed',
+      title: '🔴 Payment Disputed by Driver',
+      body: `⚠️ Driver ${driver.name || 'Driver'} reported payment NOT received for Load #${load.loadNumber || load.id}`,
+      data: { loadId: load.id },
+    });
+    res.json({ ok: true, transaction: toTransaction(load) });
+  } catch (e) {
+    console.error('driver payment dispute failed:', e);
+    res.status(500).json({ error: 'Failed to record dispute' });
   }
 });
 

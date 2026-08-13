@@ -2170,6 +2170,7 @@ function migrateLoads(){
     l.driverPayNote = l.driverPayNote || '';
     l.driverPaid = !!l.driverPaid;
     l.driverPaidDate = l.driverPaidDate || null;
+    l.paymentStatus = l.paymentStatus || (l.driverPayAccepted ? 'PAID_CONFIRMED' : (l.driverPaid ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID'));
     l.driverPay = driverPayOf(l);
   });
 }
@@ -3747,12 +3748,13 @@ function openLoadModal(id){
       <div class="field"><label>Company Margin</label><input value="${money(companyMarginOf(l))}" readonly></div>
       <div class="field">
         <label>Settlement</label>
-        <div style="display:flex;align-items:center;gap:10px;padding-top:4px;">
-          ${l.driverPaid
-            ? '<span class="placard pl-green"><span class="dot"></span>Paid'+(l.driverPaidDate? ' · '+fmtDate(l.driverPaidDate):'')+'</span>'
-            : '<span class="placard pl-yellow"><span class="dot"></span>Unpaid</span>'}
-          <button class="btn btn-sm" onclick="toggleDriverPaid('${l.id}')">${l.driverPaid? 'Mark Unpaid' : 'Mark Paid'}</button>
+        <div style="display:flex;align-items:center;gap:10px;padding-top:4px;flex-wrap:wrap;">
+          ${paymentStatusPlacard(l)}
+          <button class="btn btn-sm" onclick="toggleDriverPaid('${l.id}')">${(l.paymentStatus==='UNPAID'||!l.driverPaid)? 'Mark Paid' : 'Undo / Mark Unpaid'}</button>
         </div>
+        ${l.markedPaidBy ? `<div class="hint" style="margin-top:4px;">Marked paid by ${escapeAttr(l.markedPaidBy)}${l.markedPaidAt?' on '+fmtDateTime(l.markedPaidAt):''}</div>` : ''}
+        ${l.confirmedAt ? `<div class="hint" style="color:var(--green,#22c55e);margin-top:2px;">Confirmed by driver on ${fmtDateTime(l.confirmedAt)}</div>` : ''}
+        ${l.disputedAt ? `<div class="hint" style="color:var(--red,#ef4444);margin-top:2px;">Disputed by driver on ${fmtDateTime(l.disputedAt)}</div>` : ''}
       </div>
       <div class="field span-2">
         <label>Settlement Note</label>
@@ -4843,10 +4845,8 @@ function renderDriverPay(){
     '<td><input type="number" min="0" step="0.01" value="'+Number(l.driverDeduction||0)+'" style="width:92px;padding:5px 8px;" onchange="setDriverDeduction(\''+l.id+'\', this.value)"></td>'+
     '<td class="cell-mono" style="color:var(--yellow);">'+money(driverNetOf(l))+'</td>'+
     '<td><div class="row-actions" style="align-items:center;gap:8px;">'+
-      (l.driverPaid
-        ? '<span class="placard pl-green"><span class="dot"></span>Paid'+(l.driverPaidDate? ' · '+fmtDate(l.driverPaidDate):'')+'</span>'
-        : '<span class="placard pl-yellow"><span class="dot"></span>Unpaid</span>')+
-      '<button class="btn btn-sm btn-ghost" onclick="toggleDriverPaid(\''+l.id+'\')">'+(l.driverPaid?'Undo':'Mark Paid')+'</button>'+
+      paymentStatusPlacard(l)+
+      '<button class="btn btn-sm btn-ghost" onclick="toggleDriverPaid(\''+l.id+'\')">'+((l.paymentStatus==='UNPAID'||!l.driverPaid)?'Mark Paid':'Undo')+'</button>'+
     '</div></td>'+
     '</tr>'
   ).join('') || '<tr><td colspan="11" class="cell-dim">No loads match this filter.</td></tr>';
@@ -4870,6 +4870,13 @@ function setDriverPayNote(loadId, val){
   l.driverPayNote = String(val||'').trim();
   persist();
 }
+function paymentStatusPlacard(l){
+  const st = l.paymentStatus || (l.driverPayAccepted ? 'PAID_CONFIRMED' : (l.driverPaid ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID'));
+  if(st==='PAID_CONFIRMED') return '<span class="placard pl-green"><span class="dot"></span>Paid Confirmed'+(l.confirmedAt?' · '+fmtDate(l.confirmedAt):'')+'</span>';
+  if(st==='PAYMENT_PENDING_CONFIRMATION') return '<span class="placard pl-yellow"><span class="dot"></span>Waiting Driver Confirmation'+(l.markedPaidAt?' · '+fmtDate(l.markedPaidAt):'')+'</span>';
+  if(st==='PAYMENT_DISPUTED') return '<span class="placard pl-red"><span class="dot"></span>Payment Disputed'+(l.disputedAt?' · '+fmtDate(l.disputedAt):'')+'</span>';
+  return '<span class="placard pl-gray"><span class="dot"></span>Unpaid</span>';
+}
 function notifyDriverPaid(l){
   if(!l.driverId) return;
   fetch('/api/notifications', {
@@ -4878,8 +4885,8 @@ function notifyDriverPaid(l){
       accountId: currentAccountId(), role: STATE.role,
       toType:'driver', toId:l.driverId,
       type:'payment_paid',
-      title:'Payment marked as paid',
-      body:(l.loadNumber||l.id)+' · '+money(driverNetOf(l))+' — tap Accept Payment to confirm.',
+      title:'💰 Payment Recorded',
+      body:'Load #'+(l.loadNumber||l.id)+' has been marked as paid. Please confirm once payment is received.',
       data:{ loadId:l.id },
     })
   }).catch(()=>{});
@@ -4887,18 +4894,27 @@ function notifyDriverPaid(l){
 function toggleDriverPaid(loadId){
   if(STATE.role!=='admin') return toast('Admin only','Only Admin can settle driver pay.');
   const l = STATE.loads.find(x=>x.id===loadId); if(!l) return;
-  l.driverPaid = !l.driverPaid;
-  l.driverPaidDate = l.driverPaid ? new Date().toISOString().slice(0,10) : null;
-  l.driverPay = driverPayOf(l);
-  // New payment cycle — any prior acceptance no longer applies.
-  l.driverPayAccepted = false; l.driverPayAcceptedAt = null;
-  persist();
-  if(l.driverPaid) notifyDriverPaid(l);
-  // Auto-archive RC+BOL+POD to Drive when a load is settled
-  if(l.driverPaid && l.docs.RC && l.docs.BOL && l.docs.POD){
-    autoDriveArchive(l).catch(()=>{});
+  const isPaidNow = !(l.paymentStatus==='PAYMENT_PENDING_CONFIRMATION' || l.paymentStatus==='PAID_CONFIRMED' || l.driverPaid);
+  if(isPaidNow){
+    l.paymentStatus = 'PAYMENT_PENDING_CONFIRMATION';
+    l.driverPaid = true;
+    l.markedPaidAt = new Date().toISOString();
+    l.markedPaidBy = STATE.currentUser ? STATE.currentUser.name : 'Admin';
+    l.driverPaidDate = l.markedPaidAt.slice(0,10);
+    l.driverPay = driverPayOf(l);
+    l.driverPayAccepted = false; l.driverPayAcceptedAt = null; l.confirmedAt = null; l.disputedAt = null;
+    notifyDriverPaid(l);
+    if(l.docs.RC && l.docs.BOL && l.docs.POD){ autoDriveArchive(l).catch(()=>{}); }
+    toast('Payment recorded', l.loadNumber+' marked paid — waiting driver confirmation.', true);
+  } else {
+    l.paymentStatus = 'UNPAID';
+    l.driverPaid = false;
+    l.driverPaidDate = null;
+    l.markedPaidAt = null; l.markedPaidBy = null; l.confirmedAt = null; l.disputedAt = null;
+    l.driverPayAccepted = false; l.driverPayAcceptedAt = null;
+    toast('Marked unpaid', l.loadNumber+' reset to unpaid.', false);
   }
-  toast(l.driverPaid? 'Marked paid' : 'Marked unpaid', l.loadNumber+' · '+(l.driverName||'')+' · '+money(driverNetOf(l)), l.driverPaid);
+  persist();
   if(document.getElementById('view-driverpay').classList.contains('active')) renderDriverPay();
   if(document.getElementById('modal-load').classList.contains('active')) openLoadModal(loadId);
 }

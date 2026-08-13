@@ -950,103 +950,62 @@ async function loadDetailHtml(l){
   }
   return h;
 }
+function dpPaymentBadgeHtml(t){
+  const st = t.paymentStatus || (t.accepted ? 'PAID_CONFIRMED' : (t.status==='PAID' ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID'));
+  if (st === 'PAID_CONFIRMED') return '<span class="dp-badge" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">🟢 Paid Confirmed</span>';
+  if (st === 'PAYMENT_PENDING_CONFIRMATION') return '<span class="dp-badge" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3);">🟡 Waiting Confirmation</span>';
+  if (st === 'PAYMENT_DISPUTED') return '<span class="dp-badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">🔴 Payment Disputed</span>';
+  return '<span class="dp-badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);">🔴 Unpaid</span>';
+}
+
 function paymentHistoryBlockHtml(t){
-  const cls = t.status === 'PAID' ? 'paid' : 'pending';
+  const st = t.paymentStatus || (t.accepted ? 'PAID_CONFIRMED' : (t.status==='PAID' ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID'));
+  const isPending = st === 'PAYMENT_PENDING_CONFIRMATION' || (t.status === 'PAID' && !t.accepted);
   return '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg></span>Payment History</div></div>' +
-    '<div class="dp-pay-row" style="margin-bottom:0;"><div class="dp-pay-row-top"><div class="dp-pay-icn ' + cls + '"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>' +
+    '<div class="dp-pay-row" style="margin-bottom:0;"><div class="dp-pay-row-top"><div class="dp-pay-icn ' + (t.status==='PAID'?'paid':'pending') + '"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>' +
     '<div style="flex:1;"><div class="dp-pay-amount">' + money(t.amount) + '</div><div class="dp-pay-meta">' + (t.paidDate||t.date||'—') + '</div></div>' +
-    '<span class="dp-badge ' + (t.status==='PAID'?'st-delivered':'st-at-pickup') + '">' + t.status + '</span></div>' +
-    (t.status==='PAID' && !t.accepted ? '<button class="dp-pay-accept-btn" onclick="acceptPayment(\''+t.loadId+'\');closeModal(\'dp-job-modal\')">Accept Payment</button>' : '') +
+    dpPaymentBadgeHtml(t) + '</div>' +
+    (isPending ?
+      '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+      '<button class="dp-btn-sm" style="background:var(--green,#22c55e);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;font-weight:600;" onclick="confirmPaymentReceived(\''+t.loadId+'\');closeModal(\'dp-job-modal\')">✅ Confirm Payment Received</button>' +
+      '<button class="dp-btn-sm" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:8px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;font-weight:600;" onclick="disputePayment(\''+t.loadId+'\');closeModal(\'dp-job-modal\')">❌ Payment Not Received</button>' +
+      '</div>' : '') +
     '</div></div>';
 }
 
-// ---------------- Document / photo actions (shared: Current + Loads) ----------------
-let currentPhotoCtx = null;
-async function viewLoadPhoto(loadId, key, index){
-  try {
-    const data = await api('/api/driver/doc', {method:'POST', body: JSON.stringify({loadId, key, index})});
-    currentPhotoCtx = { loadId, key, index };
-    document.getElementById('dp-photo-title').textContent = data.name || 'Photo';
-    document.getElementById('dp-photo-img').src = data.data;
-    document.getElementById('dp-photo-modal').classList.add('active');
-  } catch(e){ toast(e.message); }
-}
-async function deleteCurrentPhoto(){
-  if (!currentPhotoCtx) return;
-  closeModal('dp-photo-modal');
-  await deleteLoadPhoto(currentPhotoCtx.loadId, currentPhotoCtx.key, currentPhotoCtx.index);
-}
-async function deleteLoadPhoto(loadId, key, index){
-  if (!confirm('Delete this photo?')) return;
-  try {
-    await api('/api/driver/upload-doc', {method:'DELETE', body: JSON.stringify({loadId, key, index})});
-    toast('Photo deleted');
-    if (document.getElementById('dp-job-modal').classList.contains('active')) openLoadDetails(loadId);
-    loadCurrent();
-  } catch(e){ toast(e.message); }
-}
-async function viewLoadDoc(loadId, key, index){
-  try { const data = await api('/api/driver/doc', {method:'POST', body: JSON.stringify({loadId, key, index})}); window.open(data.data, '_blank'); }
-  catch(e){ toast(e.message); }
-}
-function startUploadDoc(loadId, key){
-  pendingUpload = { loadId, key };
-  document.getElementById('dp-file-input').click();
-}
-document.getElementById('dp-file-input').addEventListener('change', async function(){
-  const file = this.files[0]; this.value = '';
-  if (!file || !pendingUpload) return;
-  const reader = new FileReader();
-  reader.onload = async function(){
-    try {
-      if (pendingUpload.profile) {
-        await api('/api/driver/documents', {method:'POST', body: JSON.stringify({ key: pendingUpload.key, fileName: file.name, data: reader.result, expiryDate: pendingUpload.expiryDate||null, category: pendingUpload.category||null, index: pendingUpload.index })});
-        toast('Uploaded'); loadProfile();
-      } else {
-        await api('/api/driver/upload-doc', {method:'POST', body: JSON.stringify({ loadId: pendingUpload.loadId, key: pendingUpload.key, fileName: file.name, mimeType: file.type, data: reader.result })});
-        toast('Uploaded');
-        if (document.getElementById('dp-job-modal').classList.contains('active')) openLoadDetails(pendingUpload.loadId);
-        loadCurrent();
-      }
-    } catch(e){ toast(e.message); }
-    pendingUpload = null;
-  };
-  reader.readAsDataURL(file);
-});
-
-// ---------------- Payments ----------------
-async function loadPayments(){
-  const list = document.getElementById('dp-payments-list');
-  list.innerHTML = '<div class="dp-empty">Loading…</div>';
-  try {
-    const data = await api('/api/driver/transactions');
-    PAYMENT_TXNS = data.transactions;
-    document.getElementById('pay-hero-total').textContent = money(data.summary.totalEarnings);
-    document.getElementById('pay-hero-stats').innerHTML =
-      '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg><div class="dp-pay-hero-stat-val">' + money(data.summary.paid) + '</div><div class="dp-pay-hero-stat-label">Paid</div></div>' +
-      '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><div class="dp-pay-hero-stat-val">' + money(data.summary.pending) + '</div><div class="dp-pay-hero-stat-label">Pending</div></div>' +
-      '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div class="dp-pay-hero-stat-val">' + data.summary.totalPaymentsReceived + '</div><div class="dp-pay-hero-stat-label">Loads Paid</div></div>';
-
-    renderChart();
-
-    if (!data.transactions.length){ list.innerHTML = '<div class="dp-empty">No payment records yet.</div>'; return; }
-    list.innerHTML = data.transactions.map(paymentRowHtml).join('');
-  } catch(e){ list.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
-}
 function paymentRowHtml(t){
-  const paid = t.status === 'PAID';
+  const st = t.paymentStatus || (t.accepted ? 'PAID_CONFIRMED' : (t.status==='PAID' ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID'));
+  const isPending = st === 'PAYMENT_PENDING_CONFIRMATION' || (t.status === 'PAID' && !t.accepted);
   return '<div class="dp-pay-row"><div class="dp-pay-row-top">' +
-    '<div class="dp-pay-icn ' + (paid?'paid':'pending') + '">' +
-    (paid ? '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>' : '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>') +
-    '</div><div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;"><span class="dp-pay-amount">' + money(t.amount) + '</span><span class="dp-badge ' + (paid?'st-delivered':'st-at-pickup') + '">' + t.status + '</span></div>' +
+    '<div class="dp-pay-icn ' + (t.status==='PAID'?'paid':'pending') + '">' +
+    (t.status==='PAID' ? '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>' : '<svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>') +
+    '</div><div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span class="dp-pay-amount">' + money(t.amount) + '</span>' + dpPaymentBadgeHtml(t) + '</div>' +
     '<div class="dp-pay-meta">' + escapeHtml(t.loadNumber||t.loadId) + ' · ' + (t.paidDate||t.date||'—') + '</div></div></div>' +
-    (paid && t.accepted ? '<div class="dp-pay-confirmed"><svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>Confirmed by you' + (t.acceptedAt ? ' · ' + fmtDate(t.acceptedAt) : '') + '</div>' : '') +
-    (paid && !t.accepted ? '<button class="dp-pay-accept-btn" onclick="acceptPayment(\''+t.loadId+'\')">Accept Payment</button>' : '') +
+    (st === 'PAID_CONFIRMED' ? '<div class="dp-pay-confirmed" style="margin-top:6px;font-size:12px;color:var(--green,#22c55e);"><svg style="width:12px;height:12px;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>Confirmed by you' + (t.confirmedAt || t.acceptedAt ? ' · ' + fmtDate(t.confirmedAt || t.acceptedAt) : '') + '</div>' : '') +
+    (st === 'PAYMENT_DISPUTED' ? '<div class="dp-pay-disputed" style="margin-top:6px;font-size:12px;color:#ef4444;">🔴 Payment Disputed' + (t.disputedAt ? ' · ' + fmtDate(t.disputedAt) : '') + '</div>' : '') +
+    (isPending ?
+      '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+      '<button class="dp-btn-sm" style="background:var(--green,#22c55e);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;font-weight:600;" onclick="confirmPaymentReceived(\''+t.loadId+'\')">✅ Confirm Payment Received</button>' +
+      '<button class="dp-btn-sm" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:8px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;font-weight:600;" onclick="disputePayment(\''+t.loadId+'\')">❌ Payment Not Received</button>' +
+      '</div>' : '') +
     '</div>';
 }
-async function acceptPayment(loadId){
-  try { await api('/api/driver/transactions/' + loadId + '/accept', {method:'POST'}); toast('Payment accepted'); loadPayments(); }
-  catch(e){ toast(e.message); }
+
+async function confirmPaymentReceived(loadId){
+  try {
+    await api('/api/driver/transactions/' + loadId + '/accept', {method:'POST'});
+    toast('Payment confirmed received ✓');
+    loadPayments();
+  } catch(e){ toast(e.message); }
+}
+
+async function disputePayment(loadId){
+  if (!confirm('Are you sure you want to report payment NOT received for this load?\n\nThis will immediately notify Admin.')) return;
+  try {
+    await api('/api/driver/transactions/' + loadId + '/dispute', {method:'POST'});
+    toast('Payment dispute sent to Admin');
+    loadPayments();
+  } catch(e){ toast(e.message); }
 }
 function setPayChartPeriod(p){
   currentPayPeriod = p;
