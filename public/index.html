@@ -3560,12 +3560,22 @@ function enterApp(){
   renderNotifications();
   init();
 }
+
+function init(){
+  let savedView = 'dashboard';
+  try { savedView = localStorage.getItem('haulbox_active_view') || 'dashboard'; } catch(e){}
+  switchView(savedView);
+}
+
 // role/currentUser/currentDispatcherId are session-only (persist() never saves them —
 // see its payload above); SESSION_KEY in localStorage is what lets a refresh skip
 // the login screen (see restoreSession()), so signing out has to clear that too or
 // reloading would just log the same person straight back in.
 function signOut(){
-  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+  try{
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem('haulbox_active_view');
+  }catch(e){}
   window.location.reload();
 }
 function toggleUserMenu(){ toast('Signed in', STATE.currentUser ? STATE.currentUser.email : ''); }
@@ -3582,14 +3592,21 @@ function setTheme(t){
 /* ---------------- Navigation ---------------- */
 const VIEW_TITLES = {dashboard:'Dashboard', addload:'Add Load', loadboard:'Load Board', drivers:'Drivers', driverpay:'Driver Pay', brokers:'Brokers', dispatchers:'Dispatchers', statistics:'Statistics', documents:'Documents', emaillogs:'Email Logs', myaccount:'My Account', settings:'Settings', chat:'💬 Chat'};
 function switchView(view){
-  if(view==='dispatchers' && STATE.role!=='admin'){ return toast('Admin only', 'Only Admin can manage dispatchers.'); }
-  if(view==='driverpay' && STATE.role!=='admin'){ return toast('Admin only', 'Driver pay and settlements are visible to Admin only.'); }
-  if(view==='myaccount' && STATE.role==='viewonly'){ return toast('Not available', 'Google account connections aren\'t available on a view-only link.'); }
-  if(view==='chat' && STATE.role==='viewonly'){ return toast('Not available', 'Chat is not available on a view-only link.'); }
+  if(view==='dispatchers' && STATE.role!=='admin'){ view = 'dashboard'; }
+  if(view==='driverpay' && STATE.role!=='admin'){ view = 'dashboard'; }
+  if(view==='myaccount' && STATE.role==='viewonly'){ view = 'dashboard'; }
+  if(view==='chat' && STATE.role==='viewonly'){ view = 'dashboard'; }
+  
+  let targetViewEl = document.getElementById('view-'+view);
+  if (!targetViewEl) { view = 'dashboard'; targetViewEl = document.getElementById('view-dashboard'); }
+
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+view).classList.add('active');
+  if (targetViewEl) targetViewEl.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===view));
-  document.getElementById('pagetitle').textContent = VIEW_TITLES[view];
+  if (VIEW_TITLES[view]) document.getElementById('pagetitle').textContent = VIEW_TITLES[view];
+  
+  try { localStorage.setItem('haulbox_active_view', view); } catch(e){}
+
   if(view==='dashboard') renderDashboard();
   if(view==='loadboard') renderLoadBoard();
   if(view==='drivers') renderDrivers();
