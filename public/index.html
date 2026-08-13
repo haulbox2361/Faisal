@@ -2499,8 +2499,8 @@ table.data tbody td{padding:13px 13px;}
                   </div>
                   <div class="field span-2" id="s-ai-mistralmodel-wrap">
                     <label>Mistral Model</label>
-                    <input type="text" id="s-ai-mistralmodel" placeholder="mistral-small-latest" oninput="saveSettingsField('aiMistralModel', this.value)">
-                    <div class="hint">Any current vision/document-capable Mistral model (e.g. mistral-small-latest, pixtral-12b-2409). Defaults to mistral-small-latest if left blank.</div>
+                    <input type="text" id="s-ai-mistralmodel" placeholder="pixtral-12b-2409" oninput="saveSettingsField('aiMistralModel', this.value)">
+                    <div class="hint">Use a vision/document-capable Mistral model (e.g. pixtral-12b-2409, pixtral-large-latest). Defaults to pixtral-12b-2409 for image/PDF OCR.</div>
                   </div>
                   <div class="field span-2" id="s-ai-ocrspace-wrap">
                     <label>OCR.space API Key</label>
@@ -4665,15 +4665,18 @@ async function callGeminiForDoc(base64, mediaType, isPdf, prompt){
 async function callMistralForDoc(base64, mediaType, isPdf, prompt){
   const key = (STATE.settings.aiMistralKey||'').trim();
   if(!key) throw new Error('No Mistral AI API key set — add one in Settings → AI RC Extraction.');
-  const model = (STATE.settings.aiMistralModel||'').trim() || 'mistral-small-latest';
-  const dataUrl = 'data:'+mediaType+';base64,'+base64;
-  const docBlock = isPdf ? { type:'document_url', document_url: dataUrl } : { type:'image_url', image_url: dataUrl };
+  let model = (STATE.settings.aiMistralModel||'').trim();
+  if(!model || model==='mistral-small-latest' || model==='mistral-tiny' || model==='mistral-medium'){
+    model = 'pixtral-12b-2409'; // Automatically upgrade text-only model to vision-capable Pixtral
+  }
+  const dataUrl = 'data:'+(mediaType||'image/jpeg')+';base64,'+base64;
+  const imageBlock = { type:'image_url', image_url: { url: dataUrl } };
   const resp = await fetch('https://api.mistral.ai/v1/chat/completions', {
     method:'POST',
     headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+key},
     body: JSON.stringify({
       model: model,
-      messages:[{ role:'user', content:[ { type:'text', text: prompt }, docBlock ] }],
+      messages:[{ role:'user', content:[ { type:'text', text: prompt }, imageBlock ] }],
       response_format: { type:'json_object' }
     })
   });
