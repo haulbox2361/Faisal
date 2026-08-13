@@ -604,6 +604,23 @@ a{color:inherit;}
   </div>
 </div>
 
+<!-- Accept Load ETA Modal (Required) -->
+<div class="dp-modal-overlay" id="dp-accept-eta-modal">
+  <div class="dp-modal">
+    <div class="dp-modal-head">
+      <div><div class="dp-modal-head-sub">Load Acceptance</div><h3>Enter Pickup ETA</h3></div>
+      <button class="dp-modal-close" onclick="closeModal('dp-accept-eta-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dp-modal-body">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Please specify your estimated pickup date and time before accepting this load.</p>
+      <div class="login-field"><label>Pickup Date *</label><input type="date" id="accept-eta-date" required></div>
+      <div class="login-field"><label>Pickup Time *</label><input type="time" id="accept-eta-time" required></div>
+      <div class="login-field"><label>Optional Notes</label><input type="text" id="accept-eta-notes" placeholder="e.g. Fuel stop required, traffic normal"></div>
+      <button class="dp-btn-sm primary" style="width:100%;padding:14px;font-weight:800;margin-top:10px;font-size:14px;" id="accept-eta-btn" onclick="submitAcceptEta()">Confirm &amp; Accept Load →</button>
+    </div>
+  </div>
+</div>
+
 <!-- WhatsApp-style Chat thread overlay -->
 <div id="dp-thread">
   <!-- Thread header -->
@@ -744,16 +761,17 @@ function fmtDate(s){
   return d.toLocaleDateString(undefined, { month:'short', day:'2-digit', year:'numeric' });
 }
 
-// Driver checkpoint progression — separate from dispatch's own document-
-// upload-derived `status`. This drives the primary CTA on Current Load.
-const CHECKPOINT_ORDER = ['ACCEPTED','AT_PICKUP','IN_TRANSIT','AT_DELIVERY'];
-const CHECKPOINT_LABEL = { ACCEPTED:'Accepted', AT_PICKUP:'At Pickup', IN_TRANSIT:'In Transit', AT_DELIVERY:'At Delivery' };
-const CHECKPOINT_NEXT_CTA = {
-  null: 'Confirm Load Accepted',
-  ACCEPTED: 'Arrived at Pickup',
-  AT_PICKUP: 'Start Transit',
-  IN_TRANSIT: 'Arrived at Delivery',
-  AT_DELIVERY: null,
+const CHECKPOINT_ORDER = ['ASSIGNED', 'ACCEPTED', 'EN_ROUTE_PU', 'AT_PICKUP', 'LOADED', 'IN_TRANSIT', 'AT_DELIVERY', 'POD_UPLOADED', 'COMPLETED'];
+const CHECKPOINT_LABEL = {
+  ASSIGNED: 'Assigned',
+  ACCEPTED: 'Accepted',
+  EN_ROUTE_PU: 'En Route to Pickup',
+  AT_PICKUP: 'Arrived at Pickup',
+  LOADED: 'Loaded',
+  IN_TRANSIT: 'In Transit',
+  AT_DELIVERY: 'Arrived at Delivery',
+  POD_UPLOADED: 'POD Uploaded',
+  COMPLETED: 'Completed'
 };
 
 // ---------------- Login ----------------
@@ -1085,24 +1103,157 @@ function photoBlockHtml(title, l, key){
   return h;
 }
 
-function checkpointBlockHtml(l, suffix = ''){
-  if (!PERMS.canUpdateLoadStatus) return '';
-  const cp = l.driverProgress || null;
-  const nextCta = CHECKPOINT_NEXT_CTA[cp];
-  const btnId = suffix ? 'dp-checkpoint-btn-' + suffix : 'dp-checkpoint-btn';
-  if (!nextCta) {
-    return '<button class="dp-checkpoint-btn dp-checkpoint-done" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>Delivered</button>';
-  }
-  const idx = cp ? CHECKPOINT_ORDER.indexOf(cp) : -1;
-  const nextStatus = CHECKPOINT_ORDER[idx+1];
-  return '<button class="dp-checkpoint-btn" id="' + btnId + '" onclick="advanceCheckpoint(\''+l.id+'\',\''+nextStatus+'\')">' + nextCta + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
+function workflowProgressBarHtml(l) {
+  const cp = (l.driverProgress || 'ASSIGNED').toUpperCase();
+  const stepKeys = ['ACCEPTED', 'EN_ROUTE_PU', 'AT_PICKUP', 'LOADED', 'IN_TRANSIT', 'AT_DELIVERY', 'POD_UPLOADED', 'COMPLETED'];
+  const labels = {
+    ACCEPTED: 'Accepted',
+    EN_ROUTE_PU: 'En Route PU',
+    AT_PICKUP: 'Arrived PU',
+    LOADED: 'Loaded',
+    IN_TRANSIT: 'In Transit',
+    AT_DELIVERY: 'Arrived DO',
+    POD_UPLOADED: 'POD Sent',
+    COMPLETED: 'Completed'
+  };
+
+  let activeIdx = stepKeys.indexOf(cp);
+  if (cp === 'ASSIGNED') activeIdx = -1;
+  
+  let h = '<div class="dp-card dp-block" style="margin-top:12px;padding:14px;"><div class="dp-section-title"><div class="t"><span class="icn">🚀</span>Workflow Tracker</div></div>';
+  h += '<div style="display:flex; overflow-x:auto; gap:6px; padding:4px 0; scrollbar-width:thin;">';
+  stepKeys.forEach((k, idx) => {
+    const isDone = idx <= activeIdx;
+    const isCurrent = idx === activeIdx;
+    const bg = isCurrent ? '#2563eb' : (isDone ? '#10b981' : 'var(--border-soft)');
+    const color = isDone ? '#fff' : 'var(--muted)';
+    h += `<div style="flex:0 0 auto; text-align:center; padding:6px 12px; background:${bg}; color:${color}; border-radius:18px; font-size:11.5px; font-weight:700;">
+      ${isDone ? '✓ ' : ''}${labels[k]}
+    </div>`;
+  });
+  h += '</div></div>';
+  return h;
 }
+
+function loadTimelineBlockHtml(l) {
+  const ts = l.timestamps || {};
+  const items = [
+    { label: 'Accepted Time', time: ts.acceptedAt },
+    { label: 'Pickup ETA Submitted', time: l.pickupEta || (ts.etaSubmittedAt ? fmtDate(ts.etaSubmittedAt) : null) },
+    { label: 'En Route to Pickup', time: ts.enRoutePuAt },
+    { label: 'Arrived at Pickup', time: ts.arrivedPuAt },
+    { label: 'Loaded Time', time: ts.loadedAt },
+    { label: 'BOL Uploaded', time: ts.bolUploadedAt },
+    { label: 'In Transit Started', time: ts.inTransitAt },
+    { label: 'Arrived at Delivery', time: ts.arrivedDoAt },
+    { label: 'POD Uploaded', time: ts.podUploadedAt },
+    { label: 'Completion Time', time: ts.completedAt }
+  ].filter(i => i.time);
+
+  if (!items.length) return '';
+
+  let h = '<div class="dp-card dp-block" style="margin-top:12px;"><div class="dp-section-title"><div class="t"><span class="icn">⏱</span>Load Activity Timeline</div></div>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px;">';
+  items.forEach(item => {
+    const timeStr = String(item.time).includes('T') ? new Date(item.time).toLocaleTimeString([], {month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : String(item.time);
+    h += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:10px;border:1px solid var(--border-soft);font-size:12px;">
+      <span style="font-weight:600;color:var(--foreground);">${escapeHtml(item.label)}</span>
+      <span style="font-family:monospace;font-size:11px;color:var(--brand);font-weight:700;">${escapeHtml(timeStr)}</span>
+    </div>`;
+  });
+  h += '</div></div>';
+  return h;
+}
+
+function checkpointBlockHtml(l, suffix = '') {
+  if (!PERMS.canUpdateLoadStatus) return '';
+  const cp = (l.driverProgress || 'ASSIGNED').toUpperCase();
+  const docs = l.docs || l.documents || {};
+  const hasBol = !!(docs.BOL && (docs.BOL.hasFile || docs.BOL.name || docs.BOL.data));
+  const hasPod = !!(docs.POD && (docs.POD.hasFile || docs.POD.name || docs.POD.data));
+
+  if (cp === 'COMPLETED' || (cp === 'POD_UPLOADED' && hasPod)) {
+    const compTime = l.timestamps && l.timestamps.completedAt ? new Date(l.timestamps.completedAt).toLocaleString([], {month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div class="dp-card" style="background:var(--brand-soft);border:1px solid var(--brand);text-align:center;padding:16px;">
+      <div style="font-size:16px;font-weight:800;color:var(--brand);">✓ LOAD COMPLETED</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Finished ${compTime ? ('on ' + compTime) : 'successfully'}</div>
+    </div>`;
+  }
+
+  if (cp === 'ASSIGNED') {
+    return `<button class="dp-checkpoint-btn" style="background:#10b981;" onclick="openAcceptEtaModal('${l.id}')">Accept Load (ETA Required) →</button>`;
+  }
+  if (cp === 'ACCEPTED') {
+    return `<button class="dp-checkpoint-btn" onclick="advanceCheckpoint('${l.id}','EN_ROUTE_PU')">Start Trip to Pickup →</button>`;
+  }
+  if (cp === 'EN_ROUTE_PU') {
+    return `<button class="dp-checkpoint-btn" onclick="advanceCheckpoint('${l.id}','AT_PICKUP')">Arrived at Pickup →</button>`;
+  }
+  if (cp === 'AT_PICKUP' || (cp === 'LOADED' && !hasBol)) {
+    return `<button class="dp-checkpoint-btn" style="background:#f59e0b;color:#000;" onclick="startUploadDoc('${l.id}','BOL')">Upload Required BOL →</button>`;
+  }
+  if (cp === 'LOADED' && hasBol) {
+    return `<button class="dp-checkpoint-btn" onclick="advanceCheckpoint('${l.id}','IN_TRANSIT')">Start In Transit →</button>`;
+  }
+  if (cp === 'IN_TRANSIT') {
+    return `<button class="dp-checkpoint-btn" onclick="advanceCheckpoint('${l.id}','AT_DELIVERY')">Arrived at Delivery →</button>`;
+  }
+  if (cp === 'AT_DELIVERY' || (cp === 'POD_UPLOADED' && !hasPod)) {
+    return `<button class="dp-checkpoint-btn" style="background:#10b981;" onclick="startUploadDoc('${l.id}','POD')">Upload Required POD →</button>`;
+  }
+
+  return '';
+}
+
+let pendingAcceptLoadId = null;
+
+function openAcceptEtaModal(loadId) {
+  pendingAcceptLoadId = loadId;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  document.getElementById('accept-eta-date').value = todayStr;
+  document.getElementById('accept-eta-time').value = '08:00';
+  document.getElementById('accept-eta-notes').value = '';
+  openModal('dp-accept-eta-modal');
+}
+
+async function submitAcceptEta() {
+  if (!pendingAcceptLoadId) return;
+  const dateVal = document.getElementById('accept-eta-date').value.trim();
+  const timeVal = document.getElementById('accept-eta-time').value.trim();
+  const notes = document.getElementById('accept-eta-notes').value.trim();
+
+  if (!dateVal || !timeVal) {
+    return toast('Pickup ETA Date and Time are required.');
+  }
+
+  const btn = document.getElementById('accept-eta-btn');
+  btn.disabled = true;
+  btn.textContent = 'Accepting Load…';
+
+  try {
+    const res = await api('/api/driver/loads/' + pendingAcceptLoadId + '/accept', {
+      method: 'POST',
+      body: JSON.stringify({ etaDate: dateVal, etaTime: timeVal, notes })
+    });
+    toast('✅ Load Accepted! Pickup ETA: ' + dateVal + ' ' + timeVal);
+    closeModal('dp-accept-eta-modal');
+    pendingAcceptLoadId = null;
+    loadCurrent();
+    triggerDriverGpsReport(true);
+  } catch (e) {
+    toast('Accept failed: ' + (e.message || 'Error'));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Confirm & Accept Load →';
+  }
+}
+
 async function advanceCheckpoint(loadId, status){
   const btns = document.querySelectorAll('.dp-checkpoint-btn');
   btns.forEach(b => { b.disabled = true; b.textContent = 'Updating…'; });
   try {
     await api('/api/driver/loads/' + loadId + '/status', { method:'POST', body: JSON.stringify({ status }) });
-    toast('Status updated: ' + CHECKPOINT_LABEL[status]);
+    toast('Status updated: ' + (CHECKPOINT_LABEL[status] || status));
     loadCurrent();
     triggerDriverGpsReport(true);
   } catch(e){ toast(e.message); btns.forEach(b => b.disabled = false); }
@@ -1162,6 +1313,8 @@ function currentContentHtml(dash, home){
   let h = identityHtml(dash.driver);
   h += heroLoadHtml(l);
   h += '<div class="dp-block" style="margin-top:14px;margin-bottom:14px;">' + checkpointBlockHtml(l, 'top') + '</div>';
+  h += workflowProgressBarHtml(l);
+  h += loadTimelineBlockHtml(l);
   h += stopBlockHtml(l);
   h += docsBlockHtml(l);
   h += photoBlockHtml('Loading Photos', l, 'PhotosPU');

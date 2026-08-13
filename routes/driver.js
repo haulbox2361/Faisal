@@ -481,12 +481,120 @@ router.get('/api/driver/loads/:id/history', async (req, res) => {
   }
 });
 
-// Driver-facing checkpoints. Deliberately a separate field
-// (`driverProgress`) from the dispatch-owned `status` field that
-// computeStatus()/handleDocUpload() manage in public/index.html — a driver
-// tapping "In Transit" should never silently overwrite dispatch's own status
-// logic tied to RC/BOL/POD uploads.
-const DRIVER_CHECKPOINTS = ['ACCEPTED', 'AT_PICKUP', 'IN_TRANSIT', 'AT_DELIVERY'];
+function shapeLoadForDriver(l) {
+  const docs = l.docs || l.documents || {};
+  const singleMeta = (doc) => (doc && (doc.hasFile || doc.name || doc.data) ? { hasFile: true, name: doc.name || doc.fileName || null, fileName: doc.name || doc.fileName || null, mimeType: doc.mimeType || null } : { hasFile: false });
+  const arrMeta = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && (x.hasFile || x.name || x.data)).map((x) => ({ hasFile: true, name: x.name || x.fileName || null, fileName: x.name || x.fileName || null, mimeType: x.mimeType || null, index: x.index })) : []);
+
+  return {
+    id: l.id,
+    loadNumber: l.loadNumber,
+    status: l.status,
+    driverProgress: l.driverProgress || 'ASSIGNED',
+    driverCheckpoint: l.driverProgress || l.driverCheckpoint || 'ASSIGNED',
+    pickup: l.pickup,
+    dropoff: l.dropoff,
+    pickupDate: l.pickupDate,
+    pickupTime: l.pickupTime,
+    deliveryDate: l.deliveryDate,
+    deliveryTime: l.deliveryTime,
+    pickupEta: l.pickupEta || l.driverManualEta || l.eta || null,
+    eta: l.pickupEta || l.driverManualEta || l.eta || null,
+    acceptNotes: l.acceptNotes || null,
+    timestamps: l.timestamps || {},
+    brokerName: l.brokerName || null,
+    driverPay: l.driverPay || 0,
+    driverPaid: !!l.driverPaid,
+    driverPaidDate: l.driverPaidDate || null,
+    pickupAddress: l.pickupAddress || null,
+    pickupContact: l.pickupContact || null,
+    pickupPhone: l.pickupPhone || null,
+    dropoffAddress: l.dropoffAddress || null,
+    dropoffContact: l.dropoffContact || null,
+    dropoffPhone: l.dropoffPhone || null,
+    notes: l.notes || null,
+    weight: l.weight || null,
+    commodity: l.commodity || null,
+    trailerType: l.trailerType || null,
+    docs: {
+      RC: singleMeta(docs.RC),
+      BOL: singleMeta(docs.BOL),
+      POD: singleMeta(docs.POD),
+      PhotosPU: arrMeta(docs.PhotosPU),
+      PhotosDO: arrMeta(docs.PhotosDO),
+      Extra: arrMeta(docs.Extra),
+    },
+    documents: {
+      RC: singleMeta(docs.RC),
+      BOL: singleMeta(docs.BOL),
+      POD: singleMeta(docs.POD),
+      PhotosPU: arrMeta(docs.PhotosPU),
+      PhotosDO: arrMeta(docs.PhotosDO),
+      Extra: arrMeta(docs.Extra),
+    },
+  };
+}
+
+function driverLoads(state, driverId) {
+  return (state.loads || []).filter((l) => l.driverId === driverId);
+}
+
+function isCompleted(l) {
+  const cp = (l.driverProgress || l.status || '').toUpperCase();
+  return cp === 'COMPLETED' || l.status === 'Drop-off' || l.status === 'Completed' || l.status === 'Delivered';
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+// Driver-facing checkpoints in strict sequential order
+const DRIVER_CHECKPOINTS = ['ASSIGNED', 'ACCEPTED', 'EN_ROUTE_PU', 'AT_PICKUP', 'LOADED', 'IN_TRANSIT', 'AT_DELIVERY', 'POD_UPLOADED', 'COMPLETED'];
+
+// POST /api/driver/loads/:id/accept  { etaDate, etaTime, eta, notes }
+router.post('/api/driver/loads/:id/accept', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { etaDate, etaTime, eta, notes } = req.body || {};
+  const etaStr = String(eta || (etaDate ? `${etaDate} ${etaTime || ''}` : '')).trim();
+  if (!etaStr) return res.status(400).json({ error: 'Pickup ETA (Date & Time) is required to accept this load.' });
+
+  const { state, driver } = ctx;
+  const load = (state.loads || []).find((l) => l.id === req.params.id && l.driverId === driver.id);
+  if (!load) return res.status(404).json({ error: 'Load not found' });
+
+  const nowIso = new Date().toISOString();
+  load.driverProgress = 'ACCEPTED';
+  load.pickupEta = etaStr;
+  load.eta = etaStr;
+  load.driverManualEta = etaStr;
+  load.acceptNotes = notes || null;
+  load.timestamps = load.timestamps || {};
+  load.timestamps.acceptedAt = nowIso;
+  load.timestamps.etaSubmittedAt = nowIso;
+
+  try {
+    await saveFullState(state);
+    await history.record(load.id, 'LOAD_ACCEPTED', `Driver accepted load. Pickup ETA: ${etaStr}` + (notes ? ` (Notes: ${notes})` : ''), { type: 'driver', id: driver.id, name: driver.name });
+    
+    // Notify Admin & Assigned Dispatcher
+    const notifPayload = {
+      type: 'load_status_changed',
+      title: `${driver.name || 'Driver'} Accepted Load #${load.loadNumber || load.id}`,
+      body: `Pickup ETA: ${etaStr}` + (notes ? ` | Notes: ${notes}` : ''),
+      data: { loadId: load.id, eta: etaStr },
+    };
+    await notifications.create('admin', 'admin', notifPayload);
+    if (load.dispatcherId) {
+      await notifications.create('dispatcher', load.dispatcherId, notifPayload);
+    }
+
+    res.json({ ok: true, load: shapeLoadForDriver(load) });
+  } catch (e) {
+    console.error('driver load accept failed:', e);
+    res.status(500).json({ error: 'Failed to accept load' });
+  }
+});
 
 // POST /api/driver/loads/:id/status  { status, note }
 router.post('/api/driver/loads/:id/status', async (req, res) => {
@@ -504,15 +612,45 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
   const load = (state.loads || []).find((l) => l.id === req.params.id && l.driverId === driver.id);
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
+  // Validation rules
+  const docs = load.docs || load.documents || {};
+  const hasBol = !!(docs.BOL && (docs.BOL.hasFile || docs.BOL.name || docs.BOL.data));
+  const hasPod = !!(docs.POD && (docs.POD.hasFile || docs.POD.name || docs.POD.data));
+
+  if (checkpoint === 'LOADED' && !hasBol) {
+    return res.status(400).json({ error: 'BOL document upload is required before marking as Loaded.' });
+  }
+  if (checkpoint === 'COMPLETED' && !hasPod) {
+    return res.status(400).json({ error: 'POD document upload is required before marking as Completed.' });
+  }
+
+  const nowIso = new Date().toISOString();
+  load.timestamps = load.timestamps || {};
   load.driverProgress = checkpoint;
+
+  if (checkpoint === 'EN_ROUTE_PU') load.timestamps.enRoutePuAt = nowIso;
+  else if (checkpoint === 'AT_PICKUP') load.timestamps.arrivedPuAt = nowIso;
+  else if (checkpoint === 'LOADED') { load.timestamps.loadedAt = nowIso; load.status = 'Loaded'; }
+  else if (checkpoint === 'IN_TRANSIT') { load.timestamps.inTransitAt = nowIso; load.status = 'In Transit'; }
+  else if (checkpoint === 'AT_DELIVERY') load.timestamps.arrivedDoAt = nowIso;
+  else if (checkpoint === 'POD_UPLOADED') load.timestamps.podUploadedAt = nowIso;
+  else if (checkpoint === 'COMPLETED') { load.timestamps.completedAt = nowIso; load.status = 'Completed'; }
+
   try {
     await saveFullState(state);
-    await notifications.create('admin', 'admin', {
+    await history.record(load.id, `STATUS_${checkpoint}`, `Driver updated status to ${checkpoint.replace(/_/g, ' ')}` + (note ? `: ${note}` : ''), { type: 'driver', id: driver.id, name: driver.name });
+
+    const notifPayload = {
       type: 'load_status_changed',
       title: `${driver.name || 'Driver'} — ${load.loadNumber || load.id}`,
-      body: `Marked ${checkpoint.replace('_', ' ').toLowerCase()}` + (note ? `: ${note}` : ''),
-      data: { loadId: load.id },
-    });
+      body: `Status updated to: ${checkpoint.replace(/_/g, ' ')}` + (note ? ` (${note})` : ''),
+      data: { loadId: load.id, checkpoint },
+    };
+    await notifications.create('admin', 'admin', notifPayload);
+    if (load.dispatcherId) {
+      await notifications.create('dispatcher', load.dispatcherId, notifPayload);
+    }
+
     res.json({ ok: true, load: shapeLoadForDriver(load) });
   } catch (e) {
     console.error('driver status update failed:', e);
@@ -532,6 +670,7 @@ router.post('/api/driver/loads/:id/eta', async (req, res) => {
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
   load.eta = eta;
+  load.pickupEta = eta;
   load.driverManualEta = eta;
   load.etaUpdatedAt = new Date().toISOString();
   load.etaUpdatedBy = driver.name || 'Driver';
@@ -551,8 +690,6 @@ router.post('/api/driver/loads/:id/eta', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 // POST /api/driver/doc  { driverId?, pin?, loadId, key, index? }  (or Bearer token)
-// Fetches one document's actual file data, only for a load that belongs to
-// the authenticated driver.
 router.post('/api/driver/doc', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
@@ -562,19 +699,15 @@ router.post('/api/driver/doc', async (req, res) => {
   const load = (state.loads || []).find((l) => l.id === loadId && l.driverId === driver.id);
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
-  const docs = load.docs || {};
+  const docs = load.docs || load.documents || {};
   let file = null;
   if (['RC', 'BOL', 'POD'].includes(key)) file = docs[key];
   else if (['PhotosPU', 'PhotosDO', 'Extra'].includes(key)) file = (docs[key] || [])[index];
 
   if (!file || !file.data) return res.status(404).json({ error: 'File not available' });
-  res.json({ ok: true, name: file.name, data: file.data });
+  res.json({ ok: true, name: file.name || file.fileName, data: file.data });
 });
 
-// Document slots a driver is allowed to add to themselves, and each slot's
-// cap — mirrors the limits the Admin/Dispatcher UI enforces (see docCap() in
-// public/index.html). Rate Confirmation (RC) is deliberately excluded: only
-// Admin/Dispatcher can attach that one, since it's what books the load.
 const DRIVER_UPLOAD_CAPS = { BOL: 1, POD: 1, PhotosPU: 6, PhotosDO: 6, Extra: 6 };
 
 // POST /api/driver/upload-doc  { driverId?, pin?, loadId, key, fileName, mimeType, data }  (or Bearer token)
@@ -595,8 +728,10 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
   load.docs = load.docs || {};
+  load.timestamps = load.timestamps || {};
+  const nowIso = new Date().toISOString();
   const isArray = ['PhotosPU', 'PhotosDO', 'Extra'].includes(key);
-  const rec = { name: fileName, data, uploadedAt: new Date().toISOString(), uploadedBy: driver.name || driver.id };
+  const rec = { name: fileName, fileName, data, uploadedAt: nowIso, uploadedBy: driver.name || driver.id };
 
   if (isArray) {
     const arr = (load.docs[key] = load.docs[key] || []);
@@ -609,28 +744,35 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     load.docs[key] = rec;
   }
 
-  // Uploading BOL/POD also advances the load's status, same rule the
-  // Admin/Dispatcher UI uses (see computeStatus() in public/index.html).
-  if (load.docs.POD) load.status = 'Drop-off';
-  else if (load.docs.BOL) load.status = 'Loaded';
-  else if (load.docs.RC) load.status = 'Booked';
-  else load.status = 'Pending RC';
-
-  // Payment stage only ever applies once a load hits Drop-off — same rule
-  // handleDocUpload() uses on the Admin/Dispatcher side.
-  const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
-  if (load.status === 'Drop-off' && !PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
-  if (load.status !== 'Drop-off') load.payment = null;
+  // Automatic Workflow Progress Transitions on Document Upload
+  if (key === 'BOL') {
+    load.timestamps.bolUploadedAt = nowIso;
+    load.driverProgress = 'IN_TRANSIT';
+    load.timestamps.inTransitAt = nowIso;
+    load.status = 'In Transit';
+  } else if (key === 'POD') {
+    load.timestamps.podUploadedAt = nowIso;
+    load.driverProgress = 'COMPLETED';
+    load.timestamps.completedAt = nowIso;
+    load.status = 'Completed';
+    const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
+    if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
+  }
 
   try {
     await saveFullState(state);
     await history.record(load.id, `${key}_UPLOADED`, fileName, { type: 'driver', id: driver.id, name: driver.name });
-    await notifications.create('admin', 'admin', {
+    
+    const notifPayload = {
       type: 'document_uploaded',
       title: `${driver.name || 'Driver'} uploaded ${key}`,
-      body: `${load.loadNumber || load.id} — ${fileName}`,
+      body: `Load #${load.loadNumber || load.id} — ${fileName}` + (key === 'POD' ? ' (Load Completed)' : ''),
       data: { loadId: load.id, key },
-    });
+    };
+    await notifications.create('admin', 'admin', notifPayload);
+    if (load.dispatcherId) {
+      await notifications.create('dispatcher', load.dispatcherId, notifPayload);
+    }
 
     // Auto-upload BOL and POD to Google Drive using the admin's connected
     // account token (drivers have no Google OAuth account of their own).
