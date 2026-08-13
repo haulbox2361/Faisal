@@ -3614,6 +3614,10 @@ async function submitLoadForm(e){
   pushNotification('New load booked — '+load.loadNumber, (broker?broker.name+' · ':'')+(load.pickup||'')+' → '+(load.dropoff||''));
   syncLoadToSheet(load);
   persist();
+  // Auto-upload RC to Google Drive on load creation
+  if(load.docs.RC && load.docs.RC.data){
+    autoDriveUploadDoc(load, 'RC', load.docs.RC).catch(()=>{});
+  }
   toast('Load booked', load.loadNumber+' — RC on file, status Booked', true);
   resetLoadForm();
   switchView('loadboard');
