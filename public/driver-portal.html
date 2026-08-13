@@ -707,19 +707,86 @@ function identityHtml(driver){
     '<div class="dp-online-chip"><span class="dot hb-pulse"></span>Online</div></div>';
 }
 
+function progressTimelineHtml(l){
+  const steps = [
+    { key: 'ASSIGNED', label: 'Assigned' },
+    { key: 'ACCEPTED', label: 'Accepted' },
+    { key: 'AT_PICKUP', label: 'At Pickup' },
+    { key: 'LOADED', label: 'Loaded' },
+    { key: 'IN_TRANSIT', label: 'In Transit' },
+    { key: 'AT_DELIVERY', label: 'At Delivery' },
+    { key: 'DELIVERED', label: 'Delivered' },
+    { key: 'POD_UPLOADED', label: 'POD Uploaded' },
+    { key: 'PAID', label: 'Paid' },
+    { key: 'PAID_CONFIRMED', label: 'Confirmed' }
+  ];
+
+  const currentKey = (l.driverProgress || 'ASSIGNED').toUpperCase();
+  const paymentKey = (l.paymentStatus || (l.driverPaid ? 'PAID_CONFIRMED' : '')).toUpperCase();
+  
+  let activeIdx = steps.findIndex(s => s.key === currentKey);
+  if (paymentKey === 'PAID_CONFIRMED') activeIdx = steps.length - 1;
+  else if (l.driverPaid) activeIdx = Math.max(activeIdx, 8);
+  if (activeIdx === -1) activeIdx = 0;
+
+  let h = '<div class="dp-card dp-block" style="margin-top:14px;"><div class="dp-section-title"><div class="t">🚚 Load Progress Timeline</div></div>';
+  h += '<div style="display:flex; overflow-x:auto; gap:6px; padding:6px 0; scrollbar-width:thin;">';
+  steps.forEach((step, idx) => {
+    const isDone = idx <= activeIdx;
+    const isCurrent = idx === activeIdx;
+    const bg = isCurrent ? '#2563eb' : (isDone ? '#10b981' : 'var(--border-soft)');
+    const color = isDone ? '#fff' : 'var(--text-dim)';
+    h += `<div style="flex:0 0 auto; text-align:center; padding:6px 10px; background:${bg}; color:${color}; border-radius:20px; font-size:11px; font-weight:700;">
+      ${isDone ? '✓ ' : ''}${step.label}
+    </div>`;
+  });
+  h += '</div></div>';
+  return h;
+}
+
+function locationSharingCardHtml(){
+  const mode = localStorage.getItem('hb_driver_sharing_mode') || 'ACTIVE_LOAD';
+  const statusText = window.driverGpsStatus || 'Ready (Auto-updates every 5m)';
+
+  let h = '<div class="dp-card dp-block" style="margin-top:14px;">';
+  h += '<div class="dp-section-title"><div class="t">📍 Live Location Sharing</div><span style="font-size:11px;color:var(--text-dim);">' + escapeHtml(statusText) + '</span></div>';
+  h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Select when dispatchers and admins can view your live GPS position:</div>';
+  h += '<div style="display:flex; flex-direction:column; gap:8px; font-size:12.5px;">';
+  h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+    <input type="radio" name="dp_sharing_mode" value="ACTIVE_LOAD" ${mode === 'ACTIVE_LOAD' ? 'checked' : ''} onchange="setDriverSharingMode(this.value)">
+    <b>Share Only During Active Load</b> <span style="font-size:10.5px;color:var(--brand);">(Recommended)</span>
+  </label>`;
+  h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+    <input type="radio" name="dp_sharing_mode" value="ALWAYS" ${mode === 'ALWAYS' ? 'checked' : ''} onchange="setDriverSharingMode(this.value)">
+    <b>Always Share While On Duty</b>
+  </label>`;
+  h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+    <input type="radio" name="dp_sharing_mode" value="OFF" ${mode === 'OFF' ? 'checked' : ''} onchange="setDriverSharingMode(this.value)">
+    <b>Stop Sharing</b>
+  </label>`;
+  h += '</div></div>';
+  return h;
+}
+
 function heroLoadHtml(l){
   const pickupCity = (l.pickup||'—').split(',')[0];
   const dropCity = (l.dropoff||'—').split(',')[0];
+  const trk = l.tracking || {};
+  const milesRem = trk.milesRemaining != null ? trk.milesRemaining : (l.milesRemaining != null ? l.milesRemaining : (l.miles || '—'));
+  const etaText = trk.etaDeliveryText || etaCountdownText(l.eta);
+  const riskBadge = (trk.risk && trk.risk.badge) ? trk.risk.badge : '🟢 On Time';
+
   let h = '<div class="dp-hero">';
   h += '<div class="dp-hero-top"><div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">' +
     '<div><div class="dp-hero-eyebrow">Current Load</div><div class="dp-hero-num">LOAD # ' + escapeHtml(l.loadNumber||l.id) + '</div>' +
     '<div class="dp-hero-broker"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V7l6-4 6 4v14M10 9h.01M14 9h.01M10 13h.01M14 13h.01M10 17h.01M14 17h.01"/></svg>' + escapeHtml(l.brokerName||'Rapid Freight Inc.') + '</div></div>' +
     '<div style="text-align:right;"><div class="dp-hero-rate">' + money(l.driverPay) + '</div>' +
-    '<div class="dp-badge ' + statusClass(l.driverProgress||'assigned') + '" style="margin-top:6px;"><span class="dot"></span>' + (CHECKPOINT_LABEL[l.driverProgress] || 'Assigned') + '</div></div>' +
+    '<div class="dp-badge ' + statusClass(l.driverProgress||'assigned') + '" style="margin-top:6px;"><span class="dot"></span>' + (CHECKPOINT_LABEL[l.driverProgress] || 'Assigned') + '</div>' +
+    '<div style="font-size:11px;font-weight:700;margin-top:4px;color:var(--brand);">' + escapeHtml(riskBadge) + '</div></div>' +
     '</div>';
   h += '<div class="dp-hero-stats">' +
-    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">⏱ ETA Countdown</div><div class="dp-hero-stat-val" style="color:var(--brand);">' + escapeHtml(etaCountdownText(l.eta)) + '</div></div>' +
-    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">📍 Remaining</div><div class="dp-hero-stat-val">' + (l.milesRemaining!=null ? l.milesRemaining : (l.miles || '245')) + ' <span style="font-size:12px;font-weight:600;color:var(--surface-dark-muted);">mi</span></div></div>' +
+    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">⏱ Calculated Delivery ETA</div><div class="dp-hero-stat-val" style="color:var(--brand);">' + escapeHtml(etaText) + '</div></div>' +
+    '<div class="dp-hero-stat"><div class="dp-hero-stat-label">📍 Remaining</div><div class="dp-hero-stat-val">' + milesRem + ' <span style="font-size:12px;font-weight:600;color:var(--surface-dark-muted);">mi</span></div></div>' +
     '</div></div>';
   h += '<div class="dp-hero-bottom">' +
     '<div class="dp-route-line"><span class="dp-route-dot pickup"></span><span>' + escapeHtml(pickupCity) + '</span><span class="dp-route-arrow">→</span><span class="dp-route-dot dropoff"></span><span>' + escapeHtml(dropCity) + '</span></div>' +
@@ -729,21 +796,31 @@ function heroLoadHtml(l){
 
 function stopBlockHtml(l){
   let h = '<div class="dp-block">';
-  
+  const trk = l.tracking || {};
+  const currentPos = window.driverCurrentPos || trk.currentPosition;
+  const currentOriginParam = currentPos ? `&origin=${currentPos.lat},${currentPos.lng}` : '';
+
+  const fullRouteUrl = `https://www.google.com/maps/dir/?api=1${currentOriginParam}&destination=${encodeURIComponent(l.dropoff||'')}&waypoints=${encodeURIComponent(l.pickup||'')}`;
+  const puUrl = `https://www.google.com/maps/dir/?api=1${currentOriginParam}&destination=${encodeURIComponent(l.pickup||'')}`;
+  const doUrl = `https://www.google.com/maps/dir/?api=1${currentOriginParam}&destination=${encodeURIComponent(l.dropoff||'')}`;
+
+  // Quick Action: Open Full Route
+  h += `<div style="margin-bottom:10px;"><a class="dp-btn-sm" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;background:#2563eb;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;" target="_blank" href="${fullRouteUrl}">🗺 Open Full Route in Google Maps</a></div>`;
+
   // Pickup Location Card
   h += '<div class="dp-location-card">';
-  h += '<div class="dp-location-head"><span>📍 Pickup Location</span><span>Contact</span></div>';
+  h += '<div class="dp-location-head"><span>📍 Pickup Location</span><span>ETA: ' + escapeHtml(trk.etaPickupText || l.pickupTime || 'On schedule') + '</span></div>';
   h += '<div class="dp-location-addr">' + escapeHtml(l.pickup||'—') + '</div>';
   h += '<div class="dp-location-contact"><span>' + escapeHtml(l.pickupDate||'—') + (l.pickupTime?(' · '+escapeHtml(l.pickupTime)):'') + '</span>';
-  h += '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.pickup) + '"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Navigate</a></div>';
+  h += '<a class="dp-open-maps" target="_blank" href="' + puUrl + '"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Open Pickup</a></div>';
   h += '</div>';
 
   // Delivery Location Card
   h += '<div class="dp-location-card">';
-  h += '<div class="dp-location-head"><span>🏁 Delivery Location</span><span>Contact</span></div>';
+  h += '<div class="dp-location-head"><span>🏁 Delivery Location</span><span>ETA: ' + escapeHtml(trk.etaDeliveryText || l.deliveryTime || 'On schedule') + '</span></div>';
   h += '<div class="dp-location-addr">' + escapeHtml(l.dropoff||'—') + '</div>';
   h += '<div class="dp-location-contact"><span>' + escapeHtml(l.deliveryDate||'—') + (l.deliveryTime?(' · '+escapeHtml(l.deliveryTime)):'') + '</span>';
-  h += '<a class="dp-open-maps" target="_blank" href="' + mapsUrl(l.dropoff) + '"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Navigate</a></div>';
+  h += '<a class="dp-open-maps" target="_blank" href="' + doUrl + '"><svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M9 18l6-6-6-6"/></svg>Open Delivery</a></div>';
   h += '</div>';
 
   h += '</div>';
@@ -859,6 +936,8 @@ function currentContentHtml(dash, home){
   const l = dash.currentLoad || defaultDemoLoad;
   let h = identityHtml(dash.driver);
   h += heroLoadHtml(l);
+  h += progressTimelineHtml(l);
+  h += locationSharingCardHtml();
   h += '<div class="dp-actions-row">' +
     '<button class="dp-action-btn" onclick="setDriverPortalPage(\'chat\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.362 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Call Dispatcher</button>' +
     '<button class="dp-action-btn danger" onclick="toast(\'HaulBoX safety team notified.\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Emergency</button>' +
@@ -870,7 +949,77 @@ function currentContentHtml(dash, home){
   if (l.notes) h += '<div class="dp-notes dp-block"><b>Note: </b>' + escapeHtml(l.notes) + '</div>';
   h += '<div class="dp-block">' + checkpointBlockHtml(l) + '</div>';
   h += mergedHomeHtml(home);
+
+  // Trigger location update when current load is rendered
+  setTimeout(() => triggerDriverGpsReport(), 500);
+
   return h;
+}
+
+let gpsReporterInterval = null;
+function setDriverSharingMode(val) {
+  localStorage.setItem('hb_driver_sharing_mode', val);
+  toast('Location sharing updated to: ' + (val === 'ACTIVE_LOAD' ? 'Active Load Only' : val === 'ALWAYS' ? 'Always On Duty' : 'Off'));
+  triggerDriverGpsReport(true);
+}
+
+function triggerDriverGpsReport(manual = false) {
+  const mode = localStorage.getItem('hb_driver_sharing_mode') || 'ACTIVE_LOAD';
+  if (mode === 'OFF') {
+    window.driverGpsStatus = 'Sharing Stopped';
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    window.driverGpsStatus = 'Geolocation unavailable on device';
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const speed = pos.coords.speed;
+      const heading = pos.coords.heading;
+      window.driverCurrentPos = { lat, lng };
+      window.driverGpsStatus = 'GPS Active (' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')';
+
+      try {
+        const dash = await api('/api/driver/dashboard');
+        const activeLoad = dash.currentLoad;
+
+        if (mode === 'ACTIVE_LOAD' && !activeLoad) {
+          window.driverGpsStatus = 'Standby (No Active Load)';
+          return;
+        }
+
+        await api('/api/driver/location', {
+          method: 'POST',
+          body: JSON.stringify({
+            latitude: lat,
+            longitude: lng,
+            speed,
+            heading,
+            sharingMode: mode,
+            loadId: activeLoad ? activeLoad.id : null,
+          }),
+        });
+        if (manual) toast('Location updated: ' + lat.toFixed(4) + ', ' + lng.toFixed(4));
+      } catch (e) {
+        console.warn('GPS location report failed:', e.message);
+      }
+    },
+    (err) => {
+      window.driverGpsStatus = 'GPS Warning: ' + (err.message || 'Permission needed');
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+}
+
+function startGpsReporter() {
+  triggerDriverGpsReport();
+  if (gpsReporterInterval) clearInterval(gpsReporterInterval);
+  gpsReporterInterval = setInterval(() => triggerDriverGpsReport(), 5 * 60 * 1000);
 }
 
 // ---------------- Loads ----------------

@@ -2900,6 +2900,77 @@ function renderDashboard(){
     title: '<b>'+l.driverName+'</b> — DO today',
     sub: l.brokerName+' · '+l.dropoff+' · Load '+l.loadNumber+' · '+l.status
   })), 'No drivers have a delivery today.');
+
+  // Live Fleet Tracking Section
+  renderLiveTrackingDashboardSection();
+}
+
+async function renderLiveTrackingDashboardSection(){
+  let panel = document.getElementById('live-tracking-panel');
+  if(!panel) {
+    const parent = document.getElementById('stat-grid');
+    if(parent && parent.parentNode) {
+      const container = document.createElement('div');
+      container.id = 'live-tracking-container';
+      container.style.marginTop = '16px';
+      container.style.gridColumn = '1 / -1';
+      container.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;">🚚 Live Drivers & Load Tracking</h3>
+          <button class="btn btn-sm btn-ghost" onclick="renderLiveTrackingDashboardSection()">🔄 Refresh Tracking</button>
+        </div>
+        <div id="live-tracking-panel" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:12px;">
+          <div class="cell-dim" style="font-size:12px;">Loading live tracking data…</div>
+        </div>
+      </div>`;
+      parent.parentNode.insertBefore(container, parent.nextSibling);
+      panel = document.getElementById('live-tracking-panel');
+    }
+  }
+  if(!panel) return;
+
+  try {
+    const role = (STATE.role || 'admin').toLowerCase();
+    const userId = STATE.currentUser ? STATE.currentUser.id : '';
+    const userName = STATE.currentUser ? STATE.currentUser.name : '';
+    const res = await backendFetch(`/api/tracking/live?role=${role}&userId=${encodeURIComponent(userId)}&userName=${encodeURIComponent(userName)}`);
+    const list = (res && res.trackingList) || [];
+
+    if(!list.length) {
+      panel.innerHTML = '<div class="cell-dim" style="font-size:12px;padding:10px 0;">No active loads currently being tracked.</div>';
+      return;
+    }
+
+    panel.innerHTML = list.map(t => {
+      const routeUrl = `https://www.google.com/maps/dir/?api=1${t.currentPosition ? `&origin=${t.currentPosition.lat},${t.currentPosition.lng}` : ''}&destination=${encodeURIComponent(t.deliveryLocation||'')}&waypoints=${encodeURIComponent(t.pickupLocation||'')}`;
+      const lastUpdateText = t.lastUpdateIso ? timeAgoShort(t.lastUpdateIso) : 'No location reported';
+      const isLateReport = !t.lastUpdateIso || (Date.now() - new Date(t.lastUpdateIso).getTime() > 60 * 60 * 1000);
+      const riskBadge = isLateReport ? '⚠️ Driver Not Reporting Location' : (t.risk ? t.risk.badge : '🟢 On Time');
+      const badgeClass = isLateReport ? 'background:#ef4444;color:#fff;' : (t.risk && t.risk.riskCode === 'RUNNING_LATE') ? 'background:#f59e0b;color:#fff;' : (t.risk && t.risk.riskCode === 'DELAYED') ? 'background:#ef4444;color:#fff;' : 'background:#10b981;color:#fff;';
+
+      return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;" onclick="openLoadModal('${t.loadId}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+          <div>
+            <div style="font-weight:700;font-size:13px;color:var(--text);">${escapeAttr(t.driverName || 'Driver')}</div>
+            <div style="font-size:11.5px;color:var(--brand);font-weight:600;">🚚 Load #${escapeAttr(t.loadNumber)}</div>
+          </div>
+          <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:12px;${badgeClass}">${escapeAttr(riskBadge)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);margin:6px 0;display:flex;flex-direction:column;gap:3px;">
+          <div>📍 <b>${t.milesRemaining}</b> miles remaining</div>
+          <div>⏱ ETA Pickup: <b>${escapeAttr(t.etaPickupText)}</b></div>
+          <div>🏁 ETA Delivery: <b>${escapeAttr(t.etaDeliveryText)}</b></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid var(--border-soft);font-size:11px;color:var(--text-faint);">
+          <span>Last GPS Update: <b>${lastUpdateText}</b></span>
+          <a class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:10.5px;text-decoration:none;" target="_blank" href="${routeUrl}" onclick="event.stopPropagation();">🗺 Open Route</a>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('Failed to render live tracking:', e);
+    panel.innerHTML = '<div class="cell-dim" style="font-size:12px;color:var(--red);">Failed to load tracking updates.</div>';
+  }
 }
 // Shared renderer for the dashboard's four "activity list" style cards.
 function renderListCard(containerId, items, emptyMsg){
@@ -3734,6 +3805,62 @@ function deleteLoad(id){
   STATE.loads = STATE.loads.filter(l=>l.id!==id);
   persist(); renderLoadBoard(); toast('Load deleted','', true);
 }
+function renderModalTimelineHtml(l){
+  const steps = [
+    { key: 'ASSIGNED', label: 'Assigned' },
+    { key: 'ACCEPTED', label: 'Accepted' },
+    { key: 'AT_PICKUP', label: 'At Pickup' },
+    { key: 'LOADED', label: 'Loaded' },
+    { key: 'IN_TRANSIT', label: 'In Transit' },
+    { key: 'AT_DELIVERY', label: 'At Delivery' },
+    { key: 'DELIVERED', label: 'Delivered' },
+    { key: 'POD_UPLOADED', label: 'POD Uploaded' },
+    { key: 'PAID', label: 'Paid' },
+    { key: 'PAID_CONFIRMED', label: 'Confirmed' }
+  ];
+
+  const currentKey = (l.driverProgress || 'ASSIGNED').toUpperCase();
+  const paymentKey = (l.paymentStatus || (l.driverPaid ? 'PAID_CONFIRMED' : '')).toUpperCase();
+  
+  let activeIdx = steps.findIndex(s => s.key === currentKey);
+  if (paymentKey === 'PAID_CONFIRMED') activeIdx = steps.length - 1;
+  else if (l.driverPaid) activeIdx = Math.max(activeIdx, 8);
+  if (activeIdx === -1) activeIdx = 0;
+
+  let h = '<div style="margin-bottom:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;">';
+  h += '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text-dim);">🚚 Load Progress Timeline</div>';
+  h += '<div style="display:flex; overflow-x:auto; gap:6px; padding:4px 0; scrollbar-width:thin;">';
+  steps.forEach((step, idx) => {
+    const isDone = idx <= activeIdx;
+    const isCurrent = idx === activeIdx;
+    const bg = isCurrent ? '#2563eb' : (isDone ? '#10b981' : 'var(--border-soft)');
+    const color = isDone ? '#fff' : 'var(--text-dim)';
+    h += `<div style="flex:0 0 auto; text-align:center; padding:5px 9px; background:${bg}; color:${color}; border-radius:16px; font-size:10.5px; font-weight:700;">
+      ${isDone ? '✓ ' : ''}${step.label}
+    </div>`;
+  });
+  h += '</div></div>';
+  return h;
+}
+
+function renderModalTrackingSection(l){
+  const routeUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l.dropoff||'')}&waypoints=${encodeURIComponent(l.pickup||'')}`;
+  const puUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l.pickup||'')}`;
+  const doUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l.dropoff||'')}`;
+
+  return `<div style="margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);">📍 Real-Time Tracking & Google Maps Navigation</div>
+      <div style="display:flex;gap:6px;">
+        <a class="btn btn-sm" target="_blank" href="${routeUrl}">🗺 Open Route</a>
+        <a class="btn btn-sm btn-ghost" target="_blank" href="${puUrl}">📍 Pickup</a>
+        <a class="btn btn-sm btn-ghost" target="_blank" href="${doUrl}">🏁 Delivery</a>
+      </div>
+    </div>
+    <div class="hint" style="font-size:11.5px;">Click any button to open full turn-by-turn navigation in Google Maps.</div>
+  </div>`;
+}
+
 function openLoadModal(id){
   const l = STATE.loads.find(x=>x.id===id);
   if(!l) return;
@@ -3794,6 +3921,8 @@ function openLoadModal(id){
       </div>
     </div>`;
   document.getElementById('load-modal-body').innerHTML = `
+    ${renderModalTimelineHtml(l)}
+    ${renderModalTrackingSection(l)}
     <div class="form-grid" style="margin-bottom:6px;">
       <div class="field"><label>Status</label><div style="padding-top:4px;">${placard(l.status)} <span class="hint" style="display:block;margin-top:5px;">${nextHint}</span></div></div>
       <div class="field"><label>Dispatcher</label><input value="${l.dispatcherName||'—'}" readonly></div>

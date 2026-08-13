@@ -5,6 +5,9 @@ const { Readable } = require('stream');
 const store = require('../lib/store');
 const { clientForAccount } = require('../lib/googleClient');
 const driveStore = require('../lib/driveStore');
+const kv = require('../lib/kvstore');
+const { getLatestLocationsForDrivers } = require('../lib/db');
+const { calculateLoadTracking } = require('../lib/etaEngine');
 
 const router = express.Router();
 router.use(express.json({ limit: '25mb' })); // attachments arrive as base64 in the JSON body
@@ -642,6 +645,50 @@ router.post('/api/webhook-sync', async (req, res) => {
   } catch (e) {
     console.error('webhook-sync failed:', e);
     res.status(500).json({ error: e.message || 'Webhook request failed' });
+  }
+});
+
+// GET /api/tracking/live
+// Role-scoped live tracking API for Admin and Dispatchers.
+// Admin receives all active drivers; Dispatcher receives only assigned drivers.
+router.get('/api/tracking/live', async (req, res) => {
+  try {
+    const stateBlob = await kv.get('haulline:state');
+    const state = stateBlob || {};
+    const loads = state.loads || [];
+    const role = String(req.query.role || 'admin').toLowerCase();
+    const userId = String(req.query.userId || '').trim();
+    const userName = String(req.query.userName || '').trim();
+
+    // Filter active (incomplete) loads
+    let activeLoads = loads.filter((l) => l.status !== 'PAID' && l.status !== 'PAID_CONFIRMED' && l.status !== 'ARCHIVED');
+
+    // Dispatcher privacy filter: only loads assigned to this dispatcher
+    if (role === 'dispatcher' && (userId || userName)) {
+      activeLoads = activeLoads.filter(
+        (l) => (userId && String(l.dispatcherId) === userId) || (userName && String(l.dispatcherName).toLowerCase() === userName.toLowerCase())
+      );
+    }
+
+    // Driver Privacy Rule: Drivers are NOT authorized to query all live tracking
+    if (role === 'driver') {
+      return res.status(403).json({ error: 'Driver accounts cannot access fleet tracking' });
+    }
+
+    const driverIds = activeLoads.map((l) => l.driverId).filter(Boolean);
+    const locMap = await getLatestLocationsForDrivers(driverIds);
+
+    const trackingList = activeLoads
+      .map((load) => {
+        const driverLoc = load.driverId ? locMap[load.driverId] : null;
+        return calculateLoadTracking(load, driverLoc);
+      })
+      .filter(Boolean);
+
+    res.json({ ok: true, count: trackingList.length, trackingList });
+  } catch (e) {
+    console.error('tracking/live failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to fetch live tracking' });
   }
 });
 

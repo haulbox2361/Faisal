@@ -5,9 +5,10 @@ const history = require('../lib/historyStore');
 const notifications = require('../lib/notificationStore');
 const chat = require('../lib/chatStore');
 const audit = require('../lib/auditStore');
-const driveStore = require('../lib/driveStore');
 const store = require('../lib/store');
 const { clientForAccount } = require('../lib/googleClient');
+const { recordDriverLocation, getLatestDriverLocation } = require('../lib/db');
+const { calculateLoadTracking } = require('../lib/etaEngine');
 
 const router = express.Router();
 router.use(express.json({ limit: '10mb' }));
@@ -229,6 +230,41 @@ router.get('/api/driver/me', async (req, res) => {
   });
 });
 
+// POST /api/driver/location
+// Receives live driver GPS updates (latitude, longitude, speed, heading, sharingMode, loadId).
+router.post('/api/driver/location', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { latitude, longitude, speed, heading, loadId, sharingMode } = req.body || {};
+  if (latitude == null || longitude == null) {
+    return res.status(400).json({ error: 'Missing latitude or longitude' });
+  }
+
+  try {
+    const loc = await recordDriverLocation({
+      driverId: ctx.driver.id,
+      loadId,
+      latitude,
+      longitude,
+      speed,
+      heading,
+      sharingMode: sharingMode || 'ACTIVE_LOAD',
+    });
+
+    // Calculate real-time tracking metrics if an active load is associated
+    const currentLoad = loadId
+      ? (ctx.state.loads || []).find((l) => String(l.id) === String(loadId))
+      : currentActiveLoad(ctx.state, ctx.driver.id);
+
+    const tracking = currentLoad ? calculateLoadTracking(currentLoad, loc) : null;
+
+    res.json({ ok: true, location: loc, tracking });
+  } catch (e) {
+    console.error('driver location update failed:', e);
+    res.status(500).json({ error: 'Failed to record location' });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
@@ -252,10 +288,16 @@ router.get('/api/driver/dashboard', async (req, res) => {
   const totalEarnings = loads.reduce((s, l) => s + (Number(l.driverPay) || 0), 0);
 
   const current = currentActiveLoad(state, driver.id);
+  const latestLoc = await getLatestDriverLocation(driver.id);
+  const shapedCurrent = current ? shapeLoadForDriver(current) : null;
+  if (shapedCurrent && current) {
+    shapedCurrent.tracking = calculateLoadTracking(current, latestLoc);
+  }
 
   res.json({
     driver: { id: driver.id, name: driver.name, truck: driver.truck, company: driver.company },
-    currentLoad: current ? shapeLoadForDriver(current) : null,
+    currentLoad: shapedCurrent,
+    latestLocation: latestLoc,
     summary: {
       activeLoads: active.length,
       completedLoads: completed.length,
