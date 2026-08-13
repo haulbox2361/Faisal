@@ -1007,6 +1007,29 @@ async function disputePayment(loadId){
     loadPayments();
   } catch(e){ toast(e.message); }
 }
+
+// ---------------- Payments ----------------
+async function loadPayments(){
+  const list = document.getElementById('dp-payments-list');
+  if(!list) return;
+  list.innerHTML = '<div class="dp-empty">Loading…</div>';
+  try {
+    const data = await api('/api/driver/transactions');
+    PAYMENT_TXNS = data.transactions;
+    const heroTotal = document.getElementById('pay-hero-total');
+    if(heroTotal) heroTotal.textContent = money(data.summary.totalEarnings);
+    const heroStats = document.getElementById('pay-hero-stats');
+    if(heroStats){
+      heroStats.innerHTML =
+        '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg><div class="dp-pay-hero-stat-val">' + money(data.summary.paid) + '</div><div class="dp-pay-hero-stat-label">Paid</div></div>' +
+        '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><div class="dp-pay-hero-stat-val">' + money(data.summary.pending) + '</div><div class="dp-pay-hero-stat-label">Pending</div></div>' +
+        '<div class="dp-pay-hero-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg><div class="dp-pay-hero-stat-val">' + data.summary.totalPaymentsReceived + '</div><div class="dp-pay-hero-stat-label">Loads Paid</div></div>';
+    }
+    renderChart();
+    if (!data.transactions.length){ list.innerHTML = '<div class="dp-empty">No payment records yet.</div>'; return; }
+    list.innerHTML = data.transactions.map(paymentRowHtml).join('');
+  } catch(e){ list.innerHTML = '<div class="dp-empty">' + escapeHtml(e.message) + '</div>'; }
+}
 function setPayChartPeriod(p){
   currentPayPeriod = p;
   document.querySelectorAll('[data-payperiod]').forEach(c=>c.classList.toggle('brand-active', c.dataset.payperiod===p));
