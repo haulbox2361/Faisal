@@ -209,6 +209,7 @@ nav.mainnav{flex:1; padding:14px 10px; display:flex; flex-direction:column; gap:
 .pl-yellow{background:var(--yellow-soft);color:var(--yellow);border-color:var(--yellow-soft);}
 .pl-blue{background:var(--blue-soft);color:var(--blue);border-color:var(--blue-soft);}
 .pl-green{background:var(--green-soft);color:var(--green);border-color:var(--green-soft);}
+.pl-red{background:rgba(239,68,68,0.15);color:var(--red,#ef4444);border-color:rgba(239,68,68,0.3);}
 .pl-gray{background:var(--gray-st-soft);color:var(--gray-st);border-color:var(--gray-st-soft);}
 
 /* Tables */
@@ -2127,9 +2128,23 @@ let pendingSelectTarget = null; // 'broker' | 'driver' — set when quick-adding
 // POD    = Drop-off  → after this the Admin-only payment stage takes over.
 const STATUS_META = {
   'Pending RC': {color:'gray',   label:'Pending RC'},
-  'Booked':     {color:'white',  label:'Booked'},
-  'Loaded':     {color:'yellow', label:'Loaded'},
-  'Drop-off':   {color:'blue',   label:'Drop-off'},
+  'Booked':     {color:'yellow', label:'🟡 Booked'},
+  'ACCEPTED':   {color:'green',  label:'🟢 Accepted'},
+  'Accepted':   {color:'green',  label:'🟢 Accepted'},
+  'AT_PICKUP':  {color:'yellow', label:'🟡 At Pickup'},
+  'At Pickup':  {color:'yellow', label:'🟡 At Pickup'},
+  'Loaded':     {color:'yellow', label:'🟡 Loaded'},
+  'IN_TRANSIT': {color:'green',  label:'🟢 In Transit'},
+  'In Transit': {color:'green',  label:'🟢 In Transit'},
+  'AT_DELIVERY':{color:'yellow', label:'🟡 At Delivery'},
+  'At Delivery':{color:'yellow', label:'🟡 At Delivery'},
+  'Drop-off':   {color:'yellow', label:'🟡 Drop-off'},
+  'DELIVERED':  {color:'green',  label:'🟢 Delivered'},
+  'Delivered':  {color:'green',  label:'🟢 Delivered'},
+  'POD Uploaded':{color:'green', label:'🟢 POD Uploaded'},
+  'Issue':      {color:'red',    label:'🔴 Issue'},
+  'Needs Review':{color:'red',   label:'🔴 Needs Review'},
+  'Cancelled':  {color:'red',    label:'🔴 Cancelled'},
   'Payment Not Requested': {color:'gray',   label:'Payment Not Requested'},
   'Payment Requested':     {color:'yellow', label:'Payment Requested'},
   'Payment Received':      {color:'green',  label:'Payment Received'},
@@ -2900,9 +2915,6 @@ function renderDashboard(){
     title: '<b>'+l.driverName+'</b> — DO today',
     sub: l.brokerName+' · '+l.dropoff+' · Load '+l.loadNumber+' · '+l.status
   })), 'No drivers have a delivery today.');
-
-  // Live Fleet Tracking Section
-  renderLiveTrackingDashboardSection();
 }
 
 async function renderLiveTrackingDashboardSection(){
