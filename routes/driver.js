@@ -5,6 +5,9 @@ const history = require('../lib/historyStore');
 const notifications = require('../lib/notificationStore');
 const chat = require('../lib/chatStore');
 const audit = require('../lib/auditStore');
+const driveStore = require('../lib/driveStore');
+const store = require('../lib/store');
+const { clientForAccount } = require('../lib/googleClient');
 
 const router = express.Router();
 router.use(express.json({ limit: '10mb' }));
@@ -507,6 +510,50 @@ router.post('/api/driver/upload-doc', async (req, res) => {
       body: `${load.loadNumber || load.id} — ${fileName}`,
       data: { loadId: load.id, key },
     });
+
+    // Auto-upload BOL and POD to Google Drive using the admin's connected
+    // account token (drivers have no Google OAuth account of their own).
+    // Fire-and-forget — never blocks the driver's response even on Drive errors.
+    if (['BOL', 'POD'].includes(key)) {
+      (async () => {
+        try {
+          const folderId = driveStore.folderIds()[key];
+          if (!folderId) return; // folder env var not configured — skip silently
+          const adminRecord = await store.get('admin');
+          if (!adminRecord) return; // admin not connected to Google — skip silently
+          const { clientForAccount: cfa } = require('../lib/googleClient');
+          const auth = cfa(adminRecord, store, 'admin');
+          const driveFileName = driveStore.buildFileName(key, {
+            loadNumber: load.loadNumber,
+            driverName: driver.name,
+            originalName: fileName,
+          });
+          const rawBase64 = rec.data ? rec.data.split(',').slice(1).join(',') : '';
+          if (!rawBase64) return;
+          const result = await driveStore.uploadToFolder(auth, {
+            folderId,
+            fileName: driveFileName,
+            mimeType: 'application/octet-stream',
+            base64Data: rawBase64,
+          });
+          if (!result.duplicate) {
+            await driveStore.recordUpload({
+              loadId: load.id,
+              driverId: driver.id,
+              docType: key,
+              driveFileId: result.fileId,
+              fileName: driveFileName,
+              folderId,
+              webViewLink: result.webViewLink,
+              uploadedBy: `driver:${driver.id}`,
+            });
+          }
+        } catch (driveErr) {
+          console.error(`driver ${key} Drive upload failed (non-blocking):`, driveErr.message);
+        }
+      })();
+    }
+
     res.json({ ok: true, load: shapeLoadForDriver(load) });
   } catch (e) {
     console.error('driver upload failed:', e);

@@ -3800,8 +3800,15 @@ function openLoadModal(id){
     </div>
     <div class="hint" style="margin-top:8px;">BOL/POD always send as <b>Reply All</b> inside the load's saved Gmail thread — same subject, same To/Cc as the original broker email, documents and pickup/drop-off photos attached, sent from <b>your own</b> connected Google account (see My Account) rather than a shared inbox. If no Gmail thread is linked, the send is blocked rather than starting a new conversation. "Save Package to Drive" unlocks once RC, BOL and POD are all on file, and zips straight to your connected Drive as <span class="mono">Load# · Lane · Driver first name · Dispatcher first name</span> — skipped automatically if that file's already there.</div>
     ${renderDrivePackageStatus(l)}
+    <div class="hr"></div>
+    <div class="section-head" style="margin-bottom:8px;">
+      <h2>Google Drive</h2>
+    </div>
+    <div id="drive-uploads-section-${l.id}"><div class="hint">Loading Drive records…</div></div>
   `;
   openModal('modal-load');
+  // Async-populate the Drive section after modal is open (non-blocking)
+  fetchAndRenderDriveSection(l.id);
 }
 
 const PHOTO_KEYS = ['PhotosPU','PhotosDO'];
@@ -3914,6 +3921,10 @@ async function handleDocUpload(loadId, key, input){
   persist();
   toast('Document attached', file.name+addressNote, true);
   if(l.status!==prevStatus) toast('Status updated', l.loadNumber+' → '+l.status, true);
+  // Auto-upload individual RC, BOL, POD to Drive in background (non-blocking)
+  if(['RC','BOL','POD'].includes(key)){
+    autoDriveUploadDoc(l, key, rec).catch(()=>{});
+  }
   openLoadModal(loadId); // refresh
   renderLoadBoard(); renderDashboard(); renderDocsList();
 }
@@ -3978,6 +3989,116 @@ async function downloadPackage(loadId){
   const a = document.createElement('a'); a.href = url; a.download = zipName.endsWith('.zip')? zipName : zipName+'.zip'; a.click();
   URL.revokeObjectURL(url);
   toast('Documents downloaded', zipName, true);
+}
+
+/* ================= GOOGLE DRIVE — AUTO INDIVIDUAL UPLOAD =================
+   Automatically uploads RC/BOL/POD to their configured Drive folders whenever
+   a document is attached via handleDocUpload(). Fire-and-forget — never
+   blocks save; Drive errors are shown as non-blocking warnings. */
+async function autoDriveUploadDoc(l, key, rec){
+  const holder = myGoogleAccountHolder();
+  if(!holder || !holder.driveConnected) return; // Drive not connected — skip silently
+  if(!rec || !rec.data) return;                  // file content not available
+  const {mimeType, data} = splitDataUrl(rec.data);
+  if(!data) return;
+  try{
+    const result = await backendFetch('/api/drive/upload-doc', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        accountId:   currentAccountId(),
+        docType:     key,
+        originalName: rec.name,
+        mimeType,
+        data,
+        loadId:      l.id,
+        loadNumber:  l.loadNumber,
+        pickup:      l.pickup,
+        dropoff:     l.dropoff,
+        pickupDate:  l.pickupDate,
+        driverName:  l.driverName,
+        driverId:    l.driverId,
+        uploadedBy:  STATE.currentUser ? STATE.currentUser.name : (STATE.role==='admin'?'Admin':'Dispatcher'),
+      })
+    });
+    if(result.duplicate){
+      toast('Already in Google Drive', result.fileName+' — not uploaded again.', true);
+    } else {
+      toast('Saved to Drive ✓', result.fileName, true);
+    }
+    // Refresh Drive section in the open modal without closing it
+    fetchAndRenderDriveSection(l.id);
+  }catch(driveErr){
+    console.warn('Drive auto-upload failed (non-blocking):', driveErr.message);
+    toast('Drive upload skipped', driveErr.message, false);
+  }
+}
+
+// Triggered when a load is marked Paid and has all three key docs.
+async function autoDriveArchive(l){
+  const holder = myGoogleAccountHolder();
+  if(!holder || !holder.driveConnected) return;
+  const files = [];
+  if(l.docs.RC  && l.docs.RC.data)  files.push({docType:'RC',  name:l.docs.RC.name,  data: splitDataUrl(l.docs.RC.data).data});
+  if(l.docs.BOL && l.docs.BOL.data) files.push({docType:'BOL', name:l.docs.BOL.name, data: splitDataUrl(l.docs.BOL.data).data});
+  if(l.docs.POD && l.docs.POD.data) files.push({docType:'POD', name:l.docs.POD.name, data: splitDataUrl(l.docs.POD.data).data});
+  if(!files.length) return;
+  try{
+    const result = await backendFetch('/api/drive/archive', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        accountId:  currentAccountId(),
+        loadId:     l.id,
+        loadNumber: l.loadNumber,
+        driverName: l.driverName,
+        driverId:   l.driverId,
+        pickup:     l.pickup,
+        dropoff:    l.dropoff,
+        pickupDate: l.pickupDate,
+        uploadedBy: STATE.currentUser ? STATE.currentUser.name : (STATE.role==='admin'?'Admin':'Dispatcher'),
+        files,
+      })
+    });
+    if(result.duplicate){
+      toast('Drive archive exists', result.fileName+' — not re-uploaded.', true);
+    } else {
+      toast('Archive saved to Drive ✓', result.fileName, true);
+    }
+  }catch(archErr){
+    console.warn('Drive archive failed (non-blocking):', archErr.message);
+    toast('Drive archive skipped', archErr.message, false);
+  }
+}
+
+/* ---- Drive uploads section in the load modal ---- */
+// Fetches Drive upload records from DB and injects HTML into the modal's
+// dedicated Drive section without closing or re-rendering the whole modal.
+async function fetchAndRenderDriveSection(loadId){
+  const el = document.getElementById('drive-uploads-section-'+loadId);
+  if(!el) return;
+  try{
+    const {uploads} = await backendFetch('/api/drive/uploads/'+encodeURIComponent(loadId)+'?accountId='+encodeURIComponent(currentAccountId()||'admin'));
+    el.innerHTML = renderDriveUploadsHtml(uploads||[]);
+  }catch(e){
+    el.innerHTML = '<div class="hint" style="color:var(--red,#e5484d);">Could not load Drive records: '+escapeAttr(e.message)+'</div>';
+  }
+}
+
+function renderDriveUploadsHtml(uploads){
+  if(!uploads.length) return '<div class="hint">No documents saved to Google Drive yet.</div>';
+  const icons = {RC:'📋',BOL:'📄',POD:'📄',PACKAGE:'🗂️'};
+  const labels = {RC:'Rate Confirmation',BOL:'Bill of Lading',POD:'Proof of Delivery',PACKAGE:'Full Package'};
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">'+
+    uploads.map(u=>{
+      const icon  = icons[u.docType]||'📄';
+      const label = labels[u.docType]||u.docType;
+      const openBtn = u.webViewLink
+        ? `<a href="${escapeAttr(u.webViewLink)}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;">Open ↗</a>`
+        : '';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;">`+
+        `<span>${icon}</span>`+
+        `<div><div style="font-weight:600;">${label}</div><div class="hint" style="margin:0;">${escapeAttr(u.fileName)}</div></div>`+
+        openBtn+`</div>`;
+    }).join('')+'</div>';
 }
 
 /* ================= GOOGLE DRIVE — SAVE FULL PACKAGE ================= */
@@ -4773,6 +4894,10 @@ function toggleDriverPaid(loadId){
   l.driverPayAccepted = false; l.driverPayAcceptedAt = null;
   persist();
   if(l.driverPaid) notifyDriverPaid(l);
+  // Auto-archive RC+BOL+POD to Drive when a load is settled
+  if(l.driverPaid && l.docs.RC && l.docs.BOL && l.docs.POD){
+    autoDriveArchive(l).catch(()=>{});
+  }
   toast(l.driverPaid? 'Marked paid' : 'Marked unpaid', l.loadNumber+' · '+(l.driverName||'')+' · '+money(driverNetOf(l)), l.driverPaid);
   if(document.getElementById('view-driverpay').classList.contains('active')) renderDriverPay();
   if(document.getElementById('modal-load').classList.contains('active')) openLoadModal(loadId);
