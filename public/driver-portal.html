@@ -1085,25 +1085,27 @@ function photoBlockHtml(title, l, key){
   return h;
 }
 
-function checkpointBlockHtml(l){
+function checkpointBlockHtml(l, suffix = ''){
   if (!PERMS.canUpdateLoadStatus) return '';
   const cp = l.driverProgress || null;
   const nextCta = CHECKPOINT_NEXT_CTA[cp];
+  const btnId = suffix ? 'dp-checkpoint-btn-' + suffix : 'dp-checkpoint-btn';
   if (!nextCta) {
     return '<button class="dp-checkpoint-btn dp-checkpoint-done" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>Delivered</button>';
   }
   const idx = cp ? CHECKPOINT_ORDER.indexOf(cp) : -1;
   const nextStatus = CHECKPOINT_ORDER[idx+1];
-  return '<button class="dp-checkpoint-btn" id="dp-checkpoint-btn" onclick="advanceCheckpoint(\''+l.id+'\',\''+nextStatus+'\')">' + nextCta + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
+  return '<button class="dp-checkpoint-btn" id="' + btnId + '" onclick="advanceCheckpoint(\''+l.id+'\',\''+nextStatus+'\')">' + nextCta + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>';
 }
 async function advanceCheckpoint(loadId, status){
-  const btn = document.getElementById('dp-checkpoint-btn');
-  if (btn){ btn.disabled = true; btn.textContent = 'Updating…'; }
+  const btns = document.querySelectorAll('.dp-checkpoint-btn');
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Updating…'; });
   try {
     await api('/api/driver/loads/' + loadId + '/status', { method:'POST', body: JSON.stringify({ status }) });
     toast('Status updated: ' + CHECKPOINT_LABEL[status]);
     loadCurrent();
-  } catch(e){ toast(e.message); if (btn) btn.disabled = false; }
+    triggerDriverGpsReport(true);
+  } catch(e){ toast(e.message); btns.forEach(b => b.disabled = false); }
 }
 
 const NOTIF_ICON = { load_status_changed:'📦', document_uploaded:'📄', payment_paid:'💰' };
@@ -1159,6 +1161,7 @@ function currentContentHtml(dash, home){
   const l = dash.currentLoad || defaultDemoLoad;
   let h = identityHtml(dash.driver);
   h += heroLoadHtml(l);
+  h += '<div class="dp-block" style="margin-top:12px;margin-bottom:12px;">' + checkpointBlockHtml(l, 'top') + '</div>';
   h += progressTimelineHtml(l);
   h += '<div class="dp-actions-row">' +
     '<button class="dp-action-btn" onclick="setDriverPortalPage(\'chat\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.362 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Call Dispatcher</button>' +
