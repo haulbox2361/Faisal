@@ -2121,6 +2121,7 @@ table.data tbody td{padding:13px 13px;}
                 <th style="padding:12px 16px;">Amount</th>
                 <th data-role-view="admin" style="padding:12px 16px;">Dispatcher</th>
                 <th style="padding:12px 16px;">Status</th>
+                <th data-role-view="admin" style="padding:12px 16px;text-align:right;">Actions</th>
               </tr></thead>
               <tbody id="loadboard-body"></tbody>
             </table>
@@ -5082,6 +5083,16 @@ function ocrStatusPlacard(l){
   return '<span class="placard pl-gray" style="font-size:10.5px;padding:2px 6px;"><span class="dot"></span>Processed</span>';
 }
 
+function isLoadLockedFromDeletion(l) {
+  if (!l) return false;
+  const st = String(l.status || '').trim().toLowerCase();
+  const cp = String(l.driverProgress || '').trim().toLowerCase();
+  return (
+    st === 'drop-off' || st === 'completed' || st === 'delivered' || st === 'pod uploaded' || st === 'invoiced' ||
+    cp === 'completed' || cp === 'pod_uploaded' || cp === 'delivered' || cp === 'at_delivery' || cp === 'drop-off'
+  );
+}
+
 function renderLoadBoard(){
   const q = (document.getElementById('loadboard-search') ? document.getElementById('loadboard-search').value : '').toLowerCase();
   const rows = visibleLoads().filter(l => {
@@ -5096,6 +5107,7 @@ function renderLoadBoard(){
   if (body) {
     body.innerHTML = rows.map(l => {
       const lane = [l.pickup, l.dropoff].filter(Boolean).join(' → ') || '—';
+      const isLocked = isLoadLockedFromDeletion(l);
       return `
         <tr onclick="openLoadModal('${l.id}')" style="cursor:pointer;">
           <td class="cell-mono cell-strong" style="padding:12px 16px;font-weight:700;color:#0f172a;">${escapeAttr(l.loadNumber)}</td>
@@ -5104,17 +5116,47 @@ function renderLoadBoard(){
           <td class="cell-mono" style="padding:12px 16px;font-weight:700;color:#0f172a;">${money(l.brokerRate)}</td>
           ${isAdmin ? `<td class="cell-dim" data-role-view="admin" style="padding:12px 16px;color:#64748b;">${escapeAttr(l.dispatcherName || '—')}</td>` : ''}
           <td style="padding:12px 16px;">${placard(l.status, l)}</td>
+          ${isAdmin ? `<td style="padding:12px 16px;text-align:right;" onclick="event.stopPropagation();">
+            <button class="btn btn-sm btn-ghost" style="color:${isLocked ? '#94a3b8' : '#ef4444'};padding:4px 8px;border-radius:6px;cursor:${isLocked ? 'not-allowed' : 'pointer'};" title="${isLocked ? 'Drop-off / Completed loads cannot be deleted' : 'Delete Load'}" onclick="confirmDeleteLoad('${l.id}')">
+              <svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+            </button>
+          </td>` : ''}
         </tr>
       `;
-    }).join('') || '<tr><td colspan="6" class="cell-dim" style="text-align:center;padding:24px;color:#94a3b8;">No loads found.</td></tr>';
+    }).join('') || `<tr><td colspan="${isAdmin ? 7 : 6}" class="cell-dim" style="text-align:center;padding:24px;color:#94a3b8;">No loads found.</td></tr>`;
   }
 }
+
+function confirmDeleteLoad(id){
+  if (STATE.role !== 'admin') return toast('Admin Only', 'Only Admin can delete loads from the board.');
+  const l = STATE.loads.find(x => String(x.id) === String(id));
+  if (!l) return;
+
+  // Rule 1: Drop-off / Delivered / Completed loads CANNOT be deleted by anyone!
+  if (isLoadLockedFromDeletion(l)) {
+    return toast('Deletion Blocked 🔒', 'Loads that are Drop-off, Delivered, or Completed cannot be deleted.', false);
+  }
+
+  // Rule 2: Dispatcher permission & notification confirmation
+  const dspName = l.dispatcherName || (STATE.dispatchers.find(d => String(d.id) === String(l.dispatcherId)) || {}).name;
+  if (dspName) {
+    const ok = confirm(`Load #${l.loadNumber || l.id} is assigned to Dispatcher ${dspName}.\n\nConfirm deletion and send delete authorization to Dispatcher ${dspName}?`);
+    if (!ok) return;
+    pushNotification(`Delete Request — Load #${l.loadNumber || l.id}`, `Admin deleted load #${l.loadNumber || l.id} (assigned to ${dspName}).`);
+  } else {
+    const ok = confirm(`Are you sure you want to delete Load #${l.loadNumber || l.id}?`);
+    if (!ok) return;
+  }
+
+  // Delete load permanently across board, dispatchers, and drivers
+  STATE.loads = STATE.loads.filter(x => String(x.id) !== String(id));
+  persist();
+  renderLoadBoard();
+  toast('Load Deleted', `Load #${l.loadNumber || l.id} has been removed from the board.`, true);
+}
+
 function deleteLoad(id){
-  if(STATE.role==='viewonly') return toast('View only', 'You cannot delete loads.');
-  const l = STATE.loads.find(x=>x.id===id);
-  if(!canAccessLoad(l)) return toast('Not your load', 'You can only manage loads assigned to you.');
-  STATE.loads = STATE.loads.filter(l=>l.id!==id);
-  persist(); renderLoadBoard(); toast('Load deleted','', true);
+  confirmDeleteLoad(id);
 }
 function renderModalTimelineHtml(l){
   const steps = [
