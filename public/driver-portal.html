@@ -987,27 +987,7 @@ async function updateDriverEta(loadId){
 }
 
 function locationSharingCardHtml(){
-  const mode = localStorage.getItem('hb_driver_sharing_mode') || 'ACTIVE_LOAD';
-  const statusText = window.driverGpsStatus || 'Ready (Auto-updates every 5m)';
-
-  let h = '<div class="dp-card dp-block" style="margin-top:14px;">';
-  h += '<div class="dp-section-title"><div class="t">📍 Live Location Sharing</div><span style="font-size:11px;color:var(--text-dim);">' + escapeHtml(statusText) + '</span></div>';
-  h += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Select when dispatchers and admins can view your live GPS position:</div>';
-  h += '<div style="display:flex; flex-direction:column; gap:8px; font-size:12.5px;">';
-  h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-    <input type="radio" name="dp_sharing_mode" value="ACTIVE_LOAD" ${mode === 'ACTIVE_LOAD' ? 'checked' : ''} onchange="setDriverSharingMode(this.value)">
-    <b>Share Only During Active Load</b> <span style="font-size:10.5px;color:var(--brand);">(Recommended)</span>
-  </label>`;
-  h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-    <input type="radio" name="dp_sharing_mode" value="ALWAYS" ${mode === 'ALWAYS' ? 'checked' : ''} onchange="setDriverSharingMode(this.value)">
-    <b>Always Share While On Duty</b>
-  </label>`;
-  h += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-    <input type="radio" name="dp_sharing_mode" value="OFF" ${mode === 'OFF' ? 'checked' : ''} onchange="setDriverSharingMode(this.value)">
-    <b>Stop Sharing</b>
-  </label>`;
-  h += '</div></div>';
-  return h;
+  return '';
 }
 
 function heroLoadHtml(l){
@@ -1180,7 +1160,6 @@ function currentContentHtml(dash, home){
   let h = identityHtml(dash.driver);
   h += heroLoadHtml(l);
   h += progressTimelineHtml(l);
-  h += locationSharingCardHtml();
   h += '<div class="dp-actions-row">' +
     '<button class="dp-action-btn" onclick="setDriverPortalPage(\'chat\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.362 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Call Dispatcher</button>' +
     '<button class="dp-action-btn danger" onclick="toast(\'HaulBoX safety team notified.\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>Emergency</button>' +
@@ -1200,63 +1179,89 @@ function currentContentHtml(dash, home){
 }
 
 let gpsReporterInterval = null;
-function setDriverSharingMode(val) {
-  localStorage.setItem('hb_driver_sharing_mode', val);
-  toast('Location sharing updated to: ' + (val === 'ACTIVE_LOAD' ? 'Active Load Only' : val === 'ALWAYS' ? 'Always On Duty' : 'Off'));
-  triggerDriverGpsReport(true);
+
+function isPodUploaded(load) {
+  if (!load) return false;
+  const docs = load.docs || load.documents || {};
+  const pod = docs.POD || docs.pod;
+  return !!(pod && (pod.hasFile || pod.name || pod.data));
+}
+
+function shouldShareDriverGps(load) {
+  if (!load) return false;
+  const cp = (load.driverProgress || load.status || '').toUpperCase();
+  const podDone = isPodUploaded(load);
+
+  // Auto OFF condition: Load is delivered / completed AND POD has been uploaded
+  if ((cp === 'DELIVERED' || cp === 'COMPLETED' || cp === 'DROP-OFF' || cp === 'INVOICED') && podDone) {
+    return false;
+  }
+
+  // Auto ON condition: Load is accepted and in progress (ACCEPTED, AT_PICKUP, IN_TRANSIT, AT_DELIVERY) or awaiting POD
+  if (cp === 'ACCEPTED' || cp === 'AT_PICKUP' || cp === 'IN_TRANSIT' || cp === 'AT_DELIVERY' || cp === 'BOOKED' || cp === 'ASSIGNED' || !podDone) {
+    return true;
+  }
+
+  return false;
 }
 
 function triggerDriverGpsReport(manual = false) {
-  const mode = localStorage.getItem('hb_driver_sharing_mode') || 'ACTIVE_LOAD';
-  if (mode === 'OFF') {
-    window.driverGpsStatus = 'Sharing Stopped';
-    return;
-  }
-
   if (!navigator.geolocation) {
-    window.driverGpsStatus = 'Geolocation unavailable on device';
+    window.driverGpsStatus = 'Geolocation unavailable';
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const speed = pos.coords.speed;
-      const heading = pos.coords.heading;
-      window.driverCurrentPos = { lat, lng };
-      window.driverGpsStatus = 'GPS Active (' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')';
+  api('/api/driver/dashboard').then(dash => {
+    const activeLoad = dash.currentLoad;
+    const shouldShare = shouldShareDriverGps(activeLoad);
 
-      try {
-        const dash = await api('/api/driver/dashboard');
-        const activeLoad = dash.currentLoad;
-
-        if (mode === 'ACTIVE_LOAD' && !activeLoad) {
-          window.driverGpsStatus = 'Standby (No Active Load)';
-          return;
-        }
-
-        await api('/api/driver/location', {
-          method: 'POST',
-          body: JSON.stringify({
-            latitude: lat,
-            longitude: lng,
-            speed,
-            heading,
-            sharingMode: mode,
-            loadId: activeLoad ? activeLoad.id : null,
-          }),
-        });
-        if (manual) toast('Location updated: ' + lat.toFixed(4) + ', ' + lng.toFixed(4));
-      } catch (e) {
-        console.warn('GPS location report failed:', e.message);
+    if (!shouldShare) {
+      window.driverGpsStatus = (activeLoad && isPodUploaded(activeLoad)) ? 'GPS Off (Load Completed & POD Sent)' : 'GPS Off (No Active Load)';
+      if (gpsReporterInterval) {
+        clearInterval(gpsReporterInterval);
+        gpsReporterInterval = null;
       }
-    },
-    (err) => {
-      window.driverGpsStatus = 'GPS Warning: ' + (err.message || 'Permission needed');
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-  );
+      return;
+    }
+
+    // Auto GPS Active for Accepted & In-Progress Loads
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const speed = pos.coords.speed;
+        const heading = pos.coords.heading;
+        window.driverCurrentPos = { lat, lng };
+        window.driverGpsStatus = '📍 Live GPS Active (' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')';
+
+        try {
+          await api('/api/driver/location', {
+            method: 'POST',
+            body: JSON.stringify({
+              latitude: lat,
+              longitude: lng,
+              speed,
+              heading,
+              sharingMode: 'AUTO_ACTIVE_LOAD',
+              loadId: activeLoad ? activeLoad.id : null,
+            }),
+          });
+          if (manual) toast('Location updated: ' + lat.toFixed(4) + ', ' + lng.toFixed(4));
+        } catch (e) {
+          console.warn('GPS location report failed:', e.message);
+        }
+      },
+      (err) => {
+        window.driverGpsStatus = 'GPS Warning: ' + (err.message || 'Permission needed');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+
+    // Keep background reporter active every 3 minutes while load is active
+    if (!gpsReporterInterval) {
+      gpsReporterInterval = setInterval(() => triggerDriverGpsReport(), 3 * 60 * 1000);
+    }
+  }).catch(() => {});
 }
 
 function startGpsReporter() {
@@ -1889,36 +1894,9 @@ async function loadProfile(){
     if (docs.canEdit && photos.length < 8) h += '<button class="dp-photo-add" onclick="startUploadProfile(\'truckPhotos\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add</button>';
     h += '</div></div>';
 
-    h += profileLocationToggleHtml();
     h += '<button class="dp-logout-btn" onclick="logout()">Sign Out</button>';
     el.innerHTML = h;
   } catch(e){ el.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
-}
-
-function profileLocationToggleHtml(){
-  const isOff = localStorage.getItem('hb_driver_sharing_mode') === 'OFF';
-  const isLocOn = !isOff;
-
-  return `<div class="dp-block">
-    <div class="dp-section-title"><div class="t">📍 Location Sharing Settings</div></div>
-    <div class="dp-card" style="display:flex;align-items:center;justify-content:space-between;padding:14px;">
-      <div>
-        <div style="font-weight:700;font-size:13.5px;color:var(--foreground);">GPS Location Sharing</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Allows Dispatch & Admin to view live load position</div>
-      </div>
-      <button class="dp-btn-sm ${isLocOn ? 'primary' : 'ghost'}" onclick="toggleProfileLocationSharing(${!isLocOn})" style="font-weight:800;padding:6px 16px;">
-        ${isLocOn ? '🟢 ON' : '⚪ OFF'}
-      </button>
-    </div>
-  </div>`;
-}
-
-function toggleProfileLocationSharing(turnOn){
-  const val = turnOn ? 'ACTIVE_LOAD' : 'OFF';
-  localStorage.setItem('hb_driver_sharing_mode', val);
-  toast('Location sharing turned ' + (turnOn ? 'ON' : 'OFF'));
-  triggerDriverGpsReport(true);
-  loadProfile();
 }
 function PROFILE_DOC_KEYS_LIST(){ return Object.keys(PROFILE_DOC_LABELS).concat(Object.keys(TRUCK_DOC_LABELS)); }
 async function viewProfileDoc(key, index){
