@@ -892,12 +892,12 @@ const DOC_LABELS = {RC:'Rate Confirmation', BOL:'Bill of Lading', POD:'Proof of 
 function docsBlockHtml(l, extraTitle){
   let h = '<div class="dp-card dp-block"><div class="dp-section-title"><div class="t"><span class="icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>' + (extraTitle||'Documents') + '</div></div>';
   ['RC','BOL','POD'].forEach(k=>{
-    const d = l.docs[k];
-    const ready = d && d.hasFile;
+    const d = l.docs ? l.docs[k] : null;
+    const ready = d && (d.hasFile || d.name || d.data);
     h += '<div class="dp-doc-row"><div class="dp-doc-icn ' + (ready?'ready':'empty') + '"><svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div>' +
       '<div style="flex:1;min-width:0;"><div class="dp-doc-name">' + DOC_LABELS[k] + '</div><div class="dp-doc-meta">' + (ready?'Uploaded':'Not uploaded') + '</div></div>' +
       (ready ? '<span class="dp-chip-ready">✓ Ready</span>' : '') +
-      (ready ? '<button class="dp-btn-sm ghost" onclick="viewLoadDoc(\''+l.id+'\',\''+k+'\')">View</button>' : (k!=='RC' && PERMS.canUploadDocuments ? '<button class="dp-btn-sm primary" onclick="startUploadDoc(\''+l.id+'\',\''+k+'\')">Upload</button>' : '')) +
+      (ready ? '<button class="dp-btn-sm ghost" onclick="viewLoadDoc(\''+l.id+'\',\''+k+'\')">View</button>' : (k!=='RC' ? '<button class="dp-btn-sm primary" onclick="startUploadDoc(\''+l.id+'\',\''+k+'\')">Upload</button>' : '')) +
       '</div>';
   });
   h += '</div>';
@@ -905,18 +905,19 @@ function docsBlockHtml(l, extraTitle){
 }
 const PHOTO_CAPS = { PhotosPU: 6, PhotosDO: 6, Extra: 6 };
 function photoBlockHtml(title, l, key){
-  const arr = l.docs[key] || [];
+  const arr = (l.docs ? l.docs[key] : null) || [];
   const cap = PHOTO_CAPS[key] || 6;
   let h = '<div class="dp-block">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
     '<span style="font-size:12.5px;font-weight:700;">' + title + '</span><span style="font-size:11px;color:var(--muted);">' + arr.length + '/' + cap + '</span></div>' +
     '<div class="dp-photo-grid">';
-  arr.forEach(p=>{
-    h += '<div class="dp-photo-thumb" onclick="viewLoadPhoto(\''+l.id+'\',\''+key+'\','+p.index+')">' + escapeHtml(p.name||'Photo') +
-      (PERMS.canUploadDocuments ? '<button class="dp-photo-del" onclick="event.stopPropagation();deleteLoadPhoto(\''+l.id+'\',\''+key+'\','+p.index+')">✕</button>' : '') +
+  arr.forEach((p, idx)=>{
+    const pIdx = p.index !== undefined ? p.index : idx;
+    h += '<div class="dp-photo-thumb" onclick="viewLoadPhoto(\''+l.id+'\',\''+key+'\','+pIdx+')">' + escapeHtml(p.name||'Photo') +
+      '<button class="dp-photo-del" onclick="event.stopPropagation();deleteLoadPhoto(\''+l.id+'\',\''+key+'\','+pIdx+')">✕</button>' +
       '</div>';
   });
-  if (arr.length < cap && PERMS.canUploadDocuments) {
+  if (arr.length < cap) {
     h += '<button class="dp-photo-add" onclick="startUploadDoc(\''+l.id+'\',\''+key+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add</button>';
   }
   h += '</div></div>';
@@ -1566,11 +1567,104 @@ async function saveTruckInfo(){
       make: document.getElementById('ti-make').value.trim(),
       model: document.getElementById('ti-model').value.trim(),
       year: document.getElementById('ti-year').value.trim(),
-      vin: document.getElementById('ti-vin').value.trim(),
-    })});
-    toast('Truck info saved'); closeModal('dp-job-modal'); loadProfile();
-  } catch(e){ toast(e.message); }
+function startUploadDoc(loadId, key) {
+  pendingUpload = { profile: false, loadId, key };
+  const input = document.getElementById('dp-file-input');
+  input.value = '';
+  input.click();
 }
+
+async function viewLoadDoc(loadId, key, index) {
+  try {
+    const res = await api('/api/driver/doc', {
+      method: 'POST',
+      body: JSON.stringify({ loadId, key, index })
+    });
+    if (res.data) {
+      window.open(res.data, '_blank');
+    } else {
+      toast('Document file data not available.');
+    }
+  } catch (e) {
+    toast(e.message || 'Could not view document.');
+  }
+}
+
+async function viewLoadPhoto(loadId, key, index) {
+  await viewLoadDoc(loadId, key, index);
+}
+
+async function deleteLoadPhoto(loadId, key, index) {
+  if (!confirm('Delete this photo?')) return;
+  try {
+    await api('/api/driver/doc', {
+      method: 'DELETE',
+      body: JSON.stringify({ loadId, key, index })
+    });
+    toast('Photo deleted');
+    loadCurrent();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
+document.getElementById('dp-file-input').addEventListener('change', async function (evt) {
+  const file = evt.target.files[0];
+  if (!file || !pendingUpload) return;
+
+  if (pendingUpload.profile) {
+    try {
+      toast('Uploading profile document…');
+      const dataUrl = await readFileAsDataURL(file);
+      await api('/api/driver/documents', {
+        method: 'POST',
+        body: JSON.stringify({
+          key: pendingUpload.key,
+          index: pendingUpload.index,
+          category: pendingUpload.category,
+          fileName: file.name,
+          data: dataUrl
+        })
+      });
+      toast('Profile document uploaded!');
+      loadProfile();
+    } catch (e) {
+      toast(e.message || 'Upload failed');
+    }
+  } else if (pendingUpload.loadId) {
+    try {
+      const docName = DOC_LABELS[pendingUpload.key] || pendingUpload.key;
+      toast('Uploading ' + docName + '…');
+      const dataUrl = await readFileAsDataURL(file);
+      await api('/api/driver/upload-doc', {
+        method: 'POST',
+        body: JSON.stringify({
+          loadId: pendingUpload.loadId,
+          key: pendingUpload.key,
+          fileName: file.name,
+          data: dataUrl
+        })
+      });
+      toast('✅ ' + docName + ' uploaded!');
+      loadCurrent();
+      if (document.getElementById('dp-job-modal').classList.contains('active')) {
+        openLoadDetails(pendingUpload.loadId);
+      }
+    } catch (e) {
+      toast('Upload error: ' + (e.message || 'Failed'));
+    }
+  }
+  pendingUpload = null;
+});
 </script>
 </body>
 </html>
