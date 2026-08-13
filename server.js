@@ -14,7 +14,7 @@ const { ensureSchema } = require('./lib/db');
 // signs in must match a registered dispatcher email (checked in the
 // frontend) or gets Access Denied. Override via env if you ever need to
 // change the admin account without editing code.
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'Faisaljoyia320@gmail.com').trim();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'haulbox2361@gmail.com').trim();
 
 const app = express();
 const PORT = process.env.PORT || 3000;

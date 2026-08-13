@@ -15,6 +15,6 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: ADMIN_EMAIL
-        value: Faisaljoyia320@gmail.com
+        value: haulbox2361@gmail.com
       - key: DATABASE_URL
         sync: false
