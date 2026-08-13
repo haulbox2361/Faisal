@@ -885,9 +885,8 @@ table.data tbody td{padding:13px 13px;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
         Dashboard
       </div>
-      <!-- Prominent Blue + Add Load Button -->
-      <div class="nav-item" data-view="addload" style="background:#2563eb !important;color:#ffffff !important;font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,0.3);margin:4px 0 6px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px;color:#ffffff !important;"><path d="M12 5v14M5 12h14"/></svg>
+      <!-- Clean + Add Load Button in Sidebar -->
+      <div class="nav-item" data-view="addload" style="background:#2563eb !important;color:#ffffff !important;font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,0.3);margin:4px 0 6px;justify-content:center;font-size:14px;">
         + Add Load
       </div>
       <div class="nav-item" data-view="loadboard">
@@ -918,16 +917,6 @@ table.data tbody td{padding:13px 13px;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/></svg>
         Settings
       </div>
-
-      <!-- Footer Support Card -->
-      <div style="margin-top:auto;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;color:#fff;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;">
-          <svg style="width:14px;height:14px;color:#38bdf8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.362 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-          Support
-        </div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">support@haulbox.com</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:2px;">(630) 555-8123</div>
-      </div>
     </nav>
     <div class="sidebar-foot" style="padding:10px 14px;border-top:1px solid #1e293b;">
       <div class="role-chip" id="role-chip" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;"><span class="role-dot"></span> Role: Admin</div>
@@ -941,15 +930,11 @@ table.data tbody td{padding:13px 13px;}
       <div class="topbar-left">
         <div>
           <h1 id="pagetitle" style="font-size:20px;font-weight:700;margin:0;color:#0f172a;">Dispatcher Dashboard</h1>
-          <div style="font-size:12px;color:#64748b;margin-top:2px;">Welcome back, John! Here's what's happening with your operations today.</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px;">Overview & Operations</div>
         </div>
       </div>
       <div class="topbar-right" style="gap:16px;">
-        <button class="btn btn-accent" style="background:#2563eb;color:#ffffff;font-weight:700;font-size:13px;padding:9px 16px;border-radius:10px;box-shadow:0 4px 12px rgba(37,99,235,0.25);border:none;cursor:pointer;" onclick="switchView('addload')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><path d="M12 5v14M5 12h14"/></svg>
-          + Add Load
-        </button>
-        <div class="search-box" style="width:300px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;">
+        <div class="search-box" style="width:340px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#94a3b8;"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input id="globalsearch" placeholder="Search loads, drivers, documents..." oninput="globalSearch(this.value)" style="font-size:13px;color:#0f172a;">
         </div>
