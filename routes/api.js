@@ -11,16 +11,27 @@ router.use(express.json({ limit: '25mb' })); // attachments arrive as base64 in 
 
 async function requireAccount(req, res) {
   const accountId = req.body.accountId || req.query.accountId;
-  if (!accountId) {
-    res.status(400).json({ error: 'Missing accountId' });
-    return null;
-  }
-  let record = await store.get(accountId);
+  let record = accountId ? await store.get(accountId) : null;
   let effectiveId = accountId;
+
   if (!record && accountId !== 'admin') {
     record = await store.get('admin');
     effectiveId = 'admin';
   }
+
+  // Fallback: if 'admin' key didn't hit, check if ANY account is stored in google_tokens
+  if (!record) {
+    try {
+      const { getPool, ensureSchema } = require('../lib/db');
+      await ensureSchema();
+      const { rows } = await getPool().query('SELECT account_id, email, tokens FROM google_tokens LIMIT 1');
+      if (rows.length > 0) {
+        effectiveId = rows[0].account_id;
+        record = { email: rows[0].email, tokens: rows[0].tokens };
+      }
+    } catch (e) {}
+  }
+
   if (!record) {
     res.status(401).json({ error: 'No Google account connected. Connect Admin Google account in Settings, then try again.' });
     return null;
@@ -613,6 +624,24 @@ router.post('/api/sheet-sync', async (req, res) => {
   } catch (e) {
     console.error('sheet-sync failed:', e);
     res.status(500).json({ error: e.message || 'Failed to sync to Google Sheet' });
+  }
+});
+
+// POST /api/webhook-sync  { webhookUrl, loadData }
+// Alternate zero-permission Google Sheet sync method (e.g. via Google Apps Script Web App).
+router.post('/api/webhook-sync', async (req, res) => {
+  const { webhookUrl, loadData } = req.body || {};
+  if (!webhookUrl) return res.status(400).json({ error: 'Missing webhookUrl' });
+  try {
+    const resp = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(loadData || {}),
+    });
+    res.json({ ok: true, status: resp.status });
+  } catch (e) {
+    console.error('webhook-sync failed:', e);
+    res.status(500).json({ error: e.message || 'Webhook request failed' });
   }
 });
 

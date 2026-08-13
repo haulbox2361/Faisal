@@ -2653,9 +2653,37 @@ async function writeLoadRowToSheet(load, accountId, spreadsheetId, sheetName){
     body: JSON.stringify({accountId, spreadsheetId, sheetName: sheetName||'Sheet1', row: buildSheetRow(load)})
   });
 }
+
+async function syncToWebhook(load, webhookUrl){
+  const rowData = buildSheetRow(load);
+  const payload = {
+    date: rowData[0],
+    loadNumber: rowData[1],
+    broker: rowData[2],
+    mc: rowData[3],
+    driver: rowData[4],
+    pickup: rowData[5],
+    dropoff: rowData[6],
+    puDate: rowData[7],
+    doDate: rowData[8],
+    rate: rowData[9],
+    dispatcher: rowData[10],
+    row: rowData,
+  };
+  return backendFetch('/api/webhook-sync', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({webhookUrl, loadData: payload})
+  });
+}
+
 async function syncLoadToSheet(load){
   const holder = myGoogleAccountHolder();
   const rawUrl = (holder && holder.sheetUrl) ? holder.sheetUrl : (STATE.settings ? STATE.settings.sheetUrl : '');
+  const webhookUrl = (holder && holder.sheetWebhookUrl) ? holder.sheetWebhookUrl : (STATE.settings ? STATE.settings.sheetWebhookUrl : '');
+  
+  if(webhookUrl){
+    try{ await syncToWebhook(load, webhookUrl); }catch(e){ console.error('Webhook sync failed', e); }
+  }
   const spreadsheetId = extractSheetId(rawUrl);
   if(spreadsheetId){
     try{
@@ -2666,20 +2694,35 @@ async function syncLoadToSheet(load){
     }
   }
 }
+
 async function testSheetSync(){
   const statusEl = document.getElementById('my-sheet-status');
   const holder = myGoogleAccountHolder();
   const rawUrl = (holder && holder.sheetUrl) ? holder.sheetUrl : (STATE.settings ? STATE.settings.sheetUrl : '');
+  const webhookUrl = (holder && holder.sheetWebhookUrl) ? holder.sheetWebhookUrl : (STATE.settings ? STATE.settings.sheetWebhookUrl : '');
   const spreadsheetId = extractSheetId(rawUrl);
-  if(!spreadsheetId){ if(statusEl) statusEl.textContent = 'Paste a valid Google Sheet link above first.'; return; }
+
+  if(!spreadsheetId && !webhookUrl){
+    if(statusEl) statusEl.textContent = 'Paste a valid Google Sheet link or Webhook URL above first.';
+    return;
+  }
+
   const accountId = currentAccountId() || 'admin';
   if(statusEl) statusEl.textContent = 'Testing…';
   const testLoad = STATE.loads[0] || {systemDate: new Date().toISOString().slice(0,10), loadNumber:'TEST-'+Date.now(), brokerName:'Test Broker', brokerMC:'000000', driverName:'Test Driver', pickup:'Test Pickup, TX', dropoff:'Test Dropoff, IL', pickupDate:'', deliveryDate:'', brokerRate:0, dispatcherName: STATE.currentUser?STATE.currentUser.name:'Test Dispatcher'};
   try{
-    const tabName = (holder && holder.sheetTabName) || (STATE.settings && STATE.settings.sheetTabName) || 'Sheet1';
-    const res = await writeLoadRowToSheet(testLoad, accountId, spreadsheetId, tabName);
-    if(statusEl) statusEl.textContent = '✓ Synced successfully' + (res.sheetTab ? ' (tab: '+res.sheetTab+')' : '') + ' — check your Sheet.';
-    toast('Sheet sync test passed', 'Row written successfully to Google Sheet.', true);
+    let msg = '';
+    if(webhookUrl){
+      await syncToWebhook(testLoad, webhookUrl);
+      msg = '✓ Webhook synced successfully.';
+    }
+    if(spreadsheetId){
+      const tabName = (holder && holder.sheetTabName) || (STATE.settings && STATE.settings.sheetTabName) || 'Sheet1';
+      const res = await writeLoadRowToSheet(testLoad, accountId, spreadsheetId, tabName);
+      msg += (msg?' · ':'') + '✓ Sheet API synced successfully' + (res.sheetTab ? ' (tab: '+res.sheetTab+')' : '') + '.';
+    }
+    if(statusEl) statusEl.textContent = msg + ' Check your Sheet.';
+    toast('Sheet sync test passed', 'Test row sent successfully.', true);
   }catch(e){
     if(statusEl) statusEl.textContent = '✗ '+(e.message||'Sync failed');
     toast('Sheet sync test failed', e.message||'Check the Sheet link and sharing permissions.');
@@ -5476,7 +5519,7 @@ function renderMyAccount(){
     </div>
     <div class="hr"></div>
     <div class="field" style="margin-bottom:0;">
-      <label>Google Sheet Sync</label>
+      <label>Google Sheet Sync (Option 1: Direct Link)</label>
       <div class="hint" style="margin-bottom:8px;">Share a Google Sheet with <b>${escapeAttr(holder.googleAccountEmail||'this account')}</b> as an <b>Editor</b>, paste its link below, and every load you book — plus every status change after — writes or updates a row automatically, matched by Load #. ${STATE.role==='admin'
         ? 'This is your central Sheet — every dispatcher\u2019s loads mirror here too (once you\u2019ve connected and set a Sheet), each row tagged with the Dispatcher Name column so you can see who booked it.'
         : 'This is your own personal copy; this only applies to loads booked while signed in as '+escapeAttr(STATE.currentUser?STATE.currentUser.name:'you')+'. Every load also mirrors automatically into Admin\u2019s central Sheet (if Admin has one set up) — no setup needed on your side for that part.'}</div>
@@ -5486,6 +5529,21 @@ function renderMyAccount(){
         <button type="button" class="btn btn-sm btn-ghost" onclick="testSheetSync()">Test Sync</button>
       </div>
       <div id="my-sheet-status" style="font-size:11.5px;color:var(--text-faint);margin-top:6px;"></div>
+    </div>
+    <div class="hr"></div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Google Sheet Sync (Option 2: Apps Script Webhook URL - Zero Permission Required)</label>
+      <div class="hint" style="margin-bottom:8px;">Alternatively, if you prefer zero Google sharing setup, create a Google Apps Script Web App on your Google Sheet and paste its Webhook URL below:</div>
+      <input type="text" id="my-sheet-webhook" placeholder="https://script.google.com/macros/s/.../exec" value="${escapeAttr(holder.sheetWebhookUrl||'')}" oninput="saveMySheetField('sheetWebhookUrl', this.value)" style="margin-bottom:8px;">
+      <details style="font-size:11.5px;color:var(--text-dim);cursor:pointer;"><summary>Click to view 3-line Google Apps Script snippet</summary>
+      <pre style="background:var(--bg-card);padding:8px;border-radius:6px;margin-top:6px;font-size:11px;overflow-x:auto;">
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  sheet.appendRow([data.date, data.loadNumber, data.broker, data.mc, data.driver, data.pickup, data.dropoff, data.puDate, data.doDate, data.rate, data.dispatcher]);
+  return ContentService.createTextOutput(JSON.stringify({result:"success"})).setMimeType(ContentService.MimeType.JSON);
+}</pre>
+      </details>
     </div>` : ''}
   `;
 }
