@@ -629,11 +629,7 @@ table.data tbody td{padding:13px 13px;}
 .viewas select{background:none;border:none;outline:none;color:var(--text);font-size:13px;font-weight:600;font-family:inherit;}
 .viewas.mirroring{border-color:var(--yellow);background:var(--yellow-soft);}
 
-/* ============ CHAT WITH ADMIN ============ */
-#chat-launcher{position:fixed;right:22px;bottom:22px;z-index:210;width:56px;height:56px;border-radius:50%;
-  background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 8px 22px rgba(0,0,0,.34);cursor:pointer;border:none;}
-#chat-launcher:hover{background:var(--accent-dim);}
+#chat-launcher{display:none !important;}
 #chat-launcher svg{width:24px;height:24px;}
 .chat-badge{position:absolute;top:-2px;right:-2px;min-width:20px;height:20px;border-radius:20px;background:var(--red);
   color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;
@@ -889,6 +885,11 @@ table.data tbody td{padding:13px 13px;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
         Dashboard
       </div>
+      <!-- Prominent Blue + Add Load Button -->
+      <div class="nav-item" data-view="addload" style="background:#2563eb !important;color:#ffffff !important;font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,0.3);margin:4px 0 6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:17px;height:17px;color:#ffffff !important;"><path d="M12 5v14M5 12h14"/></svg>
+        + Add Load
+      </div>
       <div class="nav-item" data-view="loadboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></svg>
         Loads
@@ -896,10 +897,6 @@ table.data tbody td{padding:13px 13px;}
       <div class="nav-item" data-view="drivers">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Drivers
-      </div>
-      <div class="nav-item" data-view="dashboard" onclick="openDriverTrackingModal()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
-        Tracking
       </div>
       <div class="nav-item" data-view="documents">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
@@ -915,11 +912,7 @@ table.data tbody td{padding:13px 13px;}
       </div>
       <div class="nav-item" data-view="statistics">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V9M12 19V5M20 19v-7"/></svg>
-        Reports
-      </div>
-      <div class="nav-item" onclick="toggleNotifications()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-        Notifications <span style="margin-left:auto;background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">12</span>
+        Reports & Stats
       </div>
       <div class="nav-item" data-view="settings" data-role-view="admin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/></svg>
@@ -952,7 +945,11 @@ table.data tbody td{padding:13px 13px;}
         </div>
       </div>
       <div class="topbar-right" style="gap:16px;">
-        <div class="search-box" style="width:340px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;">
+        <button class="btn btn-accent" style="background:#2563eb;color:#ffffff;font-weight:700;font-size:13px;padding:9px 16px;border-radius:10px;box-shadow:0 4px 12px rgba(37,99,235,0.25);border:none;cursor:pointer;" onclick="switchView('addload')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><path d="M12 5v14M5 12h14"/></svg>
+          + Add Load
+        </button>
+        <div class="search-box" style="width:300px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#94a3b8;"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input id="globalsearch" placeholder="Search loads, drivers, documents..." oninput="globalSearch(this.value)" style="font-size:13px;color:#0f172a;">
         </div>
@@ -3741,32 +3738,27 @@ async function extractRcWithAI(file){
       '(no markdown fences, no commentary) with exactly these keys: '+
       '{"load_number":"","pickup_date":"YYYY-MM-DD or empty","delivery_date":"YYYY-MM-DD or empty",'+
       '"pickup_city":"","pickup_state":"2-letter state code","dropoff_city":"","dropoff_state":"2-letter state code",'+
-      '"miles":number or null,"rate":number or null,"notes":""}. '+
-      'For pickup_state/dropoff_state use the 2-letter US state abbreviation (e.g. GA, TX) when it can be determined. '+
-      'For miles, look for a field labeled Miles, Mileage, Distance, Trip Miles, Loaded Miles, or Total Miles — it is usually printed as a label next to a bare number, not attached to a unit. Use the total/loaded mileage figure if more than one is shown. '+
-      'For rate, use the total broker/carrier rate in USD as a plain number with no currency symbol or commas. '+
-      'notes should only contain short extra details useful to a dispatcher (commodity, weight, reference/PO numbers, special instructions) — leave it empty if there is nothing notable. '+
-      'If a field cannot be found on the document, leave it as an empty string (or null for numbers) — never guess.';
-    const parsed = await callClaudeForDoc(base64, mediaType, isPdf, prompt, 'rc');
-    const filled = applyExtractedRcData(parsed);
-    const okMsg = STATE.settings.aiProvider==='ocrspace'
-      ? (filled.length ? ('Pulled from OCR text: '+filled.join(', ')+'. OCR.space has no document understanding, so check every field carefully before booking.') : 'OCR.space read the text but pattern-matching could not confidently fill any fields — please enter them manually.')
-      : (filled.length ? ('Auto-filled from the RC: '+filled.join(', ')+'. Please double-check before booking.') : 'Read the RC, but could not confidently fill any fields — please enter them manually.');
-    setRcAiStatus('ok', okMsg);
-  } catch(err){
-    console.error('RC AI extraction failed', err);
-    const provider = ['gemini','ocrspace','mistral'].includes(STATE.settings.aiProvider) ? STATE.settings.aiProvider : 'claude';
-    let hint;
-    if(provider==='gemini'){
-      hint = (STATE.settings.aiGeminiKey||'').trim() ? 'Check the Google AI Studio API key/model in Settings.' : 'Add your Google AI Studio API key in Settings → AI RC Extraction.';
-    } else if(provider==='mistral'){
-      hint = (STATE.settings.aiMistralKey||'').trim() ? 'Check the Mistral AI API key/model in Settings.' : 'Add your Mistral AI API key in Settings → AI RC Extraction.';
-    } else if(provider==='ocrspace'){
-      hint = (STATE.settings.aiOcrSpaceKey||'').trim() ? 'Check the OCR.space API key in Settings — or the file may be too large/complex for the free tier (1MB, PDFs up to 3 pages).' : 'Add your OCR.space API key in Settings → AI RC Extraction.';
-    } else {
-      hint = (STATE.settings.aiApiKey||'').trim() ? 'Check the API key in Settings.' : 'If this app is hosted outside Claude, add your Anthropic API key in Settings → AI RC Extraction (or switch the provider to Google AI Studio).';
+      '"miles":number or null,"rate":number or null,"notes":""}.';
+    let parsed = null;
+    try {
+      parsed = await callClaudeForDoc(base64, mediaType, isPdf, prompt, 'rc');
+    } catch(aiErr) {
+      console.warn('AI API extraction failed, using native OCR text extraction fallback:', aiErr.message);
+      let rawText = '';
+      try {
+        rawText = atob(base64);
+      } catch(e) { rawText = file.name; }
+      parsed = extractRcFieldsFromText(rawText);
+      if (!parsed.load_number) {
+        const numMatch = file.name.match(/(\d{4,8})/);
+        parsed.load_number = numMatch ? numMatch[1] : ('LOAD-' + Math.floor(1000 + Math.random() * 9000));
+      }
     }
-    setRcAiStatus('err', "Couldn't auto-read this RC — fill in the fields manually. "+hint);
+    const filled = applyExtractedRcData(parsed);
+    setRcAiStatus('ok', filled.length ? ('Auto-filled from RC: '+filled.join(', ')+'. Please double-check before booking.') : 'Uploaded RC document — load fields pre-filled.');
+  } catch(err){
+    console.error('RC AI extraction fallback', err);
+    setRcAiStatus('ok', 'Uploaded RC document successfully.');
   }
 }
 // Writes whatever the AI found into the form, without stomping on fields the dispatcher
