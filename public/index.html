@@ -4528,9 +4528,79 @@ async function extractRcWithAI(file){
     setRcAiStatus('ok', 'Uploaded RC document successfully.');
   }
 }
+function safeParseJsonFromAi(rawContent) {
+  if (!rawContent) throw new Error('No content returned from AI');
+  if (typeof rawContent === 'object') return rawContent;
+  
+  let str = String(rawContent).trim();
+  // Strip markdown code blocks if present
+  const codeBlockMatch = str.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (codeBlockMatch) {
+    str = codeBlockMatch[1].trim();
+  }
+  
+  // Find outermost JSON brackets { ... } or [ ... ]
+  const firstBrace = str.search(/[\{\[]/);
+  const lastBrace = Math.max(str.lastIndexOf('}'), str.lastIndexOf(']'));
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    str = str.slice(firstBrace, lastBrace + 1);
+  }
+  
+  try {
+    return JSON.parse(str);
+  } catch(e) {
+    console.error('Failed to parse AI JSON:', str, e);
+    throw new Error('AI returned non-standard JSON format: ' + e.message);
+  }
+}
+
+function normalizeRcObject(raw) {
+  if (!raw) return {};
+  if (Array.isArray(raw)) raw = raw[0] || {};
+  if (typeof raw !== 'object') return {};
+
+  // If object is wrapped inside { "data": {...} } or { "rate_confirmation": {...} }
+  const keys = Object.keys(raw);
+  if (keys.length === 1 && typeof raw[keys[0]] === 'object' && raw[keys[0]] !== null && !Array.isArray(raw[keys[0]])) {
+    raw = raw[keys[0]];
+  }
+
+  const getVal = (...candidateKeys) => {
+    for (const cand of candidateKeys) {
+      const cleanCand = cand.toLowerCase().replace(/[^a-z0-9]/g, '');
+      for (const k of Object.keys(raw)) {
+        if (k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanCand) {
+          const v = raw[k];
+          if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        }
+      }
+    }
+    return '';
+  };
+
+  return {
+    load_number: getVal('load_number', 'loadnumber', 'load_no', 'loadno', 'load', 'load_id', 'loadnum', 'order_number', 'po_number', 'confirmation_number', 'rate_confirm_id'),
+    pickup_date: getVal('pickup_date', 'pickupdate', 'ship_date', 'shipdate', 'start_date', 'date_out', 'pickup_time'),
+    delivery_date: getVal('delivery_date', 'deliverydate', 'dropoff_date', 'dropoffdate', 'unload_date', 'end_date', 'delivery_time'),
+    pickup_address: getVal('pickup_address', 'pickupaddress', 'origin_address', 'shipper_address', 'shipper'),
+    pickup_city: getVal('pickup_city', 'pickupcity', 'origin_city', 'shipper_city'),
+    pickup_state: getVal('pickup_state', 'pickupstate', 'origin_state', 'shipper_state'),
+    pickup_zip: getVal('pickup_zip', 'pickupzip', 'origin_zip', 'shipper_zip'),
+    delivery_address: getVal('delivery_address', 'deliveryaddress', 'dropoff_address', 'dropoffaddress', 'destination_address', 'consignee_address', 'consignee'),
+    dropoff_city: getVal('dropoff_city', 'dropoffcity', 'delivery_city', 'deliverycity', 'destination_city', 'consignee_city'),
+    dropoff_state: getVal('dropoff_state', 'dropoffstate', 'delivery_state', 'deliverystate', 'destination_state', 'consignee_state'),
+    delivery_zip: getVal('delivery_zip', 'deliveryzip', 'dropoff_zip', 'dropoffzip', 'destination_zip', 'consignee_zip'),
+    miles: getVal('miles', 'total_miles', 'distance', 'trip_miles'),
+    rate: getVal('rate', 'gross_rate', 'total_rate', 'total_pay', 'amount', 'flat_rate', 'total', 'agreed_amount', 'linehaul', 'total_amount'),
+    broker_name: getVal('broker_name', 'brokername', 'broker', 'company', 'issued_by', 'customer'),
+    broker_mc: getVal('broker_mc', 'brokermc', 'mc_number', 'mc_no', 'mc', 'dot'),
+    notes: getVal('notes', 'special_instructions', 'remarks', 'comments', 'instructions')
+  };
+}
+
 // Writes whatever the AI found into the form fields.
-function applyExtractedRcData(d){
-  if(!d) return [];
+function applyExtractedRcData(raw){
+  const d = normalizeRcObject(raw);
   const filled = [];
   const confScores = computeFieldConfidence(d);
 
@@ -4551,31 +4621,37 @@ function applyExtractedRcData(d){
     }
   };
 
-  if(d.load_number || d.loadNumber || d.load_no) {
-    setField('f-loadnumber', String(d.load_number||d.loadNumber||d.load_no).trim(), 'Load #', 'load_number');
+  if(d.load_number) {
+    setField('f-loadnumber', String(d.load_number).trim(), 'Load #', 'load_number');
   }
   
-  if(d.pickup_date || d.pickupDate){ 
-    setField('f-pickupdate', String(d.pickup_date||d.pickupDate).trim(), 'Pickup date', 'pickup_date'); 
+  if(d.pickup_date){ 
+    setField('f-pickupdate', String(d.pickup_date).trim(), 'Pickup date', 'pickup_date'); 
   }
-  if(d.delivery_date || d.deliveryDate || d.dropoff_date){ 
-    setField('f-deliverydate', String(d.delivery_date||d.deliveryDate||d.dropoff_date).trim(), 'Delivery date', 'delivery_date'); 
+  if(d.delivery_date){ 
+    setField('f-deliverydate', String(d.delivery_date).trim(), 'Delivery date', 'delivery_date'); 
   }
   
   const puParts = [d.pickup_address, d.pickup_city, d.pickup_state, d.pickup_zip].filter(Boolean);
   const pu = puParts.length ? puParts.join(', ') : [d.pickup_city, d.pickup_state].filter(Boolean).join(', ');
-  const doParts = [d.delivery_address || d.dropoff_address, d.delivery_city || d.dropoff_city, d.delivery_state || d.dropoff_state, d.delivery_zip || d.dropoff_zip].filter(Boolean);
-  const doo = doParts.length ? doParts.join(', ') : [d.dropoff_city || d.delivery_city, d.dropoff_state || d.delivery_state].filter(Boolean).join(', ');
+  const doParts = [d.delivery_address, d.dropoff_city, d.dropoff_state, d.delivery_zip].filter(Boolean);
+  const doo = doParts.length ? doParts.join(', ') : [d.dropoff_city, d.dropoff_state].filter(Boolean).join(', ');
 
   if(pu) setField('f-pickup', pu.trim(), 'Pickup location', 'pickup');
   if(doo) setField('f-dropoff', doo.trim(), 'Drop-off location', 'dropoff');
 
-  if((d.broker_mc || d.brokerMC) && document.getElementById('f-brokermc')){
-    setField('f-brokermc', String(d.broker_mc || d.brokerMC).trim(), 'Broker MC', 'broker_mc');
+  if(d.broker_mc && document.getElementById('f-brokermc')){
+    setField('f-brokermc', String(d.broker_mc).trim(), 'Broker MC', 'broker_mc');
   }
 
-  if(d.miles!=null && d.miles!==''){ setField('f-miles', Math.round(Number(d.miles))||'', 'Miles', 'miles'); }
-  if(d.rate!=null && d.rate!==''){ setField('f-rate', Number(d.rate)||'', 'Rate', 'rate'); }
+  if(d.miles!=null && d.miles!==''){ 
+    const num = Number(String(d.miles).replace(/[^0-9.]/g, ''));
+    if(!isNaN(num) && num > 0) setField('f-miles', Math.round(num), 'Miles', 'miles'); 
+  }
+  if(d.rate!=null && d.rate!==''){ 
+    const num = Number(String(d.rate).replace(/[^0-9.]/g, ''));
+    if(!isNaN(num) && num > 0) setField('f-rate', num, 'Rate', 'rate'); 
+  }
   if(d.notes){ setField('f-notes', String(d.notes).trim(), 'Notes', 'notes'); }
 
   validateLoadDates();
@@ -4605,7 +4681,7 @@ function computeFieldConfidence(data) {
   evalField('pickup_date', data.pickup_date, v => /^\d{4}-\d{2}-\d{2}$/.test(v));
   evalField('delivery_date', data.delivery_date, v => /^\d{4}-\d{2}-\d{2}$/.test(v));
   evalField('pickup', data.pickup_city || data.pickup_address, v => String(v).length > 2);
-  evalField('dropoff', data.delivery_city || data.dropoff_city || data.delivery_address, v => String(v).length > 2);
+  evalField('dropoff', data.dropoff_city || data.delivery_address, v => String(v).length > 2);
   evalField('rate', data.rate, v => Number(v) > 0);
   evalField('miles', data.miles, v => Number(v) > 0);
   evalField('broker_mc', data.broker_mc, v => /^\d{4,8}$/.test(String(v).replace(/\D/g, '')));
@@ -4692,8 +4768,7 @@ async function callAnthropicForDoc(base64, mediaType, isPdf, prompt){
   const data = await resp.json();
   const textBlock = (data.content||[]).find(b=>b.type==='text');
   if(!textBlock || !textBlock.text) throw new Error('No response text from AI');
-  const clean = textBlock.text.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
-  return JSON.parse(clean);
+  return safeParseJsonFromAi(textBlock.text);
 }
 async function callGeminiForDoc(base64, mediaType, isPdf, prompt){
   const key = (STATE.settings.aiGeminiKey||'').trim();
@@ -4717,8 +4792,7 @@ async function callGeminiForDoc(base64, mediaType, isPdf, prompt){
   const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
   const text = parts.map(p=>p.text||'').join('').trim();
   if(!text) throw new Error('No response text from Gemini');
-  const clean = text.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
-  return JSON.parse(clean);
+  return safeParseJsonFromAi(text);
 }
 async function callMistralForDoc(base64, mediaType, isPdf, prompt){
   const key = (STATE.settings.aiMistralKey||'').trim();
@@ -4739,8 +4813,7 @@ async function callMistralForDoc(base64, mediaType, isPdf, prompt){
   }
   const content = data.content;
   if(!content) throw new Error('No response text from Mistral');
-  const clean = (typeof content==='string' ? content : JSON.stringify(content)).trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
-  return JSON.parse(clean);
+  return safeParseJsonFromAi(content);
 }
 async function callOcrSpaceForDoc(base64, mediaType, isPdf, kind){
   const key = (STATE.settings.aiOcrSpaceKey||'').trim();
