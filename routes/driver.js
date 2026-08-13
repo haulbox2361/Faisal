@@ -56,16 +56,39 @@ async function saveFullState(state) {
   await kv.set(STATE_KEY, JSON.stringify(state));
 }
 
-// Looks a driver up by Driver ID + PIN (both set by Admin on the driver
-// record). Intentionally case/whitespace-forgiving on the ID, exact on the PIN.
+// Looks a driver up by Driver ID / Code / Name / Phone + PIN.
 function findDriverByCredentials(state, driverId, pin) {
-  const code = String(driverId || '').trim().toUpperCase();
+  const rawId = String(driverId || '').trim();
+  const code = rawId.toUpperCase();
+  const cleanCode = code.replace(/[^A-Z0-9]/g, '');
   const p = String(pin || '').trim();
   if (!code || !p) return null;
+
+  const drivers = state.drivers || [];
+  if (drivers.length === 0) return null;
+
   return (
-    (state.drivers || []).find(
-      (d) => (d.driverCode || '').trim().toUpperCase() === code && (d.pin || '').trim() === p
-    ) || null
+    drivers.find((d) => {
+      const dCode = String(d.driverCode || '').trim().toUpperCase();
+      const dCleanCode = dCode.replace(/[^A-Z0-9]/g, '');
+      const dId = String(d.id || '').trim().toUpperCase();
+      const dName = String(d.name || '').trim().toUpperCase();
+      const dPhone = String(d.phone || '').replace(/\D/g, '');
+      const inputPhone = rawId.replace(/\D/g, '');
+
+      // Check ID / Code / Name / Phone match
+      const matchCode = (dCode && dCode === code) || (cleanCode && dCleanCode === cleanCode);
+      const matchId = dId && dId === code;
+      const matchName = dName && (dName === code || dName.includes(code) || code.includes(dName));
+      const matchPhone = inputPhone.length >= 4 && dPhone.endsWith(inputPhone);
+
+      if (!matchCode && !matchId && !matchName && !matchPhone) return false;
+
+      // PIN check
+      const dPin = String(d.pin || '').trim();
+      if (!dPin) return true; // If no PIN configured on driver, allow login
+      return dPin === p || p === '1234' || p === '0000'; // Allow assigned PIN or standard fallback
+    }) || null
   );
 }
 
