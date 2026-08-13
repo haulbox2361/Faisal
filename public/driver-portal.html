@@ -738,6 +738,15 @@ async function api(path, opts={}){
   return data;
 }
 
+function openModal(id){
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+function closeModal(id){
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('active');
+}
+
 function initials(name){ return (name||'?').split(' ').filter(Boolean).slice(0,2).map(s=>s[0].toUpperCase()).join(''); }
 function money(n){ return '$' + (Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:0}); }
 function statusClass(s){ return 'st-' + String(s||'').toLowerCase().replace(/[\s_]+/g,'-'); }
