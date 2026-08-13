@@ -130,21 +130,24 @@ async function getMessagesHandler(req, res) {
 router.get('/api/chat/conversations/:id/messages', getMessagesHandler);
 router.get('/api/chat/messages/:id', getMessagesHandler);
 
-// POST /api/chat/conversations/:id/messages  { accountId, role, name, body, loadId, loadNumber }
+// POST /api/chat/conversations/:id/messages  { accountId, role, name, body, loadId, loadNumber, attachment }
 async function postMessageHandler(req, res) {
   const me = requireParty(req, res);
   if (!me) return;
-  const { name, body, loadId, loadNumber } = req.body || {};
+  const { name, body, loadId, loadNumber, attachment } = req.body || {};
   const text = String(body || '').trim();
-  if (!text) return res.status(400).json({ error: 'Message cannot be empty' });
+  // Allow empty body if there is an attachment
+  if (!text && !attachment) return res.status(400).json({ error: 'Message cannot be empty' });
 
   const conversationId = Number(req.params.id);
   try {
     if (!(await chat.isParticipant(conversationId, me))) {
       return res.status(404).json({ error: 'Chat not found' });
     }
-    const sent = await chat.sendMessage(conversationId, { ...me, name }, text, loadId, loadNumber);
-    res.json({ ok: true, message: { id: sent.id, createdAt: sent.createdAt, senderType: me.type, senderId: me.id, body: text, loadId, loadNumber } });
+    // Pass attachment metadata to sendMessage (stored as JSON in the body column if no text)
+    const effectiveText = text || (attachment ? `[File: ${attachment.name || 'attachment'}]` : '');
+    const sent = await chat.sendMessage(conversationId, { ...me, name }, effectiveText, loadId, loadNumber, attachment);
+    res.json({ ok: true, message: { id: sent.id, createdAt: sent.createdAt, senderType: me.type, senderId: me.id, body: text, loadId, loadNumber, attachment } });
   } catch (e) {
     console.error('chat send failed:', e);
     res.status(500).json({ error: 'Failed to send message' });

@@ -663,6 +663,687 @@ table.data tbody td{padding:13px 13px;}
 .chat-input-row textarea:focus{border-color:var(--accent);}
 #toast-wrap{bottom:92px;}
 @media print{ #chat-launcher,#chat-panel{display:none !important;} }
+
+/* ============================================================
+   WHATSAPP-STYLE CHAT UI
+   ============================================================ */
+
+/* Layout root */
+#wa-chat-wrap {
+  display: flex;
+  height: calc(100vh - 70px);
+  background: #fff;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 24px rgba(15,23,42,0.08);
+}
+
+/* ===== LEFT SIDEBAR ===== */
+#wa-sidebar {
+  width: 360px;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-right: 1px solid #e9edef;
+  overflow: hidden;
+}
+
+#wa-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f0f2f5;
+  border-bottom: 1px solid #e9edef;
+  min-height: 60px;
+}
+
+#wa-sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#wa-my-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111b21;
+}
+
+#wa-sidebar-header-icons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ===== Search ===== */
+#wa-search-wrap {
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+#wa-search-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f0f2f5;
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+
+#wa-search-inner svg { color: #54656f; flex-shrink: 0; }
+
+#wa-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13.5px;
+  color: #111b21;
+}
+
+#wa-search-input::placeholder { color: #8696a0; }
+
+/* ===== Filter tabs ===== */
+#wa-filter-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #fff;
+  border-bottom: 1px solid #f0f2f5;
+  overflow-x: auto;
+}
+#wa-filter-tabs::-webkit-scrollbar { height: 0; }
+
+.wa-filter-tab {
+  border: none;
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  background: #f0f2f5;
+  color: #54656f;
+  transition: all .15s;
+}
+.wa-filter-tab.active {
+  background: #d9fdd3;
+  color: #025c4c;
+  font-weight: 600;
+}
+
+/* ===== Chat list ===== */
+#wa-chat-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+#wa-chat-list::-webkit-scrollbar { width: 6px; }
+#wa-chat-list::-webkit-scrollbar-thumb { background: #cdd2d7; border-radius: 4px; }
+
+.wa-chat-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f2f5;
+  transition: background .1s;
+  position: relative;
+}
+.wa-chat-item:hover { background: #f5f6f6; }
+.wa-chat-item.active { background: #f0f2f5; }
+
+.wa-chat-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.wa-chat-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.wa-chat-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111b21;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.wa-chat-item-time {
+  font-size: 11px;
+  color: #8696a0;
+  flex-shrink: 0;
+}
+.wa-chat-item-preview {
+  font-size: 12.5px;
+  color: #8696a0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.wa-chat-badge {
+  background: #25d366;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Section labels in list */
+.wa-list-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8696a0;
+  padding: 10px 16px 4px;
+  background: #f0f2f5;
+}
+
+/* ===== Avatars ===== */
+.wa-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  background: #25d366;
+}
+.wa-avatar-lg { width: 40px; height: 40px; font-size: 15px; }
+.wa-avatar-md { width: 40px; height: 40px; font-size: 15px; }
+.wa-avatar-sm { width: 34px; height: 34px; font-size: 12px; }
+.wa-avatar-xs { width: 28px; height: 28px; font-size: 10px; }
+
+/* Avatar color variants */
+.wa-av-blue { background: #2563eb; }
+.wa-av-purple { background: #7c3aed; }
+.wa-av-orange { background: #ea580c; }
+.wa-av-teal { background: #0891b2; }
+.wa-av-red { background: #dc2626; }
+.wa-av-green { background: #059669; }
+.wa-av-gray { background: #64748b; }
+
+/* ===== Icon buttons ===== */
+.wa-icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #54656f;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.wa-icon-btn:hover { background: #e9edef; color: #111b21; }
+.wa-icon-btn svg { width: 20px; height: 20px; }
+
+/* ===== RIGHT CHAT PANE ===== */
+#wa-chat-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #efeae2;
+  /* WhatsApp's subtle paper texture for background */
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ccc' fill-opacity='0.08'%3E%3Cpath d='M50 50c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10-10-4.5-10-10M10 10c0-5.5 4.5-10 10-10s10 4.5 10 10-4.5 10-10 10S10 15.5 10 10'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  overflow: hidden;
+  position: relative;
+}
+
+/* ===== Empty State ===== */
+#wa-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: #f0f2f5;
+}
+#wa-empty-inner {
+  text-align: center;
+  max-width: 320px;
+}
+#wa-empty-inner h3 {
+  font-size: 22px;
+  font-weight: 300;
+  color: #41525d;
+  margin: 20px 0 8px;
+  font-family: 'Inter', sans-serif;
+}
+#wa-empty-inner p {
+  font-size: 13px;
+  color: #8696a0;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ===== Active Chat ===== */
+#wa-active-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Chat header */
+#wa-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #f0f2f5;
+  border-bottom: 1px solid #e9edef;
+  min-height: 60px;
+}
+#wa-chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+#wa-chat-hdr-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111b21;
+}
+#wa-chat-hdr-sub {
+  font-size: 12px;
+  color: #8696a0;
+}
+#wa-chat-header-right {
+  display: flex;
+  gap: 4px;
+}
+
+/* ===== Messages area ===== */
+#wa-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 8%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#wa-messages-area::-webkit-scrollbar { width: 6px; }
+#wa-messages-area::-webkit-scrollbar-thumb { background: rgba(0,0,0,.2); border-radius: 4px; }
+#wa-messages-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Date separators */
+.wa-date-sep {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+.wa-date-sep span {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(2px);
+  font-size: 11.5px;
+  color: #54656f;
+  padding: 4px 12px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+}
+
+/* Message bubbles */
+.wa-msg-wrap {
+  display: flex;
+  margin: 1px 0;
+}
+.wa-msg-wrap.out { justify-content: flex-end; }
+.wa-msg-wrap.in  { justify-content: flex-start; }
+
+.wa-bubble {
+  max-width: 68%;
+  padding: 6px 10px 8px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #111b21;
+  position: relative;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.13);
+  word-wrap: break-word;
+  word-break: break-word;
+}
+.wa-msg-wrap.out .wa-bubble {
+  background: #d9fdd3;
+  border-radius: 8px 0 8px 8px;
+}
+.wa-msg-wrap.in .wa-bubble {
+  background: #ffffff;
+  border-radius: 0 8px 8px 8px;
+}
+
+.wa-bubble-sender {
+  font-size: 12px;
+  font-weight: 700;
+  color: #25d366;
+  margin-bottom: 2px;
+}
+
+.wa-bubble-text { margin: 0; }
+
+.wa-bubble-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 3px;
+}
+.wa-bubble-time {
+  font-size: 10.5px;
+  color: #8696a0;
+  white-space: nowrap;
+}
+.wa-bubble-ticks { color: #53bdeb; font-size: 13px; }
+
+/* Load tag inside bubble */
+.wa-load-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #025c4c;
+  margin-bottom: 5px;
+}
+
+/* Document attachment bubble */
+.wa-doc-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  min-width: 200px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.wa-doc-bubble:hover { background: rgba(0,0,0,0.08); }
+.wa-doc-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #7c3aed;
+}
+.wa-doc-icon svg { width: 18px; height: 18px; }
+.wa-doc-info { flex: 1; min-width: 0; }
+.wa-doc-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111b21;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-doc-size { font-size: 11px; color: #8696a0; }
+
+/* Image attachment */
+.wa-img-bubble {
+  max-width: 240px;
+  max-height: 200px;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.wa-img-bubble img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ===== Attachment preview bar ===== */
+#wa-attach-preview {
+  background: #f0f2f5;
+  border-top: 1px solid #e9edef;
+  padding: 10px 16px;
+}
+#wa-attach-preview-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wa-attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #111b21;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+.wa-attach-chip button {
+  background: none;
+  border: none;
+  color: #8696a0;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+.wa-attach-chip button:hover { color: #ef4444; }
+
+/* ===== Load tag bar ===== */
+#wa-load-tag-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: #e7f8ee;
+  border-top: 1px solid #c3e6cb;
+  font-size: 12.5px;
+  color: #025c4c;
+  font-weight: 600;
+}
+#wa-load-tag-bar button {
+  background: none;
+  border: none;
+  color: #025c4c;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: auto;
+}
+
+/* ===== Emoji picker ===== */
+#wa-emoji-picker {
+  position: absolute;
+  bottom: 72px;
+  left: 8px;
+  z-index: 200;
+  background: #fff;
+  border: 1px solid #e9edef;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  padding: 12px;
+  width: 340px;
+}
+#wa-emoji-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 22px;
+  line-height: 1;
+  max-height: 180px;
+  overflow-y: auto;
+}
+#wa-emoji-grid span {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 3px;
+  transition: background .1s;
+}
+#wa-emoji-grid span:hover { background: #f0f2f5; }
+
+/* ===== Attach menu popup ===== */
+#wa-attach-menu {
+  position: absolute;
+  bottom: 48px;
+  left: 0;
+  z-index: 200;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  border: 1px solid #e9edef;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+}
+.wa-attach-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #111b21;
+  font-family: inherit;
+  transition: background .1s;
+  text-align: left;
+}
+.wa-attach-option:hover { background: #f0f2f5; }
+.wa-attach-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ===== Input area ===== */
+#wa-input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  background: #f0f2f5;
+  border-top: 1px solid #e9edef;
+  position: relative;
+}
+
+#wa-input-box-wrap {
+  flex: 1;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e9edef;
+  overflow: hidden;
+}
+
+#wa-text-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #111b21;
+  font-family: inherit;
+  resize: none;
+  min-height: 44px;
+  max-height: 150px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+#wa-text-input::placeholder { color: #8696a0; }
+
+.wa-input-btn {
+  width: 40px;
+  height: 40px;
+  color: #54656f;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
+.wa-send-btn {
+  width: 44px;
+  height: 44px;
+  background: #25d366;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: flex-end;
+  transition: background .15s, transform .1s;
+  box-shadow: 0 2px 8px rgba(37,211,102,.3);
+}
+.wa-send-btn:hover { background: #1ebe5d; transform: scale(1.05); }
+.wa-send-btn svg { width: 20px; height: 20px; }
+
+/* New chat panel */
+#wa-new-chat-panel {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 100;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+#wa-new-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #008069;
+  color: #fff;
+}
+#wa-new-chat-header h4 { margin: 0; font-size: 18px; font-weight: 600; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  #wa-sidebar { width: 100%; min-width: 100%; display: none; }
+  #wa-chat-pane { width: 100%; }
+  #wa-sidebar.mobile-show { display: flex; position: absolute; z-index: 10; top: 0; bottom: 0; }
+}
 </style>
 </head>
 <body>
@@ -2003,64 +2684,163 @@ table.data tbody td{padding:13px 13px;}
       </section>
 
       <!-- ============ DEDICATED CHAT ============ -->
-      <section class="view" id="view-chat" style="padding:0;">
-        <div class="dedicated-chat-layout" style="display:flex;height:calc(100vh - 70px);background:var(--bg-card);border-radius:12px;overflow:hidden;border:1px solid var(--border-soft);">
-          
-          <!-- LEFT PANEL -->
-          <div class="chat-sidebar-panel" style="width:340px;min-width:280px;border-right:1px solid var(--border-soft);display:flex;flex-direction:column;background:var(--bg-main);">
-            <div style="padding:16px;border-bottom:1px solid var(--border-soft);">
-              <h3 style="margin:0 0 12px;font-size:18px;font-weight:700;">💬 Messages</h3>
-              <div class="search-box" style="width:100%;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-                <input id="main-chat-search" placeholder="Search conversations & contacts..." oninput="filterMainChatList()">
+      <section class="view" id="view-chat" style="padding:0;overflow:hidden;">
+        <!-- WhatsApp-style full chat layout -->
+        <div id="wa-chat-wrap">
+
+          <!-- ===== LEFT: Chat list sidebar ===== -->
+          <div id="wa-sidebar">
+            <!-- Sidebar Header -->
+            <div id="wa-sidebar-header">
+              <div id="wa-sidebar-profile">
+                <div class="wa-avatar wa-avatar-lg" id="wa-my-avatar">Me</div>
+                <span id="wa-my-name">HaulBoX</span>
               </div>
-              <div class="tab-row" style="margin-top:10px;margin-bottom:0;gap:4px;">
-                <button class="tab-btn active" id="chat-tab-all" onclick="setMainChatFilter('all')">All</button>
-                <button class="tab-btn" id="chat-tab-dispatchers" onclick="setMainChatFilter('dispatcher')">Dispatchers</button>
-                <button class="tab-btn" id="chat-tab-drivers" onclick="setMainChatFilter('driver')">Drivers</button>
-                <button class="tab-btn" id="chat-tab-groups" onclick="setMainChatFilter('group')">Groups</button>
+              <div id="wa-sidebar-header-icons">
+                <button class="wa-icon-btn" title="New chat" onclick="waShowNewChatPanel()">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v2H4zm0 5h10v2H4zm0 5h7v2H4z"/><path d="M20 15l-5 5v-3h-2v-4h7v2z"/></svg>
+                </button>
+                <button class="wa-icon-btn" title="Menu">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                </button>
               </div>
             </div>
 
-            <div style="flex:1;overflow-y:auto;padding:12px;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-faint);margin-bottom:8px;">Start New Chat</div>
-              <div id="main-chat-contacts-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;"></div>
-
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-faint);margin-bottom:8px;">Recent Conversations</div>
-              <div id="main-chat-convos-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+            <!-- Search bar -->
+            <div id="wa-search-wrap">
+              <div id="wa-search-inner">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg>
+                <input id="wa-search-input" placeholder="Search or start new chat" oninput="waFilterList()">
+              </div>
             </div>
+
+            <!-- Filter tabs -->
+            <div id="wa-filter-tabs">
+              <button class="wa-filter-tab active" data-filter="all" onclick="waSetFilter('all')">All</button>
+              <button class="wa-filter-tab" data-filter="unread" onclick="waSetFilter('unread')">Unread</button>
+              <button class="wa-filter-tab" data-filter="driver" onclick="waSetFilter('driver')">Drivers</button>
+              <button class="wa-filter-tab" data-filter="dispatcher" onclick="waSetFilter('dispatcher')">Dispatchers</button>
+            </div>
+
+            <!-- Chat list -->
+            <div id="wa-chat-list"></div>
           </div>
 
-          <!-- RIGHT PANEL -->
-          <div class="chat-main-panel" style="flex:1;display:flex;flex-direction:column;background:var(--bg-card);">
-            <div id="main-chat-header" style="padding:14px 20px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;background:var(--bg-main);">
-              <div style="display:flex;align-items:center;gap:12px;">
-                <div id="main-chat-avatar" class="avatar-circle" style="width:38px;height:38px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">?</div>
-                <div>
-                  <div id="main-chat-title" style="font-weight:700;font-size:15px;">Select a Conversation</div>
-                  <div id="main-chat-subtitle" style="font-size:12px;color:var(--text-faint);">Choose a contact from the left list to start messaging</div>
+          <!-- ===== RIGHT: Active chat pane ===== -->
+          <div id="wa-chat-pane">
+
+            <!-- Empty state -->
+            <div id="wa-empty-state">
+              <div id="wa-empty-inner">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none"><circle cx="40" cy="40" r="40" fill="#e8f5e9"/><path d="M24 30h32v22H24z" rx="4" fill="#25d366" opacity=".3"/><rect x="28" y="36" width="24" height="3" rx="1.5" fill="#25d366"/><rect x="28" y="43" width="16" height="3" rx="1.5" fill="#25d366"/></svg>
+                <h3>HaulBoX Chat</h3>
+                <p>Select a conversation to start messaging your drivers and dispatchers. Send documents, load info, and more.</p>
+              </div>
+            </div>
+
+            <!-- Active chat -->
+            <div id="wa-active-chat" style="display:none;flex-direction:column;height:100%;">
+
+              <!-- Chat header -->
+              <div id="wa-chat-header">
+                <div id="wa-chat-header-left">
+                  <div class="wa-avatar wa-avatar-md" id="wa-chat-av">?</div>
+                  <div id="wa-chat-header-info">
+                    <div id="wa-chat-hdr-name">Name</div>
+                    <div id="wa-chat-hdr-sub">online</div>
+                  </div>
+                </div>
+                <div id="wa-chat-header-right">
+                  <button class="wa-icon-btn" title="Search in chat" onclick="waToggleMsgSearch()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14"/></svg>
+                  </button>
+                  <button class="wa-icon-btn" title="More options" onclick="waToggleInfo()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                  </button>
                 </div>
               </div>
-              <div id="main-chat-header-actions" style="display:flex;align-items:center;gap:8px;"></div>
-            </div>
 
-            <!-- Messages Area -->
-            <div id="main-chat-body" style="flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
-              <div class="chat-empty" style="margin:auto;color:var(--text-faint);text-align:center;">Select a conversation to start chatting.</div>
-            </div>
-
-            <!-- Input Area -->
-            <div id="main-chat-input-area" style="padding:14px 20px;border-top:1px solid var(--border-soft);background:var(--bg-main);display:none;flex-direction:column;gap:8px;">
-              <div id="main-chat-load-tag-bar" style="display:none;align-items:center;gap:8px;font-size:12px;background:var(--panel-hi);padding:4px 10px;border-radius:6px;width:fit-content;">
-                <span>Attached Load: <strong id="main-chat-load-tag-name"></strong></span>
-                <button type="button" style="background:none;border:none;color:var(--text-faint);cursor:pointer;" onclick="clearMainChatLoadTag()">✕</button>
+              <!-- In-chat search bar (hidden by default) -->
+              <div id="wa-msg-search-bar" style="display:none;padding:8px 16px;background:#f0f0f0;border-bottom:1px solid #ddd;">
+                <input id="wa-msg-search-input" placeholder="Search messages..." style="width:100%;padding:6px 10px;border-radius:20px;border:1px solid #ccc;font-size:13px;" oninput="waSearchMessages()">
               </div>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <input id="main-chat-input" placeholder="Type a message..." style="flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border-soft);background:var(--bg-card);color:var(--text-main);" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMainChatMessage();}">
-                <button class="btn btn-accent" onclick="sendMainChatMessage()">Send</button>
+
+              <!-- Messages area -->
+              <div id="wa-messages-area">
+                <div id="wa-messages-body"></div>
+              </div>
+
+              <!-- Attachment preview bar -->
+              <div id="wa-attach-preview" style="display:none;">
+                <div id="wa-attach-preview-inner">
+                  <div id="wa-attach-files-row"></div>
+                  <button class="wa-icon-btn" onclick="waClearAttachments()" title="Clear attachments" style="color:#ef4444;">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.4L17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Load tag bar -->
+              <div id="wa-load-tag-bar" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="14"><path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2z"/></svg>
+                <span>Load #<strong id="wa-load-tag-num"></strong></span>
+                <button onclick="waClearLoadTag()">✕</button>
+              </div>
+
+              <!-- Emoji picker (simple) -->
+              <div id="wa-emoji-picker" style="display:none;">
+                <div id="wa-emoji-grid">
+                  😀 😂 😍 🥰 😎 😊 🤔 😮 😢 😡 👍 👎 👏 🙏 🤝 💪 🔥 ❤️ ✅ ⚠️
+                  📦 🚛 📋 📞 💰 🗂️ 📍 🗺️ ⏰ 📅 🔔 📱 💬 📷 📎 🗒️ ✏️ 📌 🎯 ✔️
+                </div>
+              </div>
+
+              <!-- Input area -->
+              <div id="wa-input-area">
+                <!-- Hidden file inputs -->
+                <input type="file" id="wa-file-input" style="display:none;" multiple accept="*/*" onchange="waHandleFileSelect(event)">
+                <input type="file" id="wa-img-input" style="display:none;" multiple accept="image/*,video/*" onchange="waHandleFileSelect(event)">
+                <input type="file" id="wa-doc-input" style="display:none;" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar" onchange="waHandleFileSelect(event)">
+
+                <!-- Emoji button -->
+                <button class="wa-icon-btn wa-input-btn" title="Emoji" onclick="waToggleEmoji()" id="wa-emoji-btn">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                </button>
+
+                <!-- Attach button with dropdown -->
+                <div style="position:relative;">
+                  <button class="wa-icon-btn wa-input-btn" title="Attach" onclick="waToggleAttachMenu()" id="wa-attach-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5V6H9v9.5a3.5 3.5 0 0 0 7 0V5c0-2.76-2.24-5-5-5S6 2.24 6 5v12.5c0 3.87 3.13 7 7 7s7-3.13 7-7V6h-3.5z"/></svg>
+                  </button>
+                  <div id="wa-attach-menu" style="display:none;">
+                    <button class="wa-attach-option" onclick="document.getElementById('wa-doc-input').click();waToggleAttachMenu();">
+                      <div class="wa-attach-icon" style="background:#7c3aed;"><svg viewBox="0 0 24 24" fill="white" width="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg></div>
+                      <span>Document</span>
+                    </button>
+                    <button class="wa-attach-option" onclick="document.getElementById('wa-img-input').click();waToggleAttachMenu();">
+                      <div class="wa-attach-icon" style="background:#0891b2;"><svg viewBox="0 0 24 24" fill="white" width="18"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>
+                      <span>Photos &amp; Videos</span>
+                    </button>
+                    <button class="wa-attach-option" onclick="waCopyLoadInfo();waToggleAttachMenu();">
+                      <div class="wa-attach-icon" style="background:#059669;"><svg viewBox="0 0 24 24" fill="white" width="18"><path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2z"/></svg></div>
+                      <span>Attach Load</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Text input -->
+                <div id="wa-input-box-wrap">
+                  <textarea id="wa-text-input" placeholder="Type a message" rows="1"
+                    oninput="waAutoResize(this)"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();waSendMessage();}"></textarea>
+                </div>
+
+                <!-- Send / Mic button -->
+                <button class="wa-send-btn" id="wa-send-btn" onclick="waSendMessage()" title="Send">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -7537,6 +8317,604 @@ async function submitDriverDocUpload(e){
     loadState().then(()=>{ STATE._loaded = true; updateBranding(); return restoreSession(); }).catch(()=>{});
   });
 })();
+
+/* ================================================================
+   WHATSAPP-STYLE CHAT ENGINE
+   ================================================================ */
+
+// State
+let waCurrentConvoId = null;
+let waFilter = 'all';
+let waPendingAttachments = [];  // {name, size, type, dataUrl, base64}
+let waLoadTag = null;           // {id, number}
+let waEmojiOpen = false;
+let waAttachMenuOpen = false;
+let waMsgSearchOpen = false;
+let waChatPollTimer = null;
+
+// Initialise WhatsApp chat pane when chat view is opened
+async function initWaChat() {
+  if (STATE.role === 'viewonly') return;
+  // Set my avatar initials
+  const myName = STATE.currentUser?.name || (STATE.role === 'admin' ? 'Admin' : 'Dispatcher');
+  const myAv = document.getElementById('wa-my-avatar');
+  if (myAv) myAv.textContent = initials(myName);
+  const myNm = document.getElementById('wa-my-name');
+  if (myNm) myNm.textContent = myName;
+
+  // Build emoji grid with clickable spans
+  const grid = document.getElementById('wa-emoji-grid');
+  if (grid && grid.children.length === 0) {
+    const emojis = ['😀','😂','😍','🥰','😎','😊','🤔','😮','😢','😡','👍','👎','👏','🙏','🤝','💪','🔥','❤️','✅','⚠️','📦','🚛','📋','📞','💰','🗂️','📍','🗺️','⏰','📅','🔔','📱','💬','📷','📎','🗒️','✏️','📌','🎯','✔️'];
+    grid.innerHTML = emojis.map(e => `<span onclick="waInsertEmoji('${e}')">${e}</span>`).join('');
+  }
+
+  await Promise.all([fetchChatConvs(), fetchMainChatContacts()]);
+  waRenderList();
+  updateChatBadge();
+
+  // Start polling
+  if (!waChatPollTimer) {
+    waChatPollTimer = setInterval(async () => {
+      if (document.getElementById('view-chat')?.classList.contains('active')) {
+        await fetchChatConvs();
+        waRenderList();
+        updateChatBadge();
+        if (waCurrentConvoId) waLoadMessages();
+      }
+    }, 4000);
+  }
+}
+
+// --- Avatar color helper ---
+const WA_COLORS = ['wa-av-blue','wa-av-purple','wa-av-orange','wa-av-teal','wa-av-red','wa-av-green','wa-av-gray'];
+function waAvatarColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return WA_COLORS[Math.abs(hash) % WA_COLORS.length];
+}
+
+// --- Format time for chat list ---
+function waFormatListTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return d.toLocaleDateString([], {weekday:'short'});
+  return d.toLocaleDateString([], {day:'2-digit', month:'2-digit', year:'2-digit'});
+}
+
+// --- Format message time ---
+function waFormatMsgTime(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+// --- Format date separator ---
+function waFormatDateSep(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return d.toLocaleDateString([], {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+
+// --- Filter ---
+function waSetFilter(f) {
+  waFilter = f;
+  document.querySelectorAll('.wa-filter-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === f);
+  });
+  waRenderList();
+}
+
+function waFilterList() { waRenderList(); }
+
+// --- Render left sidebar chat list ---
+function waRenderList() {
+  const container = document.getElementById('wa-chat-list');
+  if (!container) return;
+  const searchQ = (document.getElementById('wa-search-input')?.value || '').toLowerCase().trim();
+  const accountId = String(STATE.currentUser?.id || (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+
+  // Build items from contacts (new chat) + convos (recent)
+  let html = '';
+
+  // ---- CONTACTS (new chat starters) ----
+  const filteredContacts = (mainChatContacts || []).filter(c => {
+    if (waFilter === 'driver' && c.type !== 'driver') return false;
+    if (waFilter === 'dispatcher' && c.type !== 'dispatcher') return false;
+    if (waFilter === 'unread') return false; // unread = existing convos only
+    if (searchQ && !c.name.toLowerCase().includes(searchQ)) return false;
+    return true;
+  });
+
+  if (filteredContacts.length > 0) {
+    html += `<div class="wa-list-section-label">Contacts</div>`;
+    html += filteredContacts.map(c => {
+      const color = waAvatarColor(c.name);
+      const role = c.type === 'driver' ? '🚛 Driver' : c.type === 'ops' ? '👥 Group' : '👤 Dispatcher';
+      return `
+        <div class="wa-chat-item" onclick="waStartChat('${c.type}','${c.id}','${escapeChat(c.name)}')">
+          <div class="wa-avatar wa-avatar-sm ${color}">${initials(c.name)}</div>
+          <div class="wa-chat-item-body">
+            <div class="wa-chat-item-top">
+              <span class="wa-chat-item-name">${escapeChat(c.name)}</span>
+              <span class="wa-chat-item-time" style="font-size:10px;color:#8696a0;">${role}</span>
+            </div>
+            <div class="wa-chat-item-preview">Tap to start chat</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ---- CONVERSATIONS (recent) ----
+  let filteredConvos = (chatConvs || []).filter(c => {
+    let name = c.groupName;
+    if (!name) {
+      const other = (c.members || []).find(m => String(m.id) !== accountId);
+      name = other ? (other.name || other.id) : 'Chat';
+    }
+    if (waFilter === 'driver') {
+      const other = (c.members || []).find(m => String(m.id) !== accountId);
+      if (!other || other.type !== 'driver') return false;
+    }
+    if (waFilter === 'dispatcher') {
+      const other = (c.members || []).find(m => String(m.id) !== accountId);
+      if (!other || other.type !== 'dispatcher') return false;
+    }
+    if (waFilter === 'unread' && !(c.unreadCount > 0)) return false;
+    if (searchQ) {
+      if (!name.toLowerCase().includes(searchQ) && !(c.lastMessage||'').toLowerCase().includes(searchQ)) return false;
+    }
+    return true;
+  });
+
+  if (filteredConvos.length > 0) {
+    html += `<div class="wa-list-section-label">Recent</div>`;
+    html += filteredConvos.map(c => {
+      let name = c.groupName;
+      if (!name) {
+        const other = (c.members || []).find(m => String(m.id) !== accountId);
+        name = other ? (other.name || other.id) : 'Chat';
+      }
+      const color = waAvatarColor(name);
+      const isActive = String(c.id) === String(waCurrentConvoId);
+      const preview = c.lastMessage || 'No messages yet';
+      return `
+        <div class="wa-chat-item ${isActive ? 'active' : ''}" onclick="waSelectConvo('${c.id}','${escapeChat(name)}',${!!c.isGroup})">
+          <div class="wa-avatar wa-avatar-sm ${color}">${initials(name)}</div>
+          <div class="wa-chat-item-body">
+            <div class="wa-chat-item-top">
+              <span class="wa-chat-item-name">${escapeChat(name)}</span>
+              <span class="wa-chat-item-time">${waFormatListTime(c.lastMessageAt)}</span>
+            </div>
+            <div class="wa-chat-item-preview">${escapeChat(preview)}</div>
+          </div>
+          ${c.unreadCount > 0 ? `<div class="wa-chat-badge">${c.unreadCount > 99 ? '99+' : c.unreadCount}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  if (!html) {
+    html = `<div style="padding:24px 16px;text-align:center;color:#8696a0;font-size:13px;">No conversations found</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+// --- Start new chat from contact ---
+async function waStartChat(type, id, name) {
+  const accountId = STATE.currentUser?.id || (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId);
+  try {
+    const res = await fetch('/api/chat/start', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({accountId, role: STATE.role, withType: type, withId: id})
+    });
+    if (res.ok) {
+      const d = await res.json();
+      await fetchChatConvs();
+      waSelectConvo(d.conversationId, name, type === 'ops');
+    }
+  } catch(e) { toast('Error','Failed to start chat'); }
+}
+
+// --- Select an existing convo ---
+function waSelectConvo(id, name, isGroup) {
+  waCurrentConvoId = id;
+
+  // Show active chat pane
+  document.getElementById('wa-empty-state').style.display = 'none';
+  const ac = document.getElementById('wa-active-chat');
+  ac.style.display = 'flex';
+
+  // Update header
+  const color = waAvatarColor(name);
+  document.getElementById('wa-chat-av').textContent = initials(name);
+  document.getElementById('wa-chat-av').className = `wa-avatar wa-avatar-md ${color}`;
+  document.getElementById('wa-chat-hdr-name').textContent = name;
+  document.getElementById('wa-chat-hdr-sub').textContent = isGroup ? 'Group chat' : 'Dispatcher · Driver';
+
+  waRenderList();
+  waLoadMessages();
+}
+
+// --- Load & render messages ---
+async function waLoadMessages() {
+  if (!waCurrentConvoId) return;
+  const accountId = String(STATE.currentUser?.id || (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+  const body = document.getElementById('wa-messages-body');
+  const area = document.getElementById('wa-messages-area');
+  const wasAtBottom = area ? area.scrollHeight - area.scrollTop <= area.clientHeight + 60 : true;
+
+  try {
+    const res = await fetch(`/api/chat/conversations/${waCurrentConvoId}/messages?accountId=${encodeURIComponent(accountId)}&role=${encodeURIComponent(STATE.role)}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    const msgs = d.messages || [];
+    if (!body) return;
+
+    if (!msgs.length) {
+      body.innerHTML = `<div style="text-align:center;padding:40px 0;color:#8696a0;font-size:13px;">No messages yet.<br>Say hello! 👋</div>`;
+      return;
+    }
+
+    // Group by date
+    let lastDateStr = null;
+    let html = '';
+    msgs.forEach(m => {
+      const isMine = String(m.senderId) === accountId;
+      const dir = isMine ? 'out' : 'in';
+      const timeStr = waFormatMsgTime(m.createdAt);
+      const dateStr = waFormatDateSep(m.createdAt);
+
+      // Date separator
+      if (dateStr !== lastDateStr) {
+        html += `<div class="wa-date-sep"><span>${dateStr}</span></div>`;
+        lastDateStr = dateStr;
+      }
+
+      // Build bubble content
+      let bubbleContent = '';
+
+      // Sender name (for group chats / incoming)
+      if (!isMine && m.senderName) {
+        bubbleContent += `<div class="wa-bubble-sender">${escapeChat(m.senderName)}</div>`;
+      }
+
+      // Load tag
+      if (m.loadNumber) {
+        bubbleContent += `<div class="wa-load-tag">📦 Load #${escapeChat(m.loadNumber)}</div>`;
+      }
+
+      // Attachment (image, doc, or file)
+      if (m.attachment) {
+        const att = m.attachment;
+        if (att.type && att.type.startsWith('image/')) {
+          bubbleContent += `
+            <div class="wa-img-bubble" onclick="waOpenImage('${escapeChat(att.dataUrl||'')}')">
+              <img src="${escapeChat(att.dataUrl||att.url||'')}" alt="${escapeChat(att.name||'Image')}" onerror="this.parentElement.style.display='none'">
+            </div>`;
+          if (att.caption) bubbleContent += `<div class="wa-bubble-text">${escapeChat(att.caption)}</div>`;
+        } else {
+          const extColor = waDocColor(att.name || att.type || '');
+          bubbleContent += `
+            <div class="wa-doc-bubble" onclick="waDownloadAttachment('${escapeChat(att.dataUrl||'')}','${escapeChat(att.name||'file')}')">
+              <div class="wa-doc-icon" style="background:${extColor};">
+                <svg viewBox="0 0 24 24" fill="white"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+              </div>
+              <div class="wa-doc-info">
+                <div class="wa-doc-name">${escapeChat(att.name||'Document')}</div>
+                <div class="wa-doc-size">${att.size ? waFormatSize(att.size) : 'Document'}</div>
+              </div>
+            </div>`;
+        }
+      }
+
+      // Text body
+      if (m.body && m.body.trim()) {
+        bubbleContent += `<div class="wa-bubble-text">${escapeChat(m.body)}</div>`;
+      }
+
+      // Meta row (time + ticks)
+      bubbleContent += `
+        <div class="wa-bubble-meta">
+          <span class="wa-bubble-time">${timeStr}</span>
+          ${isMine ? '<span class="wa-bubble-ticks">✓✓</span>' : ''}
+        </div>`;
+
+      html += `
+        <div class="wa-msg-wrap ${dir}">
+          <div class="wa-bubble">${bubbleContent}</div>
+        </div>`;
+    });
+
+    body.innerHTML = html;
+    if (wasAtBottom && area) area.scrollTop = area.scrollHeight;
+  } catch(e) { console.error('waLoadMessages:', e); }
+}
+
+// --- Document attachment color by extension ---
+function waDocColor(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (['pdf'].includes(ext)) return '#dc2626';
+  if (['doc','docx'].includes(ext)) return '#2563eb';
+  if (['xls','xlsx','csv'].includes(ext)) return '#059669';
+  if (['zip','rar','7z'].includes(ext)) return '#d97706';
+  if (['jpg','jpeg','png','gif','webp'].includes(ext)) return '#0891b2';
+  return '#7c3aed';
+}
+
+function waFormatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
+
+// --- Send message ---
+async function waSendMessage() {
+  if (!waCurrentConvoId) return;
+  const input = document.getElementById('wa-text-input');
+  const text = (input?.value || '').trim();
+  if (!text && !waPendingAttachments.length) return;
+
+  const accountId = String(STATE.currentUser?.id || (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+  const senderName = STATE.currentUser?.name || (STATE.role === 'admin' ? 'Admin' : 'Dispatcher');
+
+  // Close popups
+  waCloseAllPopups();
+
+  // If there are attachments, send each one as a message
+  const attachesToSend = [...waPendingAttachments];
+  waClearAttachments();
+
+  if (input) { input.value = ''; waAutoResize(input); }
+
+  const sendOne = async (payload) => {
+    try {
+      await fetch(`/api/chat/conversations/${waCurrentConvoId}/messages`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+    } catch(e) { toast('Error','Failed to send'); }
+  };
+
+  // Send attachments
+  for (const att of attachesToSend) {
+    await sendOne({
+      accountId, role: STATE.role, name: senderName,
+      body: '',
+      attachment: { name: att.name, type: att.type, size: att.size, dataUrl: att.dataUrl },
+      ...(waLoadTag ? {loadId: waLoadTag.id, loadNumber: waLoadTag.number} : {})
+    });
+  }
+
+  // Send text (or text alongside attachments if any)
+  if (text) {
+    await sendOne({
+      accountId, role: STATE.role, name: senderName,
+      body: text,
+      ...(waLoadTag ? {loadId: waLoadTag.id, loadNumber: waLoadTag.number} : {})
+    });
+  }
+
+  waClearLoadTag();
+  await fetchChatConvs();
+  waRenderList();
+  waLoadMessages();
+}
+
+// --- File handling ---
+function waHandleFileSelect(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  event.target.value = '';
+
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      waPendingAttachments.push({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: file.size,
+        dataUrl: e.target.result
+      });
+      waRenderAttachPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function waRenderAttachPreview() {
+  const bar = document.getElementById('wa-attach-preview');
+  const row = document.getElementById('wa-attach-files-row');
+  if (!bar || !row) return;
+
+  if (!waPendingAttachments.length) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = 'block';
+  row.innerHTML = waPendingAttachments.map((att, i) => {
+    const icon = att.type.startsWith('image/') ? '🖼️' : '📄';
+    return `
+      <div class="wa-attach-chip">
+        <span>${icon}</span>
+        <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeChat(att.name)}</span>
+        <span style="color:#8696a0;font-size:10px;">${waFormatSize(att.size)}</span>
+        <button onclick="waRemoveAttachment(${i})">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function waRemoveAttachment(i) {
+  waPendingAttachments.splice(i, 1);
+  waRenderAttachPreview();
+}
+
+function waClearAttachments() {
+  waPendingAttachments = [];
+  waRenderAttachPreview();
+}
+
+// --- Load tag ---
+function waClearLoadTag() {
+  waLoadTag = null;
+  const bar = document.getElementById('wa-load-tag-bar');
+  if (bar) bar.style.display = 'none';
+}
+
+function waAttachLoad(id, number) {
+  waLoadTag = {id, number};
+  const bar = document.getElementById('wa-load-tag-bar');
+  const num = document.getElementById('wa-load-tag-num');
+  if (bar && num) { num.textContent = number; bar.style.display = 'flex'; }
+}
+
+function waCopyLoadInfo() {
+  // Show a mini load picker dialog
+  const loads = (STATE.loads || []).filter(l => l.status !== 'Completed');
+  if (!loads.length) { toast('No Loads','No active loads to attach'); return; }
+  const names = loads.map((l,i) => `${i+1}. Load #${l.loadNumber} — ${l.pickup||''} → ${l.dropoff||''}`).join('\n');
+  const choice = prompt(`Select a load to attach:\n\n${names}\n\nEnter number (1-${loads.length}):`);
+  const idx = parseInt(choice) - 1;
+  if (idx >= 0 && idx < loads.length) {
+    waAttachLoad(loads[idx].id, loads[idx].loadNumber);
+    toast('Load Attached', `Load #${loads[idx].loadNumber} attached`);
+  }
+}
+
+// --- Emoji ---
+function waToggleEmoji() {
+  waEmojiOpen = !waEmojiOpen;
+  const picker = document.getElementById('wa-emoji-picker');
+  if (picker) picker.style.display = waEmojiOpen ? 'block' : 'none';
+  if (waEmojiOpen) waAttachMenuOpen = false;
+  const menu = document.getElementById('wa-attach-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+function waInsertEmoji(emoji) {
+  const input = document.getElementById('wa-text-input');
+  if (!input) return;
+  const pos = input.selectionStart || input.value.length;
+  input.value = input.value.slice(0,pos) + emoji + input.value.slice(pos);
+  input.focus();
+  waAutoResize(input);
+}
+
+// --- Attach menu ---
+function waToggleAttachMenu() {
+  waAttachMenuOpen = !waAttachMenuOpen;
+  const menu = document.getElementById('wa-attach-menu');
+  if (menu) menu.style.display = waAttachMenuOpen ? 'flex' : 'none';
+  if (waAttachMenuOpen) waEmojiOpen = false;
+  const picker = document.getElementById('wa-emoji-picker');
+  if (picker) picker.style.display = 'none';
+}
+
+// --- Message search toggle ---
+function waToggleMsgSearch() {
+  waMsgSearchOpen = !waMsgSearchOpen;
+  const bar = document.getElementById('wa-msg-search-bar');
+  if (bar) bar.style.display = waMsgSearchOpen ? 'block' : 'none';
+  if (waMsgSearchOpen) document.getElementById('wa-msg-search-input')?.focus();
+}
+
+function waSearchMessages() {
+  const q = (document.getElementById('wa-msg-search-input')?.value || '').toLowerCase();
+  document.querySelectorAll('.wa-bubble').forEach(b => {
+    const txt = b.textContent.toLowerCase();
+    b.closest('.wa-msg-wrap').style.opacity = (!q || txt.includes(q)) ? '1' : '0.2';
+  });
+}
+
+// --- Info panel toggle (placeholder) ---
+function waToggleInfo() {
+  toast('Contact Info','Profile view coming soon');
+}
+
+// --- New chat panel ---
+function waShowNewChatPanel() {
+  // Simply scroll to contacts in the list
+  document.getElementById('wa-search-input')?.focus();
+}
+
+// --- Auto-resize textarea ---
+function waAutoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+}
+
+// --- Download attachment ---
+function waDownloadAttachment(dataUrl, name) {
+  if (!dataUrl) { toast('Error','No file data available'); return; }
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = name || 'file';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// --- Open image full screen ---
+function waOpenImage(src) {
+  if (!src) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  overlay.innerHTML = `<img src="${src}" style="max-width:92vw;max-height:92vh;border-radius:8px;object-fit:contain;">`;
+  overlay.onclick = () => document.body.removeChild(overlay);
+  document.body.appendChild(overlay);
+}
+
+// --- Close all popups ---
+function waCloseAllPopups() {
+  waEmojiOpen = false;
+  waAttachMenuOpen = false;
+  const picker = document.getElementById('wa-emoji-picker');
+  const menu = document.getElementById('wa-attach-menu');
+  if (picker) picker.style.display = 'none';
+  if (menu) menu.style.display = 'none';
+}
+
+// Close popups on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#wa-emoji-btn') && !e.target.closest('#wa-emoji-picker')) {
+    waEmojiOpen = false;
+    const picker = document.getElementById('wa-emoji-picker');
+    if (picker) picker.style.display = 'none';
+  }
+  if (!e.target.closest('#wa-attach-btn') && !e.target.closest('#wa-attach-menu')) {
+    waAttachMenuOpen = false;
+    const menu = document.getElementById('wa-attach-menu');
+    if (menu) menu.style.display = 'none';
+  }
+});
+
+// Patch showView to init WA chat when navigating to chat
+const _origShowView = typeof showView === 'function' ? showView : null;
+// Hook into the existing nav system — call initWaChat when chat view becomes active
+const _waNavObs = setInterval(() => {
+  const chatView = document.getElementById('view-chat');
+  if (chatView && chatView.classList.contains('active') && STATE._loaded) {
+    initWaChat();
+    clearInterval(_waNavObs);
+  }
+}, 800);
+
+// Also hook into sidebar nav click
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-view="chat"], .nav-item[onclick*="chat"]').forEach(el => {
+    el.addEventListener('click', () => setTimeout(initWaChat, 200));
+  });
+});
 </script>
 </body>
 </html>
