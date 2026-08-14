@@ -4435,45 +4435,66 @@ function createIcon3DShapes() {
   return shapes;
 }
 
+// Creates a precision rounded luxury dice geometry
+function createRoundedDiceGeometry(size, radius, smoothness) {
+  const shape = new THREE.Shape();
+  const eps = 0.00001;
+  const rad = radius - eps;
+  const s = size / 2 - radius;
+
+  // 2D rounded rectangle
+  shape.absarc(s, s, rad, 0, Math.PI / 2, false);
+  shape.absarc(-s, s, rad, Math.PI / 2, Math.PI, false);
+  shape.absarc(-s, -s, rad, Math.PI, Math.PI * 1.5, false);
+  shape.absarc(s, -s, rad, Math.PI * 1.5, Math.PI * 2, false);
+
+  const extrudeSettings = {
+    depth: size - radius * 2,
+    bevelEnabled: true,
+    bevelSegments: smoothness * 2,
+    steps: 1,
+    bevelSize: radius,
+    bevelThickness: radius
+  };
+
+  const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  geom.center();
+  geom.computeVertexNormals();
+  return geom;
+}
+
 // Builds a genuine rounded luxury tech dice with extruded glossy 3D icons on all 6 faces
 function buildLuxuryDiceMesh() {
   const diceGroup = new THREE.Group();
 
   // Dark obsidian titanium frame material with blue glass specular highlights
   const diceBodyMat = new THREE.MeshPhysicalMaterial({
-    color: 0x070b14,
-    metalness: 0.92,
-    roughness: 0.18,
+    color: 0x091428,
+    emissive: 0x0284c7,
+    emissiveIntensity: 0.12,
+    metalness: 0.95,
+    roughness: 0.15,
     clearcoat: 1.0,
-    clearcoatRoughness: 0.1,
-    reflectivity: 0.95
+    clearcoatRoughness: 0.08,
+    reflectivity: 1.0
   });
 
-  // Main Rounded Cube Body (1.45 size, slightly reduced for perfect navbar harmony)
-  const bodyGeom = new THREE.BoxGeometry(1.45, 1.45, 1.45, 8, 8, 8);
-  // Round vertex corners
-  const pos = bodyGeom.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
-    v.normalize().multiplyScalar(1.02);
-    pos.setXYZ(i, v.x, v.y, v.z);
-  }
-  bodyGeom.computeVertexNormals();
-
+  // Precision Rounded Dice Body (1.45 size with 0.22 radius bevel)
+  const bodyGeom = createRoundedDiceGeometry(1.45, 0.22, 6);
   const bodyMesh = new THREE.Mesh(bodyGeom, diceBodyMat);
   diceGroup.add(bodyMesh);
 
-  // Inner illuminated neon core
-  const coreGeom = new THREE.SphereGeometry(0.55, 32, 32);
+  // Inner illuminated sapphire blue core
+  const coreGeom = new THREE.SphereGeometry(0.52, 32, 32);
   const coreMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, transparent: true, opacity: 0.85 });
   const coreMesh = new THREE.Mesh(coreGeom, coreMat);
   diceGroup.add(coreMesh);
 
-  // Bright glossy white extruded material with subtle cyan luminescence
+  // Bright glossy white extruded material with electric cyan edge glow
   const iconMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     emissive: 0x38bdf8,
-    emissiveIntensity: 0.35,
+    emissiveIntensity: 0.45,
     metalness: 0.15,
     roughness: 0.1,
     clearcoat: 1.0,
@@ -4481,7 +4502,7 @@ function buildLuxuryDiceMesh() {
   });
 
   const extrudeSettings = {
-    depth: 0.14,
+    depth: 0.16,
     bevelEnabled: true,
     bevelSegments: 4,
     steps: 1,
@@ -4493,12 +4514,12 @@ function buildLuxuryDiceMesh() {
 
   // Attach 3D extruded icons raised and protruding outward on all 6 faces
   const faceConfigs = [
-    { shape: shapes.truck, pos: [0.74, 0, 0], rot: [0, Math.PI / 2, 0], scale: 1.0 },       // +X Loads
-    { shape: shapes.driver, pos: [-0.74, 0, 0], rot: [0, -Math.PI / 2, 0], scale: 1.0 },    // -X Drivers
-    { shape: shapes.dollar, pos: [0, 0.74, 0], rot: [-Math.PI / 2, 0, 0], scale: 1.0 },     // +Y Payments
-    { shape: shapes.folder, pos: [0, -0.74, 0], rot: [Math.PI / 2, 0, 0], scale: 0.95 },     // -Y Documents
-    { shape: shapes.ai, pos: [0, 0, 0.74], rot: [0, 0, 0], scale: 0.95 },                   // +Z AI / Intelligence
-    { shape: shapes.headset, pos: [0, 0, -0.74], rot: [0, Math.PI, 0], scale: 0.95 }        // -Z Support
+    { shape: shapes.truck, pos: [0.76, 0, 0], rot: [0, Math.PI / 2, 0], scale: 1.05 },       // +X Loads
+    { shape: shapes.driver, pos: [-0.76, 0, 0], rot: [0, -Math.PI / 2, 0], scale: 1.05 },    // -X Drivers
+    { shape: shapes.dollar, pos: [0, 0.76, 0], rot: [-Math.PI / 2, 0, 0], scale: 1.05 },     // +Y Payments
+    { shape: shapes.folder, pos: [0, -0.76, 0], rot: [Math.PI / 2, 0, 0], scale: 1.0 },      // -Y Documents
+    { shape: shapes.ai, pos: [0, 0, 0.76], rot: [0, 0, 0], scale: 1.0 },                     // +Z AI / Intelligence
+    { shape: shapes.headset, pos: [0, 0, -0.76], rot: [0, Math.PI, 0], scale: 1.0 }          // -Z Support
   ];
 
   faceConfigs.forEach(fc => {
@@ -4512,13 +4533,7 @@ function buildLuxuryDiceMesh() {
     diceGroup.add(mesh);
   });
 
-  // Add subtle glowing inner wireframe
-  const wireGeom = new THREE.BoxGeometry(1.48, 1.48, 1.48);
-  const wireMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.25 });
-  const wireCube = new THREE.Mesh(wireGeom, wireMat);
-  diceGroup.add(wireCube);
-
-  return { diceGroup, iconMat, wireMat };
+  return { diceGroup, iconMat };
 }
 
 function init3DCubeInstance(containerId, size) {
@@ -9024,8 +9039,10 @@ async function submitDriverDocUpload(e){
   try{ pref = localStorage.getItem('haulline-theme-pref') || 'dark'; }catch(e){}
   document.documentElement.setAttribute('data-theme', pref);
   document.addEventListener('DOMContentLoaded', ()=>{
-    document.getElementById('theme-dark-btn').classList.toggle('active', pref==='dark');
-    document.getElementById('theme-light-btn').classList.toggle('active', pref==='light');
+    const darkBtn = document.getElementById('theme-dark-btn');
+    const lightBtn = document.getElementById('theme-light-btn');
+    if(darkBtn) darkBtn.classList.toggle('active', pref==='dark');
+    if(lightBtn) lightBtn.classList.toggle('active', pref==='light');
     if(isDriverModeRequested()){
       initDriverMode();
       return;
