@@ -47,18 +47,31 @@ router.get('/api/chat/contacts', async (req, res) => {
     try { if (raw) state = JSON.parse(raw); } catch (e) {}
     
     const contacts = [];
-    (state.dispatchers || []).forEach(d => {
-      if (String(d.id) !== String(me.id)) {
+    
+    if (me.type === 'admin') {
+      // Admin can message everyone: all dispatchers, all drivers, and all Ops groups
+      (state.dispatchers || []).forEach(d => {
         contacts.push({ type: 'dispatcher', id: String(d.id), name: d.name || 'Dispatcher', role: 'Dispatcher' });
-      }
-    });
-    if (me.type !== 'admin') {
+      });
+      (state.drivers || []).forEach(d => {
+        contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
+        contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
+      });
+    } else {
+      // Dispatcher can ONLY message:
+      // 1. Admin
+      // 2. Their assigned drivers
+      // 3. Operations groups for their assigned drivers
       contacts.push({ type: 'admin', id: 'admin', name: (state.settings && state.settings.companyName) ? state.settings.companyName + ' (Admin)' : 'Admin', role: 'Owner / Admin' });
+      
+      (state.drivers || []).forEach(d => {
+        if (String(d.dispatcherId) === String(me.id)) {
+          contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
+          contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
+        }
+      });
     }
-    (state.drivers || []).forEach(d => {
-      contacts.push({ type: 'driver', id: String(d.id), name: d.name || 'Driver', role: 'Driver' });
-      contacts.push({ type: 'ops', id: String(d.id), name: `Operations - ${d.name || 'Driver'}`, role: 'Group' });
-    });
+
     res.json({ contacts });
   } catch (e) {
     console.error('chat contacts failed:', e);
@@ -73,11 +86,24 @@ router.post('/api/chat/start', async (req, res) => {
   const { withType, withId } = req.body || {};
   if (!withType || !withId) return res.status(400).json({ error: 'Missing withType/withId' });
   try {
+    const raw = await kv.get('haulline:state');
+    let state = {};
+    try { if (raw) state = JSON.parse(raw); } catch (e) {}
+
+    // Authorization check for Dispatchers:
+    if (me.type === 'dispatcher') {
+      if (withType === 'driver' || withType === 'ops') {
+        const driver = (state.drivers || []).find(d => String(d.id) === String(withId));
+        if (!driver || String(driver.dispatcherId) !== String(me.id)) {
+          return res.status(403).json({ error: 'You are only authorized to message your assigned drivers.' });
+        }
+      } else if (withType === 'dispatcher' && String(withId) !== String(me.id)) {
+        return res.status(403).json({ error: 'Dispatchers can only direct message Admin and their assigned drivers.' });
+      }
+    }
+
     let id;
     if (withType === 'ops') {
-      const raw = await kv.get('haulline:state');
-      let state = {};
-      try { if (raw) state = JSON.parse(raw); } catch (e) {}
       const driver = (state.drivers || []).find(d => String(d.id) === String(withId));
       const disp = driver && driver.dispatcherId ? (state.dispatchers || []).find(d => String(d.id) === String(driver.dispatcherId)) : null;
       id = await chat.getOrCreateOpsGroup(driver ? driver.id : withId, driver ? driver.name : 'Driver', driver ? driver.dispatcherId : null, disp ? disp.name : 'Dispatcher');
