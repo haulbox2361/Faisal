@@ -472,8 +472,8 @@ a{color:inherit;}
 
 <div id="login-screen">
   <div class="login-card">
-    <div style="width:100px;height:100px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;">
-      <img src="assets/haulbox-logo-icon.png" alt="HaulBoX" style="width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 6px 14px rgba(14,165,233,0.3));margin:0;">
+    <div style="width:130px;height:130px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="spinCube(this)" title="Click to spin">
+      <img src="assets/haulbox-logo-icon.png" alt="HaulBoX" class="cube-3d-logo" style="width:100%;height:100%;object-fit:contain;margin:0;">
     </div>
     <h1 style="font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;letter-spacing:.02em;line-height:1;margin-bottom:4px;">Haul<span style="color:var(--brand,#0284c7);">BoX</span></h1>
     <p style="margin-top:2px;">Driver Portal · sign in to continue</p>
@@ -488,7 +488,7 @@ a{color:inherit;}
 <div id="app">
   <header id="dp-header">
     <div class="dp-header-left">
-      <div class="dp-logo" style="width:38px;height:38px;background:transparent;box-shadow:none;"><img src="assets/haulbox-logo-icon.png" alt="HaulBoX" style="width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(14,165,233,0.4));"></div>
+      <div class="dp-logo" style="width:44px;height:44px;background:transparent;box-shadow:none;cursor:pointer;" onclick="spinCube(this)" title="Click to spin"><img src="assets/haulbox-logo-icon.png" alt="HaulBoX" class="cube-3d-logo" style="width:100%;height:100%;object-fit:contain;"></div>
       <div id="dp-title-wrap">
         <div id="dp-title" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;letter-spacing:.02em;">Haul<span style="color:var(--brand,#38bdf8);">BoX</span></div>
         <div id="dp-subtitle">Driver Portal</div>
@@ -2257,6 +2257,15 @@ function promptUploadFreightPictures(loadId, key) {
     `;
   }
   openModal('dp-job-modal');
+}
+
+function spinCube(el){
+  if(!el) return;
+  const img = el.querySelector('img') || el;
+  img.classList.remove('cube-spin-pulse');
+  void img.offsetWidth; // trigger reflow
+  img.classList.add('cube-spin-pulse');
+  setTimeout(() => img.classList.remove('cube-spin-pulse'), 780);
 }
 </script>
 </body>

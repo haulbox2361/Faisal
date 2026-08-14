@@ -336,9 +336,33 @@ textarea{resize:vertical;min-height:70px;}
 
 /* Login gate */
 #login-gate,#driver-login-gate{position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center;flex-direction:column;}
-.login-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:36px 36px;width:100%;max-width:390px;text-align:center;box-shadow:var(--shadow);}
-.login-mark{width:110px;height:110px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
-.login-mark img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 6px 14px rgba(14,165,233,0.25));}
+.login-card{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:40px 36px;width:100%;max-width:400px;text-align:center;box-shadow:0 20px 50px -12px rgba(0,0,0,0.35);}
+.login-mark{width:140px;height:140px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;cursor:pointer;perspective:1000px;}
+.login-mark img, .cube-3d-logo {
+  width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 10px 22px rgba(37,99,235,0.45));
+  animation: cubeIdleFloat 4.2s infinite ease-in-out;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s ease;
+  will-change: transform, filter;
+}
+.login-mark:hover img, .cube-3d-logo:hover {
+  transform: translateY(-6px) scale(1.06) rotateX(6deg) rotateY(-8deg);
+  filter: drop-shadow(0 16px 32px rgba(56,189,248,0.65)) brightness(1.08);
+}
+.cube-spin-pulse {
+  animation: cubeClickSpin 0.75s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes cubeIdleFloat {
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 8px 20px rgba(37,99,235,0.4)); }
+  50% { transform: translateY(-7px) scale(1.02); filter: drop-shadow(0 14px 28px rgba(56,189,248,0.55)); }
+}
+@keyframes cubeClickSpin {
+  0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 10px rgba(56,189,248,0.6)); }
+  50% { transform: scale(1.15) rotate(180deg); filter: drop-shadow(0 0 35px rgba(56,189,248,0.95)) brightness(1.25); }
+  100% { transform: scale(1) rotate(360deg); filter: drop-shadow(0 10px 22px rgba(37,99,235,0.45)); }
+}
+
 .login-brand-title{font-family:'Oswald',sans-serif;font-weight:700;font-size:26px;letter-spacing:.02em;line-height:1;color:var(--text);margin-bottom:4px;}
 .login-brand-title span{color:var(--accent,#0284c7);}
 .login-mark svg{width:30px;height:30px;}
@@ -1563,7 +1587,7 @@ table.data tbody tr.new-row-animate {
 <!-- ============ LOGIN GATE (mock Google OAuth) ============ -->
 <div id="login-gate">
   <div class="login-card">
-    <div class="login-mark" id="login-mark">
+    <div class="login-mark" id="login-mark" onclick="spinCube(this)" title="Click to spin">
       <img src="assets/haulbox-logo-icon.png" alt="HaulBoX">
     </div>
     <div class="login-brand-title">Haul<span>BoX</span></div>
@@ -1581,7 +1605,7 @@ table.data tbody tr.new-row-animate {
 <!-- ============ DRIVER LOGIN GATE ============ -->
 <div id="driver-login-gate" style="display:none;">
   <div class="login-card">
-    <div class="login-mark" id="driver-login-mark">
+    <div class="login-mark" id="driver-login-mark" onclick="spinCube(this)" title="Click to spin">
       <img src="assets/haulbox-logo-icon.png" alt="HaulBoX">
     </div>
     <div class="login-brand-title">Haul<span>BoX</span></div>
@@ -1761,14 +1785,11 @@ table.data tbody tr.new-row-animate {
 <div id="app" style="display:none;">
   <!-- ============ SIDEBAR ============ -->
   <aside id="sidebar" style="background:#0F172A;border-right:1px solid #1E293B;color:#F8FAFC;">
-    <div class="brand" style="padding:18px 20px;border-bottom:1px solid #1E293B;display:flex;align-items:center;gap:12px;">
-      <div style="width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <img src="assets/haulbox-logo-icon.png" alt="HaulBoX" style="width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(14,165,233,0.35));">
+    <div class="brand" style="padding:22px 18px;border-bottom:1px solid #1E293B;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+      <div style="width:72px;height:72px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;" onclick="spinCube(this)" title="Click to spin">
+        <img src="assets/haulbox-logo-icon.png" alt="HaulBoX" class="cube-3d-logo">
       </div>
-      <div>
-        <div style="font-family:'Oswald',sans-serif;font-weight:700;font-size:22px;letter-spacing:.02em;line-height:1;color:#ffffff;">Haul<span style="color:#0284c7;">BoX</span></div>
-        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em;margin-top:4px;font-weight:600;" id="brand-sub">Dispatch Command</div>
-      </div>
+      <div style="font-family:'Oswald',sans-serif;font-weight:700;font-size:20px;letter-spacing:.02em;line-height:1;color:#ffffff;">Haul<span style="color:#0284c7;">BoX</span></div>
     </div>
     <nav class="mainnav" id="mainnav" style="padding:14px 10px;">
       <div class="nav-item active" data-view="dashboard">
@@ -4326,6 +4347,15 @@ function triggerCountUpAnimations(){
     }
     requestAnimationFrame(update);
   });
+}
+
+function spinCube(el){
+  if(!el) return;
+  const img = el.querySelector('img') || el;
+  img.classList.remove('cube-spin-pulse');
+  void img.offsetWidth; // trigger reflow
+  img.classList.add('cube-spin-pulse');
+  setTimeout(() => img.classList.remove('cube-spin-pulse'), 780);
 }
 
 function renderDashboard(){
