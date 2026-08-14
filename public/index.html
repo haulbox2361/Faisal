@@ -1588,7 +1588,8 @@ table.data tbody tr.new-row-animate {
 <!-- ============ LOGIN GATE (mock Google OAuth) ============ -->
 <div id="login-gate">
   <div class="login-card">
-    <div id="haulbox-3d-cube-login" style="width:160px;height:160px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Click to roll modules: Loads, Drivers, Payments, Docs, Chat, Analytics"></div>
+    <div id="haulbox-3d-cube-login" style="width:140px;height:140px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Interactive 3D HaulBoX Dice"></div>
+    <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.02em;line-height:1;margin-bottom:18px;color:var(--text,#ffffff);">Haul<span style="color:#0284c7;">BoX</span></div>
     <button class="google-btn" id="google-signin-btn" onclick="mockGoogleLogin()">
       <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34 5.1 29.3 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34 5.1 29.3 3 24 3 16.3 3 9.6 7.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 36.4 26.7 37 24 37c-5.3 0-9.6-3.4-11.3-8.1l-6.5 5C9.5 40.6 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.2 5.2C40.9 36 44 30.7 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
       Sign in with Google
@@ -1602,7 +1603,8 @@ table.data tbody tr.new-row-animate {
 <!-- ============ DRIVER LOGIN GATE ============ -->
 <div id="driver-login-gate" style="display:none;">
   <div class="login-card">
-    <div id="haulbox-3d-cube-driver-login" style="width:150px;height:150px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Click to roll modules: Loads, Drivers, Payments, Docs, Chat, Analytics"></div>
+    <div id="haulbox-3d-cube-driver-login" style="width:130px;height:130px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Interactive 3D HaulBoX Dice"></div>
+    <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.02em;line-height:1;margin-bottom:18px;color:var(--text,#ffffff);">Haul<span style="color:#0284c7;">BoX</span></div>
     <form onsubmit="return driverLoginSubmit(event)" style="display:flex;flex-direction:column;gap:10px;text-align:left;">
       <div class="field"><label>Driver ID</label><input type="text" id="drv-login-id" autocomplete="off" autocapitalize="characters" placeholder="e.g. D4821" required></div>
       <div class="field"><label>PIN</label><input type="password" id="drv-login-pin" autocomplete="off" inputmode="numeric" maxlength="4" placeholder="4-digit PIN" required></div>
@@ -1778,8 +1780,9 @@ table.data tbody tr.new-row-animate {
 <div id="app" style="display:none;">
   <!-- ============ SIDEBAR ============ -->
   <aside id="sidebar" style="background:#0F172A;border-right:1px solid #1E293B;color:#F8FAFC;">
-    <div class="brand" style="padding:14px 10px;border-bottom:1px solid #1E293B;display:flex;align-items:center;justify-content:center;position:relative;">
-      <div id="haulbox-3d-cube-container" style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Click to roll modules: Loads, Drivers, Payments, Docs, Chat, Analytics"></div>
+    <div class="brand" style="padding:16px 10px 14px;border-bottom:1px solid #1E293B;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+      <div id="haulbox-3d-cube-container" style="width:110px;height:110px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Interactive 3D HaulBoX Dice"></div>
+      <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.02em;line-height:1;margin-top:4px;color:#ffffff;">Haul<span style="color:#0284c7;">BoX</span></div>
     </div>
     <nav class="mainnav" id="mainnav" style="padding:14px 10px;">
       <div class="nav-item active" data-view="dashboard">
@@ -3827,6 +3830,7 @@ function switchView(view){
   if (VIEW_TITLES[view]) document.getElementById('pagetitle').textContent = VIEW_TITLES[view];
   
   try { localStorage.setItem('haulbox_active_view', view); } catch(e){}
+  if (typeof rotateActiveDiceToView === 'function') rotateActiveDiceToView(view);
 
   if(view==='dashboard') renderDashboard();
   if(view==='loadboard') renderLoadBoard();
@@ -4340,72 +4344,161 @@ function triggerCountUpAnimations(){
 }
 
 /* =========================================================================
-   INTERACTIVE THREE.JS 3D HAULBOX ECOSYSTEM CUBE
+   PREMIUM 3D HAULBOX ECOSYSTEM DICE (Integrated Icons & Smooth Navigation)
    6 Module Faces:
-   1: Loads (🚚) -> loadboard
-   2: Drivers (👨‍✈️) -> drivers
-   3: Payments (💰) -> driverpay
-   4: Documents (📄) -> documents
-   5: Chat (💬) -> chat
-   6: Analytics (📊) -> statistics
+   Face 1: 🚚 Truck icon   -> Loads (loadboard)
+   Face 2: 🤖 AI icon      -> AI Analytics / Dashboard (dashboard / statistics)
+   Face 3: 📁 Folder icon  -> Documents (documents)
+   Face 4: 👨‍✈️ Driver icon  -> Drivers (drivers)
+   Face 5: 🎧 Headset icon -> Dispatch Communications / Chat (chat)
+   Face 6: 💲 Dollar icon   -> Payments & Settlements (driverpay)
    ========================================================================= */
 
 const CUBE_FACES = [
-  { name: 'Loads', icon: '🚚', view: 'loadboard', rot: { x: 0, y: -Math.PI / 2, z: 0 } },       // Right face (index 0)
-  { name: 'Drivers', icon: '👨‍✈️', view: 'drivers', rot: { x: 0, y: Math.PI / 2, z: 0 } },        // Left face (index 1)
-  { name: 'Payments', icon: '💰', view: 'driverpay', rot: { x: Math.PI / 2, y: 0, z: 0 } },       // Top face (index 2)
-  { name: 'Documents', icon: '📄', view: 'documents', rot: { x: -Math.PI / 2, y: 0, z: 0 } },     // Bottom face (index 3)
-  { name: 'Loads', icon: '🚚', view: 'loadboard', rot: { x: 0, y: 0, z: 0 } },                    // Front face (index 4)
-  { name: 'Analytics', icon: '📊', view: 'statistics', rot: { x: 0, y: Math.PI, z: 0 } }          // Back face (index 5)
+  { name: 'Loads', iconType: 'truck', view: 'loadboard', rot: { x: 0, y: -Math.PI / 2, z: 0 } },        // Right face
+  { name: 'Drivers', iconType: 'driver', view: 'drivers', rot: { x: 0, y: Math.PI / 2, z: 0 } },          // Left face
+  { name: 'Payments', iconType: 'dollar', view: 'driverpay', rot: { x: Math.PI / 2, y: 0, z: 0 } },        // Top face
+  { name: 'Documents', iconType: 'folder', view: 'documents', rot: { x: -Math.PI / 2, y: 0, z: 0 } },     // Bottom face
+  { name: 'AI & Intelligence', iconType: 'ai', view: 'dashboard', rot: { x: 0, y: 0, z: 0 } },           // Front face
+  { name: 'Communications', iconType: 'headset', view: 'chat', rot: { x: 0, y: Math.PI, z: 0 } }          // Back face
 ];
 
-function createFaceCanvas(icon, label, isDark) {
+let ACTIVE_DICE_INSTANCES = [];
+
+function drawIntegratedTechIcon(ctx, iconType) {
+  ctx.save();
+  ctx.translate(256, 256);
+  ctx.strokeStyle = '#38bdf8';
+  ctx.fillStyle = '#38bdf8';
+  ctx.shadowColor = '#0ea5e9';
+  ctx.shadowBlur = 28;
+  ctx.lineWidth = 14;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (iconType === 'truck') {
+    // Futuristic aerodynamic Semi-Truck
+    ctx.beginPath();
+    ctx.strokeRect(-120, -60, 150, 110);
+    ctx.strokeRect(30, -20, 85, 70);
+    // Wheels
+    ctx.beginPath();
+    ctx.arc(-70, 65, 24, 0, Math.PI * 2);
+    ctx.arc(60, 65, 24, 0, Math.PI * 2);
+    ctx.stroke();
+    // Headlight laser
+    ctx.fillStyle = '#60a5fa';
+    ctx.fillRect(100, -10, 18, 12);
+  } else if (iconType === 'ai') {
+    // Cybernetic AI Brain Core & Nodes
+    ctx.beginPath();
+    ctx.arc(0, 0, 52, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner pulse core
+    ctx.fillStyle = '#0284c7';
+    ctx.beginPath();
+    ctx.arc(0, 0, 26, 0, Math.PI * 2);
+    ctx.fill();
+    // Surrounding neural network nodes
+    [0, 60, 120, 180, 240, 300].forEach(deg => {
+      const rad = deg * Math.PI / 180;
+      const nx = Math.cos(rad) * 95;
+      const ny = Math.sin(rad) * 95;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(nx, ny);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(nx, ny, 12, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  } else if (iconType === 'folder') {
+    // Sleek Cloud Storage / Documents Folder
+    ctx.beginPath();
+    ctx.moveTo(-110, -70);
+    ctx.lineTo(-40, -70);
+    ctx.lineTo(-10, -40);
+    ctx.lineTo(110, -40);
+    ctx.lineTo(110, 75);
+    ctx.lineTo(-110, 75);
+    ctx.closePath();
+    ctx.stroke();
+    // Laser file badge
+    ctx.strokeRect(-60, -15, 120, 60);
+  } else if (iconType === 'driver') {
+    // Driver Aviator & Identity
+    ctx.beginPath();
+    ctx.arc(0, -45, 42, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 80, 75, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  } else if (iconType === 'headset') {
+    // Modern Enterprise Support & Dispatch Headset
+    ctx.beginPath();
+    ctx.arc(0, -15, 75, Math.PI, 0);
+    ctx.stroke();
+    ctx.strokeRect(-95, -25, 26, 50);
+    ctx.strokeRect(69, -25, 26, 50);
+    ctx.beginPath();
+    ctx.moveTo(82, 25);
+    ctx.lineTo(82, 65);
+    ctx.lineTo(20, 65);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(10, 65, 12, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (iconType === 'dollar') {
+    // Fintech Currency / Settlements Core
+    ctx.beginPath();
+    ctx.arc(0, 0, 90, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.font = 'bold 120px "Inter", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('$', 0, 5);
+  }
+  ctx.restore();
+}
+
+function createDiceFaceCanvas(iconType, label) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
 
-  // Deep metallic titanium base
-  const bgGrad = ctx.createRadialGradient(256, 256, 50, 256, 256, 320);
-  bgGrad.addColorStop(0, '#0f172a');
-  bgGrad.addColorStop(0.7, '#090d16');
-  bgGrad.addColorStop(1, '#030712');
+  // Deep obsidian titanium gradient
+  const bgGrad = ctx.createRadialGradient(256, 256, 30, 256, 256, 340);
+  bgGrad.addColorStop(0, '#0c1322');
+  bgGrad.addColorStop(0.65, '#070b14');
+  bgGrad.addColorStop(1, '#020509');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, 512, 512);
 
-  // Beveled outer metallic border
-  ctx.lineWidth = 14;
+  // Precision metallic rounded frame
+  ctx.lineWidth = 16;
   ctx.strokeStyle = '#1e293b';
-  ctx.strokeRect(16, 16, 480, 480);
+  ctx.strokeRect(20, 20, 472, 472);
 
-  // Electric cyan inner neon circuit
+  // Frosted cyan bevel layer
   ctx.lineWidth = 6;
   ctx.strokeStyle = '#0284c7';
   ctx.shadowColor = '#38bdf8';
-  ctx.shadowBlur = 18;
-  ctx.strokeRect(36, 36, 440, 440);
-  ctx.shadowBlur = 0; // reset
-
-  // Corner tech notches
-  ctx.fillStyle = '#38bdf8';
-  [[42, 42], [470, 42], [42, 470], [470, 470]].forEach(([cx, cy]) => {
-    ctx.fillRect(cx - 8, cy - 8, 16, 16);
-  });
-
-  // Center glowing module icon
-  ctx.font = '160px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = '#0ea5e9';
-  ctx.shadowBlur = 24;
-  ctx.fillText(icon, 256, 230);
+  ctx.shadowBlur = 20;
+  ctx.strokeRect(40, 40, 432, 432);
   ctx.shadowBlur = 0;
 
-  // Modern sleek typography label
-  ctx.font = 'bold 36px "Inter", sans-serif';
-  ctx.fillStyle = '#f8fafc';
-  ctx.letterSpacing = '4px';
-  ctx.fillText(label.toUpperCase(), 256, 380);
+  // Integrated geometric tech icon
+  drawIntegratedTechIcon(ctx, iconType);
+
+  // Subtle label badge
+  ctx.font = '700 30px "Inter", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#94a3b8';
+  ctx.letterSpacing = '3px';
+  ctx.fillText(label.toUpperCase(), 256, 420);
 
   return canvas;
 }
@@ -4415,8 +4508,8 @@ function init3DCubeInstance(containerId, size) {
   if (!container || !window.THREE) return;
   container.innerHTML = '';
 
-  const width = size || container.clientWidth || 120;
-  const height = size || container.clientHeight || 120;
+  const width = size || container.clientWidth || 110;
+  const height = size || container.clientHeight || 110;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
@@ -4426,41 +4519,40 @@ function init3DCubeInstance(containerId, size) {
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.domElement.style.outline = 'none';
-  renderer.domElement.style.userSelect = 'none';
   renderer.domElement.style.cursor = 'pointer';
   container.appendChild(renderer.domElement);
 
   // Lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
   scene.add(ambientLight);
 
-  const keyLight = new THREE.DirectionalLight(0x38bdf8, 2.8);
+  const keyLight = new THREE.DirectionalLight(0x38bdf8, 3.0);
   keyLight.position.set(4, 5, 6);
   scene.add(keyLight);
 
-  const fillLight = new THREE.DirectionalLight(0x2563eb, 1.8);
+  const fillLight = new THREE.DirectionalLight(0x2563eb, 2.0);
   fillLight.position.set(-4, -3, 2);
   scene.add(fillLight);
 
-  const pointLight = new THREE.PointLight(0x0ea5e9, 3.5, 10);
-  pointLight.position.set(0, 0, 1.5);
+  const pointLight = new THREE.PointLight(0x0ea5e9, 4.0, 10);
+  pointLight.position.set(0, 0, 1.6);
   scene.add(pointLight);
 
-  // Materials for 6 faces
+  // Materials with 6 integrated faces
   const materials = [
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('🚚', 'Loads')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('👨‍✈️', 'Drivers')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('💰', 'Payments')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('📄', 'Documents')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('💬', 'Chat')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('📊', 'Analytics')), roughness: 0.25, metalness: 0.85 })
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('truck', 'Loads')), roughness: 0.2, metalness: 0.88 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('driver', 'Drivers')), roughness: 0.2, metalness: 0.88 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('dollar', 'Payments')), roughness: 0.2, metalness: 0.88 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('folder', 'Documents')), roughness: 0.2, metalness: 0.88 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('ai', 'HaulBoX AI')), roughness: 0.2, metalness: 0.88 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('headset', 'Dispatch')), roughness: 0.2, metalness: 0.88 })
   ];
 
   const geometry = new THREE.BoxGeometry(1.8, 1.8, 1.8);
   const cube = new THREE.Mesh(geometry, materials);
   scene.add(cube);
 
-  // Add glowing wireframe cage
+  // Glowing cyber outer cage
   const wireGeom = new THREE.BoxGeometry(1.86, 1.86, 1.86);
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.35 });
   const wireCube = new THREE.Mesh(wireGeom, wireMat);
@@ -4468,102 +4560,102 @@ function init3DCubeInstance(containerId, size) {
 
   let mouseX = 0, mouseY = 0;
   let isHovered = false;
-  let isRolling = false;
-  let targetRot = { x: 0.35, y: 0.55 };
+  let isTransitioning = false;
 
   container.addEventListener('mouseenter', () => { isHovered = true; });
   container.addEventListener('mouseleave', () => { isHovered = false; mouseX = 0; mouseY = 0; });
   container.addEventListener('mousemove', (e) => {
     const rect = container.getBoundingClientRect();
-    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.7;
-    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.7;
+    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.6;
+    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.6;
   });
 
-  // Roll dice on click
-  function rollToModule(viewTarget) {
-    if (isRolling) return;
-    isRolling = true;
-
-    // Pick random face or match target view
-    const targetIdx = viewTarget ? CUBE_FACES.findIndex(f => f.view === viewTarget) : Math.floor(Math.random() * CUBE_FACES.length);
-    const chosenFace = CUBE_FACES[targetIdx >= 0 ? targetIdx : 4];
-
-    // Spins: 2-3 full 360 loops + target landing
-    const spinLoopsX = (Math.floor(Math.random() * 2) + 2) * Math.PI * 2;
-    const spinLoopsY = (Math.floor(Math.random() * 2) + 2) * Math.PI * 2;
-    const destX = chosenFace.rot.x + spinLoopsX;
-    const destY = chosenFace.rot.y + spinLoopsY;
+  // Smooth rotation directly to target face (no random spinning)
+  function rotateToFace(targetView) {
+    if (isTransitioning) return;
+    const face = CUBE_FACES.find(f => f.view === targetView) || CUBE_FACES[4];
+    isTransitioning = true;
 
     const startX = cube.rotation.x;
     const startY = cube.rotation.y;
     const startZ = cube.rotation.z;
     const startTime = performance.now();
-    const duration = 900; // 900ms fast, satisfying dice roll
+    const duration = 650; // Smooth 650ms enterprise transition
 
-    // Blue energy pulse flash
-    wireMat.opacity = 0.95;
-    pointLight.intensity = 7;
+    wireMat.opacity = 0.8;
+    pointLight.intensity = 5.5;
 
-    function animRoll(now) {
+    function anim(now) {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // Ease out elastic/back
+      // Ease out cubic
       const ease = 1 - Math.pow(1 - progress, 3);
-      cube.rotation.x = startX + (destX - startX) * ease;
-      cube.rotation.y = startY + (destY - startY) * ease;
-      cube.rotation.z = startZ * (1 - ease);
-
-      // Bounce scale
-      const scaleVal = 1 + Math.sin(progress * Math.PI) * 0.18;
-      cube.scale.set(scaleVal, scaleVal, scaleVal);
+      cube.rotation.x = startX + (face.rot.x - startX) * ease;
+      cube.rotation.y = startY + (face.rot.y - startY) * ease;
+      cube.rotation.z = startZ + (0 - startZ) * ease;
 
       if (progress < 1) {
-        requestAnimationFrame(animRoll);
+        requestAnimationFrame(anim);
       } else {
-        cube.rotation.x = chosenFace.rot.x;
-        cube.rotation.y = chosenFace.rot.y;
+        cube.rotation.x = face.rot.x;
+        cube.rotation.y = face.rot.y;
         cube.rotation.z = 0;
-        cube.scale.set(1, 1, 1);
         wireMat.opacity = 0.35;
-        pointLight.intensity = 3.5;
-        isRolling = false;
-        
-        // Trigger Toast & Navigate
-        toast('3D Module Navigation', `${chosenFace.icon} ${chosenFace.name}`, true);
-        if (typeof switchView === 'function' && chosenFace.view) {
-          switchView(chosenFace.view);
-        }
+        pointLight.intensity = 3.8;
+        isTransitioning = false;
       }
     }
-    requestAnimationFrame(animRoll);
+    requestAnimationFrame(anim);
   }
 
-  container.addEventListener('click', () => rollToModule());
+  // Click on dice cycles through core platform modules smoothly
+  container.addEventListener('click', () => {
+    const nextIdx = (CUBE_FACES.findIndex(f => Math.abs(f.rot.x - cube.rotation.x) < 0.2 && Math.abs(f.rot.y - cube.rotation.y) < 0.2) + 1) % CUBE_FACES.length;
+    const nextFace = CUBE_FACES[nextIdx];
+    if (typeof switchView === 'function' && nextFace.view) {
+      switchView(nextFace.view);
+    } else {
+      rotateToFace(nextFace.view);
+    }
+  });
 
   // Render loop
   function animate() {
     requestAnimationFrame(animate);
-    if (!isRolling) {
+    if (!isTransitioning) {
       if (isHovered) {
-        cube.rotation.y += (mouseX * 1.5 - cube.rotation.y % (Math.PI * 2)) * 0.05 + 0.005;
-        cube.rotation.x += (mouseY * 1.5 - cube.rotation.x % (Math.PI * 2)) * 0.05;
-        pointLight.intensity = 4.5;
+        cube.rotation.y += (mouseX * 1.2 - cube.rotation.y % (Math.PI * 2)) * 0.05 + 0.003;
+        cube.rotation.x += (mouseY * 1.2 - cube.rotation.x % (Math.PI * 2)) * 0.05;
+        pointLight.intensity = 4.8;
       } else {
         // Continuous slow idle float and spin
-        cube.rotation.y += 0.007;
-        cube.rotation.x = 0.28 + Math.sin(Date.now() * 0.0015) * 0.08;
-        pointLight.intensity = 3.2 + Math.sin(Date.now() * 0.002) * 0.6;
+        cube.rotation.y += 0.006;
+        cube.rotation.x = 0.24 + Math.sin(Date.now() * 0.0012) * 0.06;
+        pointLight.intensity = 3.6 + Math.sin(Date.now() * 0.002) * 0.5;
       }
     }
     renderer.render(scene, camera);
   }
   animate();
+
+  const instance = { rotateToFace };
+  ACTIVE_DICE_INSTANCES.push(instance);
+  return instance;
+}
+
+function rotateActiveDiceToView(viewName) {
+  ACTIVE_DICE_INSTANCES.forEach(inst => {
+    if (inst && typeof inst.rotateToFace === 'function') {
+      inst.rotateToFace(viewName);
+    }
+  });
 }
 
 function initAllHaulbox3DCubes() {
+  ACTIVE_DICE_INSTANCES = [];
   init3DCubeInstance('haulbox-3d-cube-container', 110);
-  init3DCubeInstance('haulbox-3d-cube-login', 150);
-  init3DCubeInstance('haulbox-3d-cube-driver-login', 140);
+  init3DCubeInstance('haulbox-3d-cube-login', 140);
+  init3DCubeInstance('haulbox-3d-cube-driver-login', 130);
 }
 
 // Auto-boot 3D cubes once DOM ready
