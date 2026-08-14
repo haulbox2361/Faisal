@@ -4344,163 +4344,181 @@ function triggerCountUpAnimations(){
 }
 
 /* =========================================================================
-   PREMIUM 3D HAULBOX ECOSYSTEM DICE (Integrated Icons & Smooth Navigation)
-   6 Module Faces:
-   Face 1: 🚚 Truck icon   -> Loads (loadboard)
-   Face 2: 🤖 AI icon      -> AI Analytics / Dashboard (dashboard / statistics)
-   Face 3: 📁 Folder icon  -> Documents (documents)
-   Face 4: 👨‍✈️ Driver icon  -> Drivers (drivers)
-   Face 5: 🎧 Headset icon -> Dispatch Communications / Chat (chat)
-   Face 6: 💲 Dollar icon   -> Payments & Settlements (driverpay)
+   LUXURY 3D HAULBOX NAVIGATION DICE (Genuine Extruded 3D Raised Geometry)
+   6 Platform Module Faces:
+   1: Truck (Loads / Freight / Dispatch -> loadboard)
+   2: AI Brain / Core (HaulBoX AI -> dashboard)
+   3: Documents Folder (Documents / BOL / POD -> documents)
+   4: Driver Aviator (Driver Portal / Management -> drivers)
+   5: Support Headset (Dispatch Support / Chat -> chat)
+   6: Currency Dollar (Payments / Settlements -> driverpay)
    ========================================================================= */
 
 const CUBE_FACES = [
-  { name: 'Loads', iconType: 'truck', view: 'loadboard', rot: { x: 0, y: -Math.PI / 2, z: 0 } },        // Right face
-  { name: 'Drivers', iconType: 'driver', view: 'drivers', rot: { x: 0, y: Math.PI / 2, z: 0 } },          // Left face
-  { name: 'Payments', iconType: 'dollar', view: 'driverpay', rot: { x: Math.PI / 2, y: 0, z: 0 } },        // Top face
-  { name: 'Documents', iconType: 'folder', view: 'documents', rot: { x: -Math.PI / 2, y: 0, z: 0 } },     // Bottom face
-  { name: 'AI & Intelligence', iconType: 'ai', view: 'dashboard', rot: { x: 0, y: 0, z: 0 } },           // Front face
-  { name: 'Communications', iconType: 'headset', view: 'chat', rot: { x: 0, y: Math.PI, z: 0 } }          // Back face
+  { name: 'Loads', view: 'loadboard', rot: { x: 0, y: -Math.PI / 2, z: 0 } },        // +X Right
+  { name: 'Drivers', view: 'drivers', rot: { x: 0, y: Math.PI / 2, z: 0 } },          // -X Left
+  { name: 'Payments', view: 'driverpay', rot: { x: Math.PI / 2, y: 0, z: 0 } },        // +Y Top
+  { name: 'Documents', view: 'documents', rot: { x: -Math.PI / 2, y: 0, z: 0 } },     // -Y Bottom
+  { name: 'HaulBoX AI', view: 'dashboard', rot: { x: 0, y: 0, z: 0 } },               // +Z Front
+  { name: 'Support', view: 'chat', rot: { x: 0, y: Math.PI, z: 0 } }                  // -Z Back
 ];
 
 let ACTIVE_DICE_INSTANCES = [];
 
-function drawIntegratedTechIcon(ctx, iconType) {
-  ctx.save();
-  ctx.translate(256, 256);
-  ctx.strokeStyle = '#38bdf8';
-  ctx.fillStyle = '#38bdf8';
-  ctx.shadowColor = '#0ea5e9';
-  ctx.shadowBlur = 28;
-  ctx.lineWidth = 14;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+// Helper to create bold 2D shapes for 3D extrusion
+function createIcon3DShapes() {
+  const shapes = {};
 
-  if (iconType === 'truck') {
-    // Futuristic aerodynamic Semi-Truck
-    ctx.beginPath();
-    ctx.strokeRect(-120, -60, 150, 110);
-    ctx.strokeRect(30, -20, 85, 70);
-    // Wheels
-    ctx.beginPath();
-    ctx.arc(-70, 65, 24, 0, Math.PI * 2);
-    ctx.arc(60, 65, 24, 0, Math.PI * 2);
-    ctx.stroke();
-    // Headlight laser
-    ctx.fillStyle = '#60a5fa';
-    ctx.fillRect(100, -10, 18, 12);
-  } else if (iconType === 'ai') {
-    // Cybernetic AI Brain Core & Nodes
-    ctx.beginPath();
-    ctx.arc(0, 0, 52, 0, Math.PI * 2);
-    ctx.stroke();
-    // Inner pulse core
-    ctx.fillStyle = '#0284c7';
-    ctx.beginPath();
-    ctx.arc(0, 0, 26, 0, Math.PI * 2);
-    ctx.fill();
-    // Surrounding neural network nodes
-    [0, 60, 120, 180, 240, 300].forEach(deg => {
-      const rad = deg * Math.PI / 180;
-      const nx = Math.cos(rad) * 95;
-      const ny = Math.sin(rad) * 95;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(nx, ny);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(nx, ny, 12, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  } else if (iconType === 'folder') {
-    // Sleek Cloud Storage / Documents Folder
-    ctx.beginPath();
-    ctx.moveTo(-110, -70);
-    ctx.lineTo(-40, -70);
-    ctx.lineTo(-10, -40);
-    ctx.lineTo(110, -40);
-    ctx.lineTo(110, 75);
-    ctx.lineTo(-110, 75);
-    ctx.closePath();
-    ctx.stroke();
-    // Laser file badge
-    ctx.strokeRect(-60, -15, 120, 60);
-  } else if (iconType === 'driver') {
-    // Driver Aviator & Identity
-    ctx.beginPath();
-    ctx.arc(0, -45, 42, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 80, 75, Math.PI * 1.15, Math.PI * 1.85);
-    ctx.stroke();
-  } else if (iconType === 'headset') {
-    // Modern Enterprise Support & Dispatch Headset
-    ctx.beginPath();
-    ctx.arc(0, -15, 75, Math.PI, 0);
-    ctx.stroke();
-    ctx.strokeRect(-95, -25, 26, 50);
-    ctx.strokeRect(69, -25, 26, 50);
-    ctx.beginPath();
-    ctx.moveTo(82, 25);
-    ctx.lineTo(82, 65);
-    ctx.lineTo(20, 65);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(10, 65, 12, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (iconType === 'dollar') {
-    // Fintech Currency / Settlements Core
-    ctx.beginPath();
-    ctx.arc(0, 0, 90, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.font = 'bold 120px "Inter", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillText('$', 0, 5);
-  }
-  ctx.restore();
+  // 1. Bold Futuristic Truck Shape
+  const truck = new THREE.Shape();
+  truck.moveTo(-0.55, -0.28);
+  truck.lineTo(-0.55, 0.28);
+  truck.lineTo(0.12, 0.28);
+  truck.lineTo(0.12, 0.08);
+  truck.lineTo(0.38, 0.08);
+  truck.lineTo(0.55, -0.12);
+  truck.lineTo(0.55, -0.28);
+  truck.closePath();
+  shapes.truck = truck;
+
+  // 2. Bold AI Brain / Neural Core Shape
+  const ai = new THREE.Shape();
+  ai.absarc(0, 0, 0.42, 0, Math.PI * 2, false);
+  shapes.ai = ai;
+
+  // 3. Bold Documents Folder Shape
+  const folder = new THREE.Shape();
+  folder.moveTo(-0.52, -0.36);
+  folder.lineTo(-0.52, 0.24);
+  folder.lineTo(-0.18, 0.24);
+  folder.lineTo(-0.04, 0.38);
+  folder.lineTo(0.52, 0.38);
+  folder.lineTo(0.52, -0.36);
+  folder.closePath();
+  shapes.folder = folder;
+
+  // 4. Bold Driver Aviator Head Shape
+  const driver = new THREE.Shape();
+  driver.absarc(0, 0.12, 0.28, 0, Math.PI * 2, false);
+  shapes.driver = driver;
+
+  // 5. Bold Support Headset Arc Shape
+  const headset = new THREE.Shape();
+  headset.moveTo(-0.46, -0.3);
+  headset.lineTo(-0.46, 0.05);
+  headset.absarc(0, 0.05, 0.46, Math.PI, 0, false);
+  headset.lineTo(0.46, -0.3);
+  headset.lineTo(0.34, -0.3);
+  headset.lineTo(0.34, 0.05);
+  headset.absarc(0, 0.05, 0.34, 0, Math.PI, true);
+  headset.lineTo(-0.34, -0.3);
+  headset.closePath();
+  shapes.headset = headset;
+
+  // 6. Bold Dollar Shape
+  const dollar = new THREE.Shape();
+  dollar.moveTo(-0.24, -0.38);
+  dollar.lineTo(0.24, -0.38);
+  dollar.lineTo(0.24, -0.20);
+  dollar.lineTo(-0.10, -0.20);
+  dollar.lineTo(-0.10, -0.06);
+  dollar.lineTo(0.24, -0.02);
+  dollar.lineTo(0.24, 0.38);
+  dollar.lineTo(-0.24, 0.38);
+  dollar.lineTo(-0.24, 0.20);
+  dollar.lineTo(0.10, 0.20);
+  dollar.lineTo(0.10, 0.06);
+  dollar.lineTo(-0.24, 0.02);
+  dollar.closePath();
+  shapes.dollar = dollar;
+
+  return shapes;
 }
 
-function createDiceFaceCanvas(iconType, label) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
+// Builds a genuine rounded luxury tech dice with extruded glossy 3D icons on all 6 faces
+function buildLuxuryDiceMesh() {
+  const diceGroup = new THREE.Group();
 
-  // Deep obsidian titanium gradient
-  const bgGrad = ctx.createRadialGradient(256, 256, 30, 256, 256, 340);
-  bgGrad.addColorStop(0, '#0c1322');
-  bgGrad.addColorStop(0.65, '#070b14');
-  bgGrad.addColorStop(1, '#020509');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, 512, 512);
+  // Dark obsidian titanium frame material with blue glass specular highlights
+  const diceBodyMat = new THREE.MeshPhysicalMaterial({
+    color: 0x070b14,
+    metalness: 0.92,
+    roughness: 0.18,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1,
+    reflectivity: 0.95
+  });
 
-  // Precision metallic rounded frame
-  ctx.lineWidth = 16;
-  ctx.strokeStyle = '#1e293b';
-  ctx.strokeRect(20, 20, 472, 472);
+  // Main Rounded Cube Body (1.45 size, slightly reduced for perfect navbar harmony)
+  const bodyGeom = new THREE.BoxGeometry(1.45, 1.45, 1.45, 8, 8, 8);
+  // Round vertex corners
+  const pos = bodyGeom.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    v.normalize().multiplyScalar(1.02);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  bodyGeom.computeVertexNormals();
 
-  // Frosted cyan bevel layer
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = '#0284c7';
-  ctx.shadowColor = '#38bdf8';
-  ctx.shadowBlur = 20;
-  ctx.strokeRect(40, 40, 432, 432);
-  ctx.shadowBlur = 0;
+  const bodyMesh = new THREE.Mesh(bodyGeom, diceBodyMat);
+  diceGroup.add(bodyMesh);
 
-  // Integrated geometric tech icon
-  drawIntegratedTechIcon(ctx, iconType);
+  // Inner illuminated neon core
+  const coreGeom = new THREE.SphereGeometry(0.55, 32, 32);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, transparent: true, opacity: 0.85 });
+  const coreMesh = new THREE.Mesh(coreGeom, coreMat);
+  diceGroup.add(coreMesh);
 
-  // Subtle label badge
-  ctx.font = '700 30px "Inter", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#94a3b8';
-  ctx.letterSpacing = '3px';
-  ctx.fillText(label.toUpperCase(), 256, 420);
+  // Bright glossy white extruded material with subtle cyan luminescence
+  const iconMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    emissive: 0x38bdf8,
+    emissiveIntensity: 0.35,
+    metalness: 0.15,
+    roughness: 0.1,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05
+  });
 
-  return canvas;
+  const extrudeSettings = {
+    depth: 0.14,
+    bevelEnabled: true,
+    bevelSegments: 4,
+    steps: 1,
+    bevelSize: 0.03,
+    bevelThickness: 0.03
+  };
+
+  const shapes = createIcon3DShapes();
+
+  // Attach 3D extruded icons raised and protruding outward on all 6 faces
+  const faceConfigs = [
+    { shape: shapes.truck, pos: [0.74, 0, 0], rot: [0, Math.PI / 2, 0], scale: 1.0 },       // +X Loads
+    { shape: shapes.driver, pos: [-0.74, 0, 0], rot: [0, -Math.PI / 2, 0], scale: 1.0 },    // -X Drivers
+    { shape: shapes.dollar, pos: [0, 0.74, 0], rot: [-Math.PI / 2, 0, 0], scale: 1.0 },     // +Y Payments
+    { shape: shapes.folder, pos: [0, -0.74, 0], rot: [Math.PI / 2, 0, 0], scale: 0.95 },     // -Y Documents
+    { shape: shapes.ai, pos: [0, 0, 0.74], rot: [0, 0, 0], scale: 0.95 },                   // +Z AI / Intelligence
+    { shape: shapes.headset, pos: [0, 0, -0.74], rot: [0, Math.PI, 0], scale: 0.95 }        // -Z Support
+  ];
+
+  faceConfigs.forEach(fc => {
+    if (!fc.shape) return;
+    const geom = new THREE.ExtrudeGeometry(fc.shape, extrudeSettings);
+    geom.center();
+    const mesh = new THREE.Mesh(geom, iconMat);
+    mesh.position.set(...fc.pos);
+    mesh.rotation.set(...fc.rot);
+    mesh.scale.set(fc.scale, fc.scale, fc.scale);
+    diceGroup.add(mesh);
+  });
+
+  // Add subtle glowing inner wireframe
+  const wireGeom = new THREE.BoxGeometry(1.48, 1.48, 1.48);
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.25 });
+  const wireCube = new THREE.Mesh(wireGeom, wireMat);
+  diceGroup.add(wireCube);
+
+  return { diceGroup, iconMat, wireMat };
 }
 
 function init3DCubeInstance(containerId, size) {
@@ -4508,12 +4526,12 @@ function init3DCubeInstance(containerId, size) {
   if (!container || !window.THREE) return;
   container.innerHTML = '';
 
-  const width = size || container.clientWidth || 110;
-  const height = size || container.clientHeight || 110;
+  const width = size || container.clientWidth || 100;
+  const height = size || container.clientHeight || 100;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-  camera.position.z = 4.4;
+  const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
+  camera.position.z = 4.2;
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(width, height);
@@ -4522,116 +4540,140 @@ function init3DCubeInstance(containerId, size) {
   renderer.domElement.style.cursor = 'pointer';
   container.appendChild(renderer.domElement);
 
-  // Lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+  // Luxury Studio Lights
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.6);
   scene.add(ambientLight);
 
-  const keyLight = new THREE.DirectionalLight(0x38bdf8, 3.0);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 3.4);
   keyLight.position.set(4, 5, 6);
   scene.add(keyLight);
 
-  const fillLight = new THREE.DirectionalLight(0x2563eb, 2.0);
-  fillLight.position.set(-4, -3, 2);
-  scene.add(fillLight);
+  const rimLight = new THREE.DirectionalLight(0x38bdf8, 2.5);
+  rimLight.position.set(-4, -3, 3);
+  scene.add(rimLight);
 
-  const pointLight = new THREE.PointLight(0x0ea5e9, 4.0, 10);
-  pointLight.position.set(0, 0, 1.6);
+  const pointLight = new THREE.PointLight(0x0ea5e9, 3.5, 10);
+  pointLight.position.set(0, 0, 1.8);
   scene.add(pointLight);
 
-  // Materials with 6 integrated faces
-  const materials = [
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('truck', 'Loads')), roughness: 0.2, metalness: 0.88 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('driver', 'Drivers')), roughness: 0.2, metalness: 0.88 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('dollar', 'Payments')), roughness: 0.2, metalness: 0.88 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('folder', 'Documents')), roughness: 0.2, metalness: 0.88 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('ai', 'HaulBoX AI')), roughness: 0.2, metalness: 0.88 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createDiceFaceCanvas('headset', 'Dispatch')), roughness: 0.2, metalness: 0.88 })
-  ];
-
-  const geometry = new THREE.BoxGeometry(1.8, 1.8, 1.8);
-  const cube = new THREE.Mesh(geometry, materials);
-  scene.add(cube);
-
-  // Glowing cyber outer cage
-  const wireGeom = new THREE.BoxGeometry(1.86, 1.86, 1.86);
-  const wireMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.35 });
-  const wireCube = new THREE.Mesh(wireGeom, wireMat);
-  cube.add(wireCube);
+  const { diceGroup, iconMat, wireMat } = buildLuxuryDiceMesh();
+  scene.add(diceGroup);
 
   let mouseX = 0, mouseY = 0;
   let isHovered = false;
   let isTransitioning = false;
+  let activeView = 'dashboard';
 
   container.addEventListener('mouseenter', () => { isHovered = true; });
   container.addEventListener('mouseleave', () => { isHovered = false; mouseX = 0; mouseY = 0; });
   container.addEventListener('mousemove', (e) => {
     const rect = container.getBoundingClientRect();
-    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.6;
-    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.6;
+    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.5;
+    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.5;
   });
 
-  // Smooth rotation directly to target face (no random spinning)
+  // Smooth rotation directly to target face on page change
   function rotateToFace(targetView) {
+    activeView = targetView;
     if (isTransitioning) return;
     const face = CUBE_FACES.find(f => f.view === targetView) || CUBE_FACES[4];
     isTransitioning = true;
 
-    const startX = cube.rotation.x;
-    const startY = cube.rotation.y;
-    const startZ = cube.rotation.z;
+    const startX = diceGroup.rotation.x;
+    const startY = diceGroup.rotation.y;
+    const startZ = diceGroup.rotation.z;
     const startTime = performance.now();
     const duration = 650; // Smooth 650ms enterprise transition
 
-    wireMat.opacity = 0.8;
+    iconMat.emissiveIntensity = 0.8;
     pointLight.intensity = 5.5;
 
     function anim(now) {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
       const ease = 1 - Math.pow(1 - progress, 3);
-      cube.rotation.x = startX + (face.rot.x - startX) * ease;
-      cube.rotation.y = startY + (face.rot.y - startY) * ease;
-      cube.rotation.z = startZ + (0 - startZ) * ease;
+      diceGroup.rotation.x = startX + (face.rot.x - startX) * ease;
+      diceGroup.rotation.y = startY + (face.rot.y - startY) * ease;
+      diceGroup.rotation.z = startZ + (0 - startZ) * ease;
 
       if (progress < 1) {
         requestAnimationFrame(anim);
       } else {
-        cube.rotation.x = face.rot.x;
-        cube.rotation.y = face.rot.y;
-        cube.rotation.z = 0;
-        wireMat.opacity = 0.35;
-        pointLight.intensity = 3.8;
+        diceGroup.rotation.x = face.rot.x;
+        diceGroup.rotation.y = face.rot.y;
+        diceGroup.rotation.z = 0;
+        iconMat.emissiveIntensity = 0.35;
+        pointLight.intensity = 3.5;
         isTransitioning = false;
       }
     }
     requestAnimationFrame(anim);
   }
 
-  // Click on dice cycles through core platform modules smoothly
+  // Click on dice triggers a smooth multi-axis 360 rotation and returns to current active face
   container.addEventListener('click', () => {
-    const nextIdx = (CUBE_FACES.findIndex(f => Math.abs(f.rot.x - cube.rotation.x) < 0.2 && Math.abs(f.rot.y - cube.rotation.y) < 0.2) + 1) % CUBE_FACES.length;
-    const nextFace = CUBE_FACES[nextIdx];
-    if (typeof switchView === 'function' && nextFace.view) {
-      switchView(nextFace.view);
-    } else {
-      rotateToFace(nextFace.view);
+    if (isTransitioning) return;
+    isTransitioning = true;
+
+    const face = CUBE_FACES.find(f => f.view === activeView) || CUBE_FACES[4];
+    const startX = diceGroup.rotation.x;
+    const startY = diceGroup.rotation.y;
+    const startZ = diceGroup.rotation.z;
+    const destX = face.rot.x + Math.PI * 2;
+    const destY = face.rot.y + Math.PI * 2;
+    const startTime = performance.now();
+    const duration = 750;
+
+    iconMat.emissiveIntensity = 1.0;
+    pointLight.intensity = 6.5;
+
+    function animClick(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      diceGroup.rotation.x = startX + (destX - startX) * ease;
+      diceGroup.rotation.y = startY + (destY - startY) * ease;
+      diceGroup.rotation.z = startZ + Math.sin(progress * Math.PI) * 0.4;
+
+      const scale = 1 + Math.sin(progress * Math.PI) * 0.12;
+      diceGroup.scale.set(scale, scale, scale);
+
+      if (progress < 1) {
+        requestAnimationFrame(animClick);
+      } else {
+        diceGroup.rotation.x = face.rot.x;
+        diceGroup.rotation.y = face.rot.y;
+        diceGroup.rotation.z = 0;
+        diceGroup.scale.set(1, 1, 1);
+        iconMat.emissiveIntensity = 0.35;
+        pointLight.intensity = 3.5;
+        isTransitioning = false;
+      }
     }
+    requestAnimationFrame(animClick);
   });
 
-  // Render loop
+  // Continuous simultaneous idle floating + multi-axis breathing motion
   function animate() {
     requestAnimationFrame(animate);
+    const time = Date.now() * 0.0012;
+    
+    // Continuous subtle floating & breathing
+    diceGroup.position.y = Math.sin(time * 1.5) * 0.05;
+    
     if (!isTransitioning) {
       if (isHovered) {
-        cube.rotation.y += (mouseX * 1.2 - cube.rotation.y % (Math.PI * 2)) * 0.05 + 0.003;
-        cube.rotation.x += (mouseY * 1.2 - cube.rotation.x % (Math.PI * 2)) * 0.05;
+        diceGroup.rotation.y += (mouseX * 1.0 - diceGroup.rotation.y % (Math.PI * 2)) * 0.05 + 0.002;
+        diceGroup.rotation.x += (mouseY * 1.0 - diceGroup.rotation.x % (Math.PI * 2)) * 0.05;
+        diceGroup.scale.set(1.03, 1.03, 1.03);
         pointLight.intensity = 4.8;
       } else {
-        // Continuous slow idle float and spin
-        cube.rotation.y += 0.006;
-        cube.rotation.x = 0.24 + Math.sin(Date.now() * 0.0012) * 0.06;
-        pointLight.intensity = 3.6 + Math.sin(Date.now() * 0.002) * 0.5;
+        // Continuous simultaneous multi-axis living motion
+        diceGroup.rotation.y += 0.004;
+        diceGroup.rotation.x += Math.sin(time * 0.8) * 0.0015;
+        diceGroup.rotation.z = Math.sin(time * 0.5) * 0.02;
+        diceGroup.scale.set(1, 1, 1);
+        pointLight.intensity = 3.4 + Math.sin(time * 2.0) * 0.4;
       }
     }
     renderer.render(scene, camera);
@@ -4653,9 +4695,9 @@ function rotateActiveDiceToView(viewName) {
 
 function initAllHaulbox3DCubes() {
   ACTIVE_DICE_INSTANCES = [];
-  init3DCubeInstance('haulbox-3d-cube-container', 110);
-  init3DCubeInstance('haulbox-3d-cube-login', 140);
-  init3DCubeInstance('haulbox-3d-cube-driver-login', 130);
+  init3DCubeInstance('haulbox-3d-cube-container', 95);
+  init3DCubeInstance('haulbox-3d-cube-login', 130);
+  init3DCubeInstance('haulbox-3d-cube-driver-login', 120);
 }
 
 // Auto-boot 3D cubes once DOM ready

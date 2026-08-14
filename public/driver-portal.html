@@ -2253,60 +2253,135 @@ function promptUploadFreightPictures(loadId, key) {
 }
 
 /* =========================================================================
-   INTERACTIVE THREE.JS 3D HAULBOX ECOSYSTEM CUBE (DRIVER PORTAL)
+   LUXURY 3D HAULBOX NAVIGATION DICE (DRIVER PORTAL)
    ========================================================================= */
 
-const CUBE_FACES_DP = [
-  { name: 'Loads', icon: '🚚', page: 'loads', rot: { x: 0, y: -Math.PI / 2, z: 0 } },
-  { name: 'Home', icon: '⚡', page: 'current', rot: { x: 0, y: Math.PI / 2, z: 0 } },
-  { name: 'Settlements', icon: '💰', page: 'pay', rot: { x: Math.PI / 2, y: 0, z: 0 } },
-  { name: 'Documents', icon: '📄', page: 'docs', rot: { x: -Math.PI / 2, y: 0, z: 0 } },
-  { name: 'Loads', icon: '🚚', page: 'loads', rot: { x: 0, y: 0, z: 0 } },
-  { name: 'Chat', icon: '💬', page: 'chat', rot: { x: 0, y: Math.PI, z: 0 } }
-];
+function createIcon3DShapesDP() {
+  const shapes = {};
 
-function createFaceCanvasDP(icon, label) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
+  // Truck
+  const truck = new THREE.Shape();
+  truck.moveTo(-0.55, -0.28);
+  truck.lineTo(-0.55, 0.28);
+  truck.lineTo(0.12, 0.28);
+  truck.lineTo(0.12, 0.08);
+  truck.lineTo(0.38, 0.08);
+  truck.lineTo(0.55, -0.12);
+  truck.lineTo(0.55, -0.28);
+  truck.closePath();
+  shapes.truck = truck;
 
-  const bgGrad = ctx.createRadialGradient(256, 256, 50, 256, 256, 320);
-  bgGrad.addColorStop(0, '#0f172a');
-  bgGrad.addColorStop(0.7, '#090d16');
-  bgGrad.addColorStop(1, '#030712');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, 512, 512);
+  // Driver Aviator
+  const driver = new THREE.Shape();
+  driver.absarc(0, 0.12, 0.28, 0, Math.PI * 2, false);
+  shapes.driver = driver;
 
-  ctx.lineWidth = 14;
-  ctx.strokeStyle = '#1e293b';
-  ctx.strokeRect(16, 16, 480, 480);
+  // Folder
+  const folder = new THREE.Shape();
+  folder.moveTo(-0.52, -0.36);
+  folder.lineTo(-0.52, 0.24);
+  folder.lineTo(-0.18, 0.24);
+  folder.lineTo(-0.04, 0.38);
+  folder.lineTo(0.52, 0.38);
+  folder.lineTo(0.52, -0.36);
+  folder.closePath();
+  shapes.folder = folder;
 
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = '#10b981';
-  ctx.shadowColor = '#34d399';
-  ctx.shadowBlur = 18;
-  ctx.strokeRect(36, 36, 440, 440);
-  ctx.shadowBlur = 0;
+  // Dollar
+  const dollar = new THREE.Shape();
+  dollar.moveTo(-0.24, -0.38);
+  dollar.lineTo(0.24, -0.38);
+  dollar.lineTo(0.24, -0.20);
+  dollar.lineTo(-0.10, -0.20);
+  dollar.lineTo(-0.10, -0.06);
+  dollar.lineTo(0.24, -0.02);
+  dollar.lineTo(0.24, 0.38);
+  dollar.lineTo(-0.24, 0.38);
+  dollar.lineTo(-0.24, 0.20);
+  dollar.lineTo(0.10, 0.20);
+  dollar.lineTo(0.10, 0.06);
+  dollar.lineTo(-0.24, 0.02);
+  dollar.closePath();
+  shapes.dollar = dollar;
 
-  ctx.fillStyle = '#34d399';
-  [[42, 42], [470, 42], [42, 470], [470, 470]].forEach(([cx, cy]) => {
-    ctx.fillRect(cx - 8, cy - 8, 16, 16);
+  // Support Headset
+  const headset = new THREE.Shape();
+  headset.moveTo(-0.46, -0.3);
+  headset.lineTo(-0.46, 0.05);
+  headset.absarc(0, 0.05, 0.46, Math.PI, 0, false);
+  headset.lineTo(0.46, -0.3);
+  headset.lineTo(0.34, -0.3);
+  headset.lineTo(0.34, 0.05);
+  headset.absarc(0, 0.05, 0.34, 0, Math.PI, true);
+  headset.lineTo(-0.34, -0.3);
+  headset.closePath();
+  shapes.headset = headset;
+
+  return shapes;
+}
+
+function buildLuxuryDiceMeshDP() {
+  const diceGroup = new THREE.Group();
+
+  const diceBodyMat = new THREE.MeshPhysicalMaterial({
+    color: 0x070b14,
+    metalness: 0.92,
+    roughness: 0.18,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1
   });
 
-  ctx.font = '160px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = '#10b981';
-  ctx.shadowBlur = 24;
-  ctx.fillText(icon, 256, 230);
-  ctx.shadowBlur = 0;
+  const bodyGeom = new THREE.BoxGeometry(1.45, 1.45, 1.45, 8, 8, 8);
+  const pos = bodyGeom.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    v.normalize().multiplyScalar(1.02);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  bodyGeom.computeVertexNormals();
 
-  ctx.font = 'bold 36px "Inter", sans-serif';
-  ctx.fillStyle = '#f8fafc';
-  ctx.fillText(label.toUpperCase(), 256, 380);
+  const bodyMesh = new THREE.Mesh(bodyGeom, diceBodyMat);
+  diceGroup.add(bodyMesh);
 
-  return canvas;
+  const iconMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    emissive: 0x10b981,
+    emissiveIntensity: 0.35,
+    metalness: 0.15,
+    roughness: 0.1,
+    clearcoat: 1.0
+  });
+
+  const extrudeSettings = {
+    depth: 0.14,
+    bevelEnabled: true,
+    bevelSegments: 4,
+    steps: 1,
+    bevelSize: 0.03,
+    bevelThickness: 0.03
+  };
+
+  const shapes = createIcon3DShapesDP();
+  const faceConfigs = [
+    { shape: shapes.truck, pos: [0.74, 0, 0], rot: [0, Math.PI / 2, 0] },
+    { shape: shapes.driver, pos: [-0.74, 0, 0], rot: [0, -Math.PI / 2, 0] },
+    { shape: shapes.dollar, pos: [0, 0.74, 0], rot: [-Math.PI / 2, 0, 0] },
+    { shape: shapes.folder, pos: [0, -0.74, 0], rot: [Math.PI / 2, 0, 0] },
+    { shape: shapes.truck, pos: [0, 0, 0.74], rot: [0, 0, 0] },
+    { shape: shapes.headset, pos: [0, 0, -0.74], rot: [0, Math.PI, 0] }
+  ];
+
+  faceConfigs.forEach(fc => {
+    if (!fc.shape) return;
+    const geom = new THREE.ExtrudeGeometry(fc.shape, extrudeSettings);
+    geom.center();
+    const mesh = new THREE.Mesh(geom, iconMat);
+    mesh.position.set(...fc.pos);
+    mesh.rotation.set(...fc.rot);
+    diceGroup.add(mesh);
+  });
+
+  return { diceGroup, iconMat };
 }
 
 function init3DCubeInstanceDP(containerId, size) {
@@ -2314,132 +2389,59 @@ function init3DCubeInstanceDP(containerId, size) {
   if (!container || !window.THREE) return;
   container.innerHTML = '';
 
-  const width = size || container.clientWidth || 100;
-  const height = size || container.clientHeight || 100;
+  const width = size || container.clientWidth || 48;
+  const height = size || container.clientHeight || 48;
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-  camera.position.z = 4.4;
+  const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
+  camera.position.z = 4.2;
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.domElement.style.outline = 'none';
-  renderer.domElement.style.userSelect = 'none';
   renderer.domElement.style.cursor = 'pointer';
   container.appendChild(renderer.domElement);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.6);
   scene.add(ambientLight);
 
-  const keyLight = new THREE.DirectionalLight(0x34d399, 2.8);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
   keyLight.position.set(4, 5, 6);
   scene.add(keyLight);
 
-  const fillLight = new THREE.DirectionalLight(0x059669, 1.8);
-  fillLight.position.set(-4, -3, 2);
-  scene.add(fillLight);
-
   const pointLight = new THREE.PointLight(0x10b981, 3.5, 10);
-  pointLight.position.set(0, 0, 1.5);
+  pointLight.position.set(0, 0, 1.8);
   scene.add(pointLight);
 
-  const materials = [
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvasDP('🚚', 'Loads')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvasDP('⚡', 'Home')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvasDP('💰', 'Pay')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvasDP('📄', 'Docs')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvasDP('🚚', 'Loads')), roughness: 0.25, metalness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvasDP('💬', 'Chat')), roughness: 0.25, metalness: 0.85 })
-  ];
-
-  const geometry = new THREE.BoxGeometry(1.8, 1.8, 1.8);
-  const cube = new THREE.Mesh(geometry, materials);
-  scene.add(cube);
-
-  const wireGeom = new THREE.BoxGeometry(1.86, 1.86, 1.86);
-  const wireMat = new THREE.MeshBasicMaterial({ color: 0x34d399, wireframe: true, transparent: true, opacity: 0.35 });
-  const wireCube = new THREE.Mesh(wireGeom, wireMat);
-  cube.add(wireCube);
+  const { diceGroup, iconMat } = buildLuxuryDiceMeshDP();
+  scene.add(diceGroup);
 
   let mouseX = 0, mouseY = 0;
   let isHovered = false;
-  let isRolling = false;
 
   container.addEventListener('mouseenter', () => { isHovered = true; });
   container.addEventListener('mouseleave', () => { isHovered = false; mouseX = 0; mouseY = 0; });
   container.addEventListener('mousemove', (e) => {
     const rect = container.getBoundingClientRect();
-    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.7;
-    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.7;
+    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.5;
+    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.5;
   });
-
-  function rollToModuleDP() {
-    if (isRolling) return;
-    isRolling = true;
-
-    const targetIdx = Math.floor(Math.random() * CUBE_FACES_DP.length);
-    const chosenFace = CUBE_FACES_DP[targetIdx];
-
-    const spinLoopsX = (Math.floor(Math.random() * 2) + 2) * Math.PI * 2;
-    const spinLoopsY = (Math.floor(Math.random() * 2) + 2) * Math.PI * 2;
-    const destX = chosenFace.rot.x + spinLoopsX;
-    const destY = chosenFace.rot.y + spinLoopsY;
-
-    const startX = cube.rotation.x;
-    const startY = cube.rotation.y;
-    const startZ = cube.rotation.z;
-    const startTime = performance.now();
-    const duration = 900;
-
-    wireMat.opacity = 0.95;
-    pointLight.intensity = 7;
-
-    function animRoll(now) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      cube.rotation.x = startX + (destX - startX) * ease;
-      cube.rotation.y = startY + (destY - startY) * ease;
-      cube.rotation.z = startZ * (1 - ease);
-
-      const scaleVal = 1 + Math.sin(progress * Math.PI) * 0.18;
-      cube.scale.set(scaleVal, scaleVal, scaleVal);
-
-      if (progress < 1) {
-        requestAnimationFrame(animRoll);
-      } else {
-        cube.rotation.x = chosenFace.rot.x;
-        cube.rotation.y = chosenFace.rot.y;
-        cube.rotation.z = 0;
-        cube.scale.set(1, 1, 1);
-        wireMat.opacity = 0.35;
-        pointLight.intensity = 3.5;
-        isRolling = false;
-        
-        toast(`${chosenFace.icon} ${chosenFace.name}`);
-        if (typeof setDriverPortalPage === 'function' && chosenFace.page) {
-          setDriverPortalPage(chosenFace.page);
-        }
-      }
-    }
-    requestAnimationFrame(animRoll);
-  }
-
-  container.addEventListener('click', rollToModuleDP);
 
   function animate() {
     requestAnimationFrame(animate);
-    if (!isRolling) {
-      if (isHovered) {
-        cube.rotation.y += (mouseX * 1.5 - cube.rotation.y % (Math.PI * 2)) * 0.05 + 0.005;
-        cube.rotation.x += (mouseY * 1.5 - cube.rotation.x % (Math.PI * 2)) * 0.05;
-        pointLight.intensity = 4.5;
-      } else {
-        cube.rotation.y += 0.007;
-        cube.rotation.x = 0.28 + Math.sin(Date.now() * 0.0015) * 0.08;
-        pointLight.intensity = 3.2 + Math.sin(Date.now() * 0.002) * 0.6;
-      }
+    const time = Date.now() * 0.0012;
+    diceGroup.position.y = Math.sin(time * 1.5) * 0.05;
+
+    if (isHovered) {
+      diceGroup.rotation.y += (mouseX * 1.0 - diceGroup.rotation.y % (Math.PI * 2)) * 0.05 + 0.002;
+      diceGroup.rotation.x += (mouseY * 1.0 - diceGroup.rotation.x % (Math.PI * 2)) * 0.05;
+      diceGroup.scale.set(1.03, 1.03, 1.03);
+    } else {
+      diceGroup.rotation.y += 0.004;
+      diceGroup.rotation.x += Math.sin(time * 0.8) * 0.0015;
+      diceGroup.rotation.z = Math.sin(time * 0.5) * 0.02;
+      diceGroup.scale.set(1, 1, 1);
     }
     renderer.render(scene, camera);
   }
@@ -2447,8 +2449,8 @@ function init3DCubeInstanceDP(containerId, size) {
 }
 
 function initAllDP3DCubes() {
-  init3DCubeInstanceDP('dp-3d-cube-header', 46);
-  init3DCubeInstanceDP('dp-3d-cube-login', 130);
+  init3DCubeInstanceDP('dp-3d-cube-header', 44);
+  init3DCubeInstanceDP('dp-3d-cube-login', 120);
 }
 
 if (document.readyState === 'loading') {
