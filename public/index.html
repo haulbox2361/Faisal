@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -1587,11 +1588,7 @@ table.data tbody tr.new-row-animate {
 <!-- ============ LOGIN GATE (mock Google OAuth) ============ -->
 <div id="login-gate">
   <div class="login-card">
-    <div class="login-mark" id="login-mark" onclick="spinCube(this)" title="Click to spin">
-      <img src="assets/haulbox-logo-icon.png" alt="HaulBoX">
-    </div>
-    <div class="login-brand-title">Haul<span>BoX</span></div>
-    <p style="margin-top:2px;">Dispatch Command · sign in to continue</p>
+    <div id="haulbox-3d-cube-login" style="width:160px;height:160px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Click to roll modules: Loads, Drivers, Payments, Docs, Chat, Analytics"></div>
     <button class="google-btn" id="google-signin-btn" onclick="mockGoogleLogin()">
       <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34 5.1 29.3 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34 5.1 29.3 3 24 3 16.3 3 9.6 7.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 36.4 26.7 37 24 37c-5.3 0-9.6-3.4-11.3-8.1l-6.5 5C9.5 40.6 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.2 5.2C40.9 36 44 30.7 44 24c0-1.2-.1-2.4-.4-3.5z"/></svg>
       Sign in with Google
@@ -1605,11 +1602,7 @@ table.data tbody tr.new-row-animate {
 <!-- ============ DRIVER LOGIN GATE ============ -->
 <div id="driver-login-gate" style="display:none;">
   <div class="login-card">
-    <div class="login-mark" id="driver-login-mark" onclick="spinCube(this)" title="Click to spin">
-      <img src="assets/haulbox-logo-icon.png" alt="HaulBoX">
-    </div>
-    <div class="login-brand-title">Haul<span>BoX</span></div>
-    <p style="margin-top:2px;">Driver Login · check your loads &amp; pay</p>
+    <div id="haulbox-3d-cube-driver-login" style="width:150px;height:150px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Click to roll modules: Loads, Drivers, Payments, Docs, Chat, Analytics"></div>
     <form onsubmit="return driverLoginSubmit(event)" style="display:flex;flex-direction:column;gap:10px;text-align:left;">
       <div class="field"><label>Driver ID</label><input type="text" id="drv-login-id" autocomplete="off" autocapitalize="characters" placeholder="e.g. D4821" required></div>
       <div class="field"><label>PIN</label><input type="password" id="drv-login-pin" autocomplete="off" inputmode="numeric" maxlength="4" placeholder="4-digit PIN" required></div>
@@ -1785,11 +1778,8 @@ table.data tbody tr.new-row-animate {
 <div id="app" style="display:none;">
   <!-- ============ SIDEBAR ============ -->
   <aside id="sidebar" style="background:#0F172A;border-right:1px solid #1E293B;color:#F8FAFC;">
-    <div class="brand" style="padding:22px 18px;border-bottom:1px solid #1E293B;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
-      <div style="width:72px;height:72px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:8px;" onclick="spinCube(this)" title="Click to spin">
-        <img src="assets/haulbox-logo-icon.png" alt="HaulBoX" class="cube-3d-logo">
-      </div>
-      <div style="font-family:'Oswald',sans-serif;font-weight:700;font-size:20px;letter-spacing:.02em;line-height:1;color:#ffffff;">Haul<span style="color:#0284c7;">BoX</span></div>
+    <div class="brand" style="padding:14px 10px;border-bottom:1px solid #1E293B;display:flex;align-items:center;justify-content:center;position:relative;">
+      <div id="haulbox-3d-cube-container" style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Click to roll modules: Loads, Drivers, Payments, Docs, Chat, Analytics"></div>
     </div>
     <nav class="mainnav" id="mainnav" style="padding:14px 10px;">
       <div class="nav-item active" data-view="dashboard">
@@ -4349,13 +4339,238 @@ function triggerCountUpAnimations(){
   });
 }
 
-function spinCube(el){
-  if(!el) return;
-  const img = el.querySelector('img') || el;
-  img.classList.remove('cube-spin-pulse');
-  void img.offsetWidth; // trigger reflow
-  img.classList.add('cube-spin-pulse');
-  setTimeout(() => img.classList.remove('cube-spin-pulse'), 780);
+/* =========================================================================
+   INTERACTIVE THREE.JS 3D HAULBOX ECOSYSTEM CUBE
+   6 Module Faces:
+   1: Loads (🚚) -> loadboard
+   2: Drivers (👨‍✈️) -> drivers
+   3: Payments (💰) -> driverpay
+   4: Documents (📄) -> documents
+   5: Chat (💬) -> chat
+   6: Analytics (📊) -> statistics
+   ========================================================================= */
+
+const CUBE_FACES = [
+  { name: 'Loads', icon: '🚚', view: 'loadboard', rot: { x: 0, y: -Math.PI / 2, z: 0 } },       // Right face (index 0)
+  { name: 'Drivers', icon: '👨‍✈️', view: 'drivers', rot: { x: 0, y: Math.PI / 2, z: 0 } },        // Left face (index 1)
+  { name: 'Payments', icon: '💰', view: 'driverpay', rot: { x: Math.PI / 2, y: 0, z: 0 } },       // Top face (index 2)
+  { name: 'Documents', icon: '📄', view: 'documents', rot: { x: -Math.PI / 2, y: 0, z: 0 } },     // Bottom face (index 3)
+  { name: 'Loads', icon: '🚚', view: 'loadboard', rot: { x: 0, y: 0, z: 0 } },                    // Front face (index 4)
+  { name: 'Analytics', icon: '📊', view: 'statistics', rot: { x: 0, y: Math.PI, z: 0 } }          // Back face (index 5)
+];
+
+function createFaceCanvas(icon, label, isDark) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Deep metallic titanium base
+  const bgGrad = ctx.createRadialGradient(256, 256, 50, 256, 256, 320);
+  bgGrad.addColorStop(0, '#0f172a');
+  bgGrad.addColorStop(0.7, '#090d16');
+  bgGrad.addColorStop(1, '#030712');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Beveled outer metallic border
+  ctx.lineWidth = 14;
+  ctx.strokeStyle = '#1e293b';
+  ctx.strokeRect(16, 16, 480, 480);
+
+  // Electric cyan inner neon circuit
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = '#0284c7';
+  ctx.shadowColor = '#38bdf8';
+  ctx.shadowBlur = 18;
+  ctx.strokeRect(36, 36, 440, 440);
+  ctx.shadowBlur = 0; // reset
+
+  // Corner tech notches
+  ctx.fillStyle = '#38bdf8';
+  [[42, 42], [470, 42], [42, 470], [470, 470]].forEach(([cx, cy]) => {
+    ctx.fillRect(cx - 8, cy - 8, 16, 16);
+  });
+
+  // Center glowing module icon
+  ctx.font = '160px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#0ea5e9';
+  ctx.shadowBlur = 24;
+  ctx.fillText(icon, 256, 230);
+  ctx.shadowBlur = 0;
+
+  // Modern sleek typography label
+  ctx.font = 'bold 36px "Inter", sans-serif';
+  ctx.fillStyle = '#f8fafc';
+  ctx.letterSpacing = '4px';
+  ctx.fillText(label.toUpperCase(), 256, 380);
+
+  return canvas;
+}
+
+function init3DCubeInstance(containerId, size) {
+  const container = document.getElementById(containerId);
+  if (!container || !window.THREE) return;
+  container.innerHTML = '';
+
+  const width = size || container.clientWidth || 120;
+  const height = size || container.clientHeight || 120;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+  camera.position.z = 4.4;
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(width, height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.domElement.style.outline = 'none';
+  renderer.domElement.style.userSelect = 'none';
+  renderer.domElement.style.cursor = 'pointer';
+  container.appendChild(renderer.domElement);
+
+  // Lighting
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+  scene.add(ambientLight);
+
+  const keyLight = new THREE.DirectionalLight(0x38bdf8, 2.8);
+  keyLight.position.set(4, 5, 6);
+  scene.add(keyLight);
+
+  const fillLight = new THREE.DirectionalLight(0x2563eb, 1.8);
+  fillLight.position.set(-4, -3, 2);
+  scene.add(fillLight);
+
+  const pointLight = new THREE.PointLight(0x0ea5e9, 3.5, 10);
+  pointLight.position.set(0, 0, 1.5);
+  scene.add(pointLight);
+
+  // Materials for 6 faces
+  const materials = [
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('🚚', 'Loads')), roughness: 0.25, metalness: 0.85 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('👨‍✈️', 'Drivers')), roughness: 0.25, metalness: 0.85 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('💰', 'Payments')), roughness: 0.25, metalness: 0.85 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('📄', 'Documents')), roughness: 0.25, metalness: 0.85 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('💬', 'Chat')), roughness: 0.25, metalness: 0.85 }),
+    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(createFaceCanvas('📊', 'Analytics')), roughness: 0.25, metalness: 0.85 })
+  ];
+
+  const geometry = new THREE.BoxGeometry(1.8, 1.8, 1.8);
+  const cube = new THREE.Mesh(geometry, materials);
+  scene.add(cube);
+
+  // Add glowing wireframe cage
+  const wireGeom = new THREE.BoxGeometry(1.86, 1.86, 1.86);
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.35 });
+  const wireCube = new THREE.Mesh(wireGeom, wireMat);
+  cube.add(wireCube);
+
+  let mouseX = 0, mouseY = 0;
+  let isHovered = false;
+  let isRolling = false;
+  let targetRot = { x: 0.35, y: 0.55 };
+
+  container.addEventListener('mouseenter', () => { isHovered = true; });
+  container.addEventListener('mouseleave', () => { isHovered = false; mouseX = 0; mouseY = 0; });
+  container.addEventListener('mousemove', (e) => {
+    const rect = container.getBoundingClientRect();
+    mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.7;
+    mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.7;
+  });
+
+  // Roll dice on click
+  function rollToModule(viewTarget) {
+    if (isRolling) return;
+    isRolling = true;
+
+    // Pick random face or match target view
+    const targetIdx = viewTarget ? CUBE_FACES.findIndex(f => f.view === viewTarget) : Math.floor(Math.random() * CUBE_FACES.length);
+    const chosenFace = CUBE_FACES[targetIdx >= 0 ? targetIdx : 4];
+
+    // Spins: 2-3 full 360 loops + target landing
+    const spinLoopsX = (Math.floor(Math.random() * 2) + 2) * Math.PI * 2;
+    const spinLoopsY = (Math.floor(Math.random() * 2) + 2) * Math.PI * 2;
+    const destX = chosenFace.rot.x + spinLoopsX;
+    const destY = chosenFace.rot.y + spinLoopsY;
+
+    const startX = cube.rotation.x;
+    const startY = cube.rotation.y;
+    const startZ = cube.rotation.z;
+    const startTime = performance.now();
+    const duration = 900; // 900ms fast, satisfying dice roll
+
+    // Blue energy pulse flash
+    wireMat.opacity = 0.95;
+    pointLight.intensity = 7;
+
+    function animRoll(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out elastic/back
+      const ease = 1 - Math.pow(1 - progress, 3);
+      cube.rotation.x = startX + (destX - startX) * ease;
+      cube.rotation.y = startY + (destY - startY) * ease;
+      cube.rotation.z = startZ * (1 - ease);
+
+      // Bounce scale
+      const scaleVal = 1 + Math.sin(progress * Math.PI) * 0.18;
+      cube.scale.set(scaleVal, scaleVal, scaleVal);
+
+      if (progress < 1) {
+        requestAnimationFrame(animRoll);
+      } else {
+        cube.rotation.x = chosenFace.rot.x;
+        cube.rotation.y = chosenFace.rot.y;
+        cube.rotation.z = 0;
+        cube.scale.set(1, 1, 1);
+        wireMat.opacity = 0.35;
+        pointLight.intensity = 3.5;
+        isRolling = false;
+        
+        // Trigger Toast & Navigate
+        toast('3D Module Navigation', `${chosenFace.icon} ${chosenFace.name}`, true);
+        if (typeof switchView === 'function' && chosenFace.view) {
+          switchView(chosenFace.view);
+        }
+      }
+    }
+    requestAnimationFrame(animRoll);
+  }
+
+  container.addEventListener('click', () => rollToModule());
+
+  // Render loop
+  function animate() {
+    requestAnimationFrame(animate);
+    if (!isRolling) {
+      if (isHovered) {
+        cube.rotation.y += (mouseX * 1.5 - cube.rotation.y % (Math.PI * 2)) * 0.05 + 0.005;
+        cube.rotation.x += (mouseY * 1.5 - cube.rotation.x % (Math.PI * 2)) * 0.05;
+        pointLight.intensity = 4.5;
+      } else {
+        // Continuous slow idle float and spin
+        cube.rotation.y += 0.007;
+        cube.rotation.x = 0.28 + Math.sin(Date.now() * 0.0015) * 0.08;
+        pointLight.intensity = 3.2 + Math.sin(Date.now() * 0.002) * 0.6;
+      }
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+}
+
+function initAllHaulbox3DCubes() {
+  init3DCubeInstance('haulbox-3d-cube-container', 110);
+  init3DCubeInstance('haulbox-3d-cube-login', 150);
+  init3DCubeInstance('haulbox-3d-cube-driver-login', 140);
+}
+
+// Auto-boot 3D cubes once DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(initAllHaulbox3DCubes, 100));
+} else {
+  setTimeout(initAllHaulbox3DCubes, 100);
 }
 
 function renderDashboard(){
