@@ -6771,6 +6771,34 @@
   </div>
 
   <!-- ============ MODALS ============ -->
+  <!-- Settings 6-Digit PIN Security Modal -->
+  <div class="modal-overlay" id="modal-settings-pin">
+    <div class="modal" style="max-width:380px;text-align:center;">
+      <div class="modal-head" style="justify-content:center;position:relative;">
+        <h3 style="font-size:16px;font-weight:800;color:var(--text);">🔒 Admin Settings PIN</h3>
+        <div class="modal-close" style="position:absolute;right:16px;top:16px;" onclick="cancelSettingsPin()"><svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg></div>
+      </div>
+      <div class="modal-body" style="padding:22px 20px;">
+        <p style="font-size:13px;color:var(--text-dim);margin:0 0 16px;line-height:1.5;">Enter the 6-digit security PIN to unlock the Settings page.</p>
+        <form onsubmit="return submitSettingsPin(event)">
+          <div style="margin-bottom:16px;">
+            <input type="password" id="settings-pin-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••••"
+              style="font-size:24px;letter-spacing:10px;text-align:center;font-weight:800;padding:10px;width:100%;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text);"
+              autocomplete="off" required>
+          </div>
+          <div id="settings-pin-error" style="color:var(--red,#ef4444);font-size:12px;font-weight:600;min-height:18px;margin-bottom:14px;"></div>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button type="button" class="btn btn-ghost" onclick="cancelSettingsPin()" style="flex:1;">Cancel</button>
+            <button type="submit" id="settings-pin-submit-btn" class="btn btn-accent" style="flex:1.2;font-weight:700;">Unlock</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-driver">
     <div class="modal" style="max-width:780px;">
       <div class="modal-head">
@@ -7592,6 +7620,9 @@
     function init() {
       let savedView = 'dashboard';
       try { savedView = localStorage.getItem('haulbox_active_view') || 'dashboard'; } catch (e) { }
+      if (savedView === 'settings' && !IS_SETTINGS_PIN_UNLOCKED) {
+        savedView = 'dashboard';
+      }
       switchView(savedView);
     }
 
@@ -7619,7 +7650,85 @@
 
     /* ---------------- Navigation ---------------- */
     const VIEW_TITLES = { dashboard: 'Dashboard', addload: 'Add Load', loadboard: 'Load Board', drivers: 'Drivers', driverpay: 'Driver Pay', brokers: 'Brokers', dispatchers: 'Dispatchers', statistics: 'Statistics', documents: 'Documents', emaillogs: 'Email Logs', myaccount: 'My Account', settings: 'Settings', chat: '💬 Chat' };
+    
+    // Security PIN session flag for Admin Settings
+    let IS_SETTINGS_PIN_UNLOCKED = false;
+    let PENDING_SETTINGS_SWITCH = false;
+
+    function openSettingsWithPin() {
+      if (IS_SETTINGS_PIN_UNLOCKED) {
+        doSwitchView('settings');
+        return;
+      }
+      PENDING_SETTINGS_SWITCH = true;
+      const pinInput = document.getElementById('settings-pin-input');
+      const errEl = document.getElementById('settings-pin-error');
+      if (pinInput) { pinInput.value = ''; }
+      if (errEl) { errEl.textContent = ''; }
+      openModal('modal-settings-pin');
+      setTimeout(() => { if (pinInput) pinInput.focus(); }, 150);
+    }
+
+    async function submitSettingsPin(e) {
+      if (e) e.preventDefault();
+      const pinInput = document.getElementById('settings-pin-input');
+      const errEl = document.getElementById('settings-pin-error');
+      const btn = document.getElementById('settings-pin-submit-btn');
+      const pin = pinInput ? pinInput.value.trim() : '';
+
+      if (!pin || pin.length < 6) {
+        if (errEl) errEl.textContent = 'Please enter a full 6-digit PIN.';
+        return false;
+      }
+
+      if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+      if (errEl) errEl.textContent = '';
+
+      try {
+        const resp = await fetch('/api/verify-settings-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin })
+        });
+        const data = await resp.json();
+
+        if (resp.ok && data.ok) {
+          IS_SETTINGS_PIN_UNLOCKED = true;
+          closeModal('modal-settings-pin');
+          toast('Settings Unlocked', 'Access granted to Admin Settings.', true);
+          doSwitchView('settings');
+        } else {
+          if (errEl) errEl.textContent = data.error || 'Incorrect 6-digit PIN. Access denied.';
+          if (pinInput) { pinInput.select(); pinInput.focus(); }
+        }
+      } catch (err) {
+        if (errEl) errEl.textContent = 'Failed to verify PIN. Please try again.';
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Unlock'; }
+      }
+      return false;
+    }
+
+    function cancelSettingsPin() {
+      PENDING_SETTINGS_SWITCH = false;
+      closeModal('modal-settings-pin');
+      // Revert sidebar active highlight to current view if settings was cancelled
+      const activeView = localStorage.getItem('haulbox_active_view') || 'dashboard';
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === activeView));
+    }
+
     function switchView(view) {
+      if (view === 'settings') {
+        if (STATE.role !== 'admin') { switchView('dashboard'); return; }
+        if (!IS_SETTINGS_PIN_UNLOCKED) {
+          openSettingsWithPin();
+          return;
+        }
+      }
+      doSwitchView(view);
+    }
+
+    function doSwitchView(view) {
       if (view === 'dispatchers' && STATE.role !== 'admin') { view = 'dashboard'; }
       if (view === 'driverpay' && STATE.role !== 'admin') { view = 'dashboard'; }
       if (view === 'myaccount' && STATE.role === 'viewonly') { view = 'dashboard'; }

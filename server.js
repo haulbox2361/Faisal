@@ -16,10 +16,13 @@ const { ensureSchema } = require('./lib/db');
 // frontend) or gets Access Denied. Override via env if you ever need to
 // change the admin account without editing code.
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'haulbox2361@gmail.com').trim();
+// 6-digit security PIN required to open the Settings page (Configured in Render / environment)
+const SETTINGS_ADMIN_PIN = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(authRoutes);
 app.use(apiRoutes);
@@ -33,6 +36,16 @@ app.use(mistralRoutes);
 // become Admin — kept server-side so it can't be tampered with client-side.
 app.get('/api/config', (req, res) => {
   res.json({ adminEmail: ADMIN_EMAIL });
+});
+
+// Verifies the 6-digit Admin Settings PIN server-side
+app.post('/api/verify-settings-pin', (req, res) => {
+  const { pin } = req.body || {};
+  const cleanPin = String(pin || '').trim();
+  if (cleanPin === SETTINGS_ADMIN_PIN) {
+    return res.json({ ok: true, message: 'PIN verified' });
+  }
+  return res.status(403).json({ ok: false, error: 'Incorrect 6-digit PIN. Access denied.' });
 });
 
 app.get('/', (req, res) => {
