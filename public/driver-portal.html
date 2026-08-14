@@ -433,11 +433,11 @@ a{color:inherit;}
 
 <div id="login-screen">
   <div class="login-card">
-    <div style="width:52px;height:52px;margin:0 auto 14px;border-radius:14px;background:#10b981;display:flex;align-items:center;justify-content:center;">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="white"><path d="M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-6 0H10V5h4v2z"/></svg>
+    <div style="width:100px;height:100px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;">
+      <img src="assets/haulbox-logo-icon.png" alt="HaulBoX" style="width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 6px 14px rgba(14,165,233,0.3));margin:0;">
     </div>
-    <h1>HaulBoX Driver</h1>
-    <p>Sign in with your Driver ID and PIN</p>
+    <h1 style="font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;letter-spacing:.02em;line-height:1;margin-bottom:4px;">Haul<span style="color:var(--brand,#0284c7);">BoX</span></h1>
+    <p style="margin-top:2px;">Driver Portal · sign in to continue</p>
     <div class="login-field"><label>Driver ID</label><input id="li-driverid" autocomplete="username" placeholder="e.g. D1023" onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()"></div>
     <div class="login-field"><label>PIN</label><input id="li-pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="login-btn" id="li-btn" onclick="doLogin()">Sign In</button>
@@ -449,9 +449,9 @@ a{color:inherit;}
 <div id="app">
   <header id="dp-header">
     <div class="dp-header-left">
-      <div class="dp-logo"><img src="assets/haulbox-logo-icon.png" alt="HaulBoX"></div>
+      <div class="dp-logo" style="width:38px;height:38px;background:transparent;box-shadow:none;"><img src="assets/haulbox-logo-icon.png" alt="HaulBoX" style="width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(14,165,233,0.4));"></div>
       <div id="dp-title-wrap">
-        <div id="dp-title">Haul<span style="color:var(--brand);">BoX</span></div>
+        <div id="dp-title" style="font-family:'Oswald',sans-serif;font-weight:700;font-size:18px;letter-spacing:.02em;">Haul<span style="color:var(--brand,#38bdf8);">BoX</span></div>
         <div id="dp-subtitle">Driver Portal</div>
       </div>
     </div>
