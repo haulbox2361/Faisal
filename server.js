@@ -11,11 +11,18 @@ const notificationRoutes = require('./routes/notifications');
 const mistralRoutes = require('./routes/mistral');
 const { ensureSchema } = require('./lib/db');
 
-// The ONLY Google account allowed to sign in as Admin. Everyone else who
-// signs in must match a registered dispatcher email (checked in the
-// frontend) or gets Access Denied. Override via env if you ever need to
-// change the admin account without editing code.
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'haulbox2361@gmail.com').trim();
+// Admin and Super Admin Google accounts allowed to sign in.
+// Supports comma-separated emails or SUPER_ADMIN_EMAIL / ADMIN_EMAIL env vars.
+const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_EMAILS_RAW = (process.env.ADMIN_EMAIL || process.env.ADMIN_EMAILS || 'haulbox2361@gmail.com')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean);
+
+if (SUPER_ADMIN_EMAIL && !ADMIN_EMAILS_RAW.includes(SUPER_ADMIN_EMAIL)) {
+  ADMIN_EMAILS_RAW.unshift(SUPER_ADMIN_EMAIL);
+}
+
 // 6-digit security PIN required to open the Settings page (Configured in Render / environment)
 const SETTINGS_ADMIN_PIN = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
 
@@ -32,10 +39,13 @@ app.use(chatRoutes);
 app.use(notificationRoutes);
 app.use(mistralRoutes);
 
-// Frontend fetches this on load to know which Google account is allowed to
-// become Admin — kept server-side so it can't be tampered with client-side.
+// Frontend fetches this on load to know which Google accounts are allowed as Admin / Super Admin
 app.get('/api/config', (req, res) => {
-  res.json({ adminEmail: ADMIN_EMAIL });
+  res.json({
+    adminEmail: ADMIN_EMAILS_RAW[0] || 'haulbox2361@gmail.com',
+    adminEmails: ADMIN_EMAILS_RAW,
+    superAdminEmail: SUPER_ADMIN_EMAIL || ADMIN_EMAILS_RAW[0] || 'haulbox2361@gmail.com'
+  });
 });
 
 // Verifies the 6-digit Admin Settings PIN server-side
@@ -96,7 +106,8 @@ app.get('/driver', async (req, res) => {
 app.listen(PORT, () => {
   const missingEnv = !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET;
   console.log(`HaulBoX backend running at http://localhost:${PORT}`);
-  console.log(`Admin account locked to: ${ADMIN_EMAIL}`);
+  console.log(`Admin accounts active: ${ADMIN_EMAILS_RAW.join(', ')}`);
+  if (SUPER_ADMIN_EMAIL) console.log(`Super Admin locked to: ${SUPER_ADMIN_EMAIL}`);
   if (missingEnv) {
     console.log('⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail until you fill in .env (see README.md).');
   }

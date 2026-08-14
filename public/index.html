@@ -4619,16 +4619,288 @@
       }
     }
 
-    /* Accessibility: Respect Reduced Motion */
-    @media (prefers-reduced-motion: reduce) {
+    /* ============ ABOUT US POPUP MODAL (Glassmorphism & SaaS Theme) ============ */
+    .about-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 12, 20, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+      opacity: 0;
+      transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
 
-      *,
-      ::before,
-      ::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
+    .about-modal-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .about-modal-card {
+      position: relative;
+      width: 100%;
+      max-width: 620px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.92) 100%);
+      border: 1.5px solid #3B82F6;
+      border-radius: 20px;
+      padding: 32px 30px;
+      box-shadow: 0 20px 50px -10px rgba(59, 130, 246, 0.22), 0 10px 25px -5px rgba(0, 0, 0, 0.12);
+      transform: scale(0.92) translateY(12px);
+      opacity: 0;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+
+    [data-theme="dark"] .about-modal-card,
+    :root[data-theme="dark"] .about-modal-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.94) 0%, rgba(11, 15, 25, 0.96) 100%);
+      border: 1.5px solid rgba(59, 130, 246, 0.7);
+      box-shadow: 0 25px 60px -12px rgba(59, 130, 246, 0.3), 0 12px 30px -6px rgba(0, 0, 0, 0.6);
+    }
+
+    .about-modal-card:hover {
+      border-color: #60a5fa;
+      box-shadow: 0 25px 60px -8px rgba(59, 130, 246, 0.32), 0 0 25px rgba(59, 130, 246, 0.2);
+    }
+
+    .about-modal-overlay.active .about-modal-card {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    .about-close-btn {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(148, 163, 184, 0.08);
+      color: var(--text, #0f172a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .about-close-btn:hover {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+      transform: rotate(90deg) scale(1.05);
+    }
+
+    .about-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .about-icon-badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 20px -4px rgba(59, 130, 246, 0.5);
+      flex-shrink: 0;
+    }
+
+    .about-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text, #0f172a);
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+
+    .about-subtitle {
+      font-size: 13px;
+      color: #3B82F6;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .about-desc-p {
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--text-dim, #475569);
+      margin: 0 0 14px;
+    }
+
+    [data-theme="dark"] .about-desc-p,
+    :root[data-theme="dark"] .about-desc-p {
+      color: #cbd5e1;
+    }
+
+    .about-tags-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 16px 0 20px;
+    }
+
+    .about-tag {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 11px;
+      border-radius: 8px;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      color: #2563eb;
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="dark"] .about-tag,
+    :root[data-theme="dark"] .about-tag {
+      background: rgba(59, 130, 246, 0.14);
+      border-color: rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+    }
+
+    .about-tag:hover {
+      background: #3B82F6;
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Contact Card */
+    .about-contact-card {
+      background: rgba(59, 130, 246, 0.05);
+      border: 1.5px dashed rgba(59, 130, 246, 0.35);
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all 0.25s ease;
+      margin-top: 20px;
+    }
+
+    [data-theme="dark"] .about-contact-card,
+    :root[data-theme="dark"] .about-contact-card {
+      background: rgba(15, 23, 42, 0.6);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .about-contact-card:hover {
+      background: rgba(59, 130, 246, 0.09);
+      border-color: #3B82F6;
+      border-style: solid;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.2);
+    }
+
+    .about-contact-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .about-contact-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: #3B82F6;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .about-contact-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #3B82F6;
+    }
+
+    .about-contact-email {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text, #0f172a);
+      word-break: break-all;
+    }
+
+    .about-contact-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .about-copy-btn, .about-send-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .about-copy-btn {
+      background: var(--panel, #ffffff);
+      border: 1px solid var(--border, #e2e8f0);
+      color: var(--text, #0f172a);
+    }
+
+    .about-copy-btn:hover {
+      border-color: #3B82F6;
+      color: #3B82F6;
+      transform: translateY(-1px);
+    }
+
+    .about-send-btn {
+      background: #3B82F6;
+      border: 1px solid #3B82F6;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+    }
+
+    .about-send-btn:hover {
+      background: #2563eb;
+      border-color: #2563eb;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.45);
+    }
+
+    @media (max-width: 580px) {
+      .about-modal-card {
+        padding: 24px 20px;
+      }
+      .about-contact-card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .about-contact-btns {
+        width: 100%;
+        margin-top: 6px;
+      }
+      .about-copy-btn, .about-send-btn {
+        flex: 1;
+        justify-content: center;
       }
     }
   </style>
@@ -4660,8 +4932,11 @@
       <div id="login-status" style="min-height:16px;font-size:11.5px;margin-top:10px;color:var(--text-faint);"></div>
       <div class="login-foot">Only Google accounts registered as Admin or a Dispatcher can get in — everyone else is
         turned away automatically. Ask your Admin to add your email under Dispatchers if you're locked out.</div>
-      <div class="login-foot" style="margin-top:10px;"><a href="#" onclick="showDriverLogin();return false;"
-          style="color:var(--accent);text-decoration:none;font-weight:600;">Driver Login →</a></div>
+      <div class="login-foot" style="margin-top:10px;display:flex;justify-content:center;gap:14px;">
+        <a href="#" onclick="showDriverLogin();return false;" style="color:var(--accent);text-decoration:none;font-weight:600;">Driver Login →</a>
+        <span style="color:var(--text-faint);">•</span>
+        <a href="#" onclick="openAboutModal();return false;" style="color:#60a5fa;text-decoration:none;font-weight:600;">About Us ✨</a>
+      </div>
     </div>
   </div>
 
@@ -5000,6 +5275,14 @@
           </svg>
           Settings
         </div>
+        <div class="nav-item" onclick="openAboutModal()" style="color:#60a5fa;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          About Us
+        </div>
       </nav>
       <div class="sidebar-foot" style="padding:10px 14px;border-top:1px solid #1e293b;">
         <div class="role-chip" id="role-chip" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;"><span
@@ -5051,6 +5334,16 @@
               <div id="notif-panel-list"></div>
             </div>
           </div>
+          <button class="btn btn-ghost btn-sm" id="topbar-about-btn" onclick="openAboutModal()"
+            style="display:flex;align-items:center;gap:6px;font-weight:700;color:#2563EB;border:1px solid rgba(37,99,235,0.25);border-radius:10px;padding:7px 12px;background:rgba(37,99,235,0.06);transition:all 0.2s;"
+            title="About Us & Company Expertise">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            About Us
+          </button>
           <div class="user-pill" onclick="toggleUserMenu()"
             style="position:relative;padding:4px 12px 4px 4px;border-radius:20px;background:#f8fafc;border:1px solid #e2e8f0;cursor:pointer;">
             <div class="avatar" id="user-avatar"
@@ -6771,6 +7064,91 @@
   </div>
 
   <!-- ============ MODALS ============ -->
+  <!-- About Us Modern Glassmorphism Popup Modal -->
+  <div class="about-modal-overlay" id="modal-about" onclick="handleAboutOverlayClick(event)">
+    <div class="about-modal-card">
+      <button class="about-close-btn" onclick="closeAboutModal()" title="Close (Esc)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+
+      <div class="about-header">
+        <div class="about-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div>
+          <h3 class="about-title">About Us</h3>
+          <div class="about-subtitle">Innovative Technology &amp; Smart Automation</div>
+        </div>
+      </div>
+
+      <p class="about-desc-p">
+        We help businesses grow through innovative technology and smart automation. Our expertise includes
+        <strong>AI Automation</strong>, <strong>Custom Web Development</strong>, <strong>Web Applications</strong>,
+        <strong>Android Apps</strong>, <strong>Business Software</strong>, <strong>Data Analytics</strong>,
+        <strong>Graphic Design</strong>, <strong>UI/UX Design</strong>, <strong>API Integrations</strong>, and
+        <strong>Digital Transformation Solutions</strong>.
+      </p>
+
+      <div class="about-tags-wrap">
+        <span class="about-tag">⚡ AI Automation</span>
+        <span class="about-tag">🌐 Custom Web Development</span>
+        <span class="about-tag">📱 Android &amp; Mobile Apps</span>
+        <span class="about-tag">💼 Business Software</span>
+        <span class="about-tag">📊 Data Analytics</span>
+        <span class="about-tag">🎨 UI/UX &amp; Graphic Design</span>
+        <span class="about-tag">🔌 API Integrations</span>
+        <span class="about-tag">🚀 Digital Transformation</span>
+      </div>
+
+      <p class="about-desc-p">
+        Whether you need a powerful website, a custom management system, AI-powered business automation, or a complete digital solution, we deliver modern, scalable, and results-driven products tailored to your needs.
+      </p>
+
+      <p class="about-desc-p" style="font-weight:600;color:var(--text, #0f172a);margin-bottom:6px;">
+        Have an idea or project in mind? Contact us today and let's build something exceptional together.
+      </p>
+
+      <!-- Professional Contact Card -->
+      <div class="about-contact-card">
+        <div class="about-contact-left">
+          <div class="about-contact-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+          </div>
+          <div>
+            <div class="about-contact-label">Get in Touch</div>
+            <div class="about-contact-email" id="about-email-text">haulbox2361@gmail.com</div>
+          </div>
+        </div>
+        <div class="about-contact-btns">
+          <button type="button" class="about-copy-btn" onclick="copyAboutEmail()" id="about-copy-btn" title="Copy email address">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span id="about-copy-label">Copy Email</span>
+          </button>
+          <a href="mailto:haulbox2361@gmail.com?subject=New%20Project%20Inquiry%20%E2%80%94%20HaulBoX&body=Hi%2C%0A%0AI%20would%20like%20to%20discuss%20a%20new%20project%20or%20inquiry%3A%0A%0A"
+            class="about-send-btn" title="Open email client">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            Contact Us
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings 6-Digit PIN Security Modal -->
   <div class="modal-overlay" id="modal-settings-pin">
     <div class="modal" style="max-width:380px;text-align:center;">
@@ -7443,49 +7821,47 @@
     // The one Google account allowed to sign in as Admin. Fetched once from the
     // backend (server.js reads it from ADMIN_EMAIL, hardcoded default set there)
     // so it can't be spoofed by editing anything client-side.
-    let ADMIN_EMAIL_REQUIRED = null;
+    let ADMIN_EMAILS_ALLOWED = [];
+    let SUPER_ADMIN_EMAIL_REQUIRED = '';
     async function loadAdminEmailConfig() {
-      if (ADMIN_EMAIL_REQUIRED) return ADMIN_EMAIL_REQUIRED;
+      if (ADMIN_EMAILS_ALLOWED && ADMIN_EMAILS_ALLOWED.length) return ADMIN_EMAILS_ALLOWED;
       try {
         const res = await fetch('/api/config');
         const data = await res.json();
-        ADMIN_EMAIL_REQUIRED = (data.adminEmail || '').trim().toLowerCase();
-      } catch (e) { ADMIN_EMAIL_REQUIRED = ''; }
-      return ADMIN_EMAIL_REQUIRED;
+        ADMIN_EMAILS_ALLOWED = (data.adminEmails || [data.adminEmail || '']).map(e => String(e || '').trim().toLowerCase()).filter(Boolean);
+        SUPER_ADMIN_EMAIL_REQUIRED = String(data.superAdminEmail || data.adminEmail || '').trim().toLowerCase();
+      } catch (e) {
+        ADMIN_EMAILS_ALLOWED = ['haulbox2361@gmail.com'];
+        SUPER_ADMIN_EMAIL_REQUIRED = 'haulbox2361@gmail.com';
+      }
+      return ADMIN_EMAILS_ALLOWED;
     }
 
-    // Which signed-in Google account this browser last got into HaulBoX with —
-    // stored locally (not sent to the shared team database, and never trusted
-    // blindly: restoreSession() below re-checks it against the current Admin
-    // email / dispatcher list every time) purely so a page refresh doesn't force
-    // a fresh Google sign-in on every load.
+    // Which signed-in Google account this browser last got into HaulBoX with
     const SESSION_KEY = 'haulbox_session_email';
-    // Called once at boot, after loadState() has populated STATE.dispatchers. If
-    // this browser has a remembered email and it still matches the Admin email or
-    // a registered dispatcher, skips the login screen entirely. If the match no
-    // longer holds (dispatcher removed, admin email changed), clears it and falls
-    // back to the normal "Sign in with Google" screen.
     async function restoreSession() {
       let savedEmail = '';
       try { savedEmail = localStorage.getItem(SESSION_KEY) || ''; } catch (e) { }
       if (!savedEmail) return false;
 
-      const adminEmail = await loadAdminEmailConfig();
+      const adminEmails = await loadAdminEmailConfig();
       const matchedDispatcher = STATE.dispatchers.find(d => (d.email || '').trim().toLowerCase() === savedEmail);
 
       if (matchedDispatcher) {
         STATE.role = 'dispatcher';
+        STATE.isSuperAdmin = false;
         STATE.currentDispatcherId = matchedDispatcher.id;
         STATE.viewAs = null;
         STATE.currentUser = { name: matchedDispatcher.name, email: matchedDispatcher.googleAccountEmail || savedEmail, initials: initials(matchedDispatcher.name) };
         enterApp();
         return true;
       }
-      if (adminEmail && savedEmail === adminEmail) {
+      if (adminEmails && adminEmails.includes(savedEmail)) {
         STATE.role = 'admin';
+        STATE.isSuperAdmin = (savedEmail === SUPER_ADMIN_EMAIL_REQUIRED) || (adminEmails[0] === savedEmail);
         STATE.currentDispatcherId = null;
         STATE.viewAs = null;
-        STATE.currentUser = { name: STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin', email: STATE.settings.googleAccountEmail || savedEmail, initials: initials(savedEmail.split('@')[0]) };
+        STATE.currentUser = { name: (STATE.isSuperAdmin ? 'Super Admin' : (STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin')), email: STATE.settings.googleAccountEmail || savedEmail, initials: initials(savedEmail.split('@')[0]) };
         enterApp();
         return true;
       }
@@ -7546,13 +7922,14 @@
       const email = (result.email || '').trim().toLowerCase();
       showLoginStatus('Checking access for ' + result.email + '…');
 
-      const adminEmail = await loadAdminEmailConfig();
+      const adminEmails = await loadAdminEmailConfig();
       const matchedDispatcher = STATE.dispatchers.find(d => (d.email || '').trim().toLowerCase() === email);
 
       if (matchedDispatcher) {
         try { await backendFetch('/auth/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromAccountId: loginAttemptId, toAccountId: matchedDispatcher.id }) }); }
         catch (e) { /* claim failing shouldn't block login */ }
         STATE.role = 'dispatcher';
+        STATE.isSuperAdmin = false;
         STATE.currentDispatcherId = matchedDispatcher.id;
         STATE.viewAs = null;
         matchedDispatcher.gmailConnected = true;
@@ -7568,10 +7945,11 @@
         return;
       }
 
-      if (adminEmail && email === adminEmail) {
+      if (adminEmails && adminEmails.includes(email)) {
         try { await backendFetch('/auth/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromAccountId: loginAttemptId, toAccountId: 'admin' }) }); }
-        catch (e) { /* claim failing shouldn't block login — sending can be reconnected later in Settings */ }
+        catch (e) { /* claim failing shouldn't block login */ }
         STATE.role = 'admin';
+        STATE.isSuperAdmin = (email === SUPER_ADMIN_EMAIL_REQUIRED) || (adminEmails[0] === email);
         STATE.currentDispatcherId = null;
         STATE.viewAs = null;
         STATE.settings.googleAccountEmail = result.email;
@@ -7580,7 +7958,7 @@
         STATE.settings.gmailEnabled = true;
         STATE.settings.gmailConnectionStatus = 'Connected';
         STATE.settings.gmailLastSync = new Date().toISOString();
-        STATE.currentUser = { name: STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin', email: result.email, initials: initials(result.email.split('@')[0]) };
+        STATE.currentUser = { name: (STATE.isSuperAdmin ? 'Super Admin' : (STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin')), email: result.email, initials: initials(result.email.split('@')[0]) };
         try { localStorage.setItem(SESSION_KEY, email); } catch (e) { }
         persist();
         enterApp();
@@ -7606,6 +7984,33 @@
       el.textContent = msg || '';
       el.style.color = isError ? 'var(--red)' : 'var(--text-faint)';
     }
+    function applyRoleUI() {
+      const chip = document.getElementById('role-chip');
+      if (chip) {
+        if (STATE.isSuperAdmin) {
+          chip.innerHTML = '<span class="role-dot" style="background:#38bdf8;"></span> Role: Super Admin ⭐';
+          chip.style.borderColor = '#38bdf8';
+          chip.style.color = '#38bdf8';
+        } else if (STATE.role === 'admin') {
+          chip.innerHTML = '<span class="role-dot" style="background:#3b82f6;"></span> Role: Admin';
+          chip.style.borderColor = '#334155';
+          chip.style.color = '#94a3b8';
+        } else if (STATE.role === 'dispatcher') {
+          chip.innerHTML = '<span class="role-dot" style="background:#10b981;"></span> Role: Dispatcher';
+          chip.style.borderColor = '#334155';
+          chip.style.color = '#94a3b8';
+        } else {
+          chip.innerHTML = '<span class="role-dot"></span> Role: View Only';
+        }
+      }
+
+      // Hide or show admin-only navigation tabs
+      const isAdmin = STATE.role === 'admin';
+      document.querySelectorAll('[data-role-view="admin"]').forEach(el => {
+        el.style.display = isAdmin ? 'flex' : 'none';
+      });
+    }
+
     function enterApp() {
       document.getElementById('login-gate').style.display = 'none';
       document.getElementById('app').style.display = 'flex';
@@ -10114,44 +10519,55 @@
     }
 
     function confirmDeleteLoad(id) {
-      if (STATE.role !== 'admin') return toast('Admin Only', 'Only Admin can delete loads from the board.');
+      if (STATE.role !== 'admin') return toast('Admin Only', 'Only Administrators can delete loads.');
       const l = STATE.loads.find(x => String(x.id) === String(id));
       if (!l) return;
 
-      const isDelivered = String(l.status || '').trim().toLowerCase() === 'drop-off' || String(l.status || '').trim().toLowerCase() === 'completed' || String(l.driverProgress || '').trim().toLowerCase() === 'delivered';
+      const st = String(l.status || '').trim().toLowerCase();
+      const prog = String(l.driverProgress || '').trim().toLowerCase();
+      const isLoadedOrDelivered = st === 'loaded' || st === 'drop-off' || st === 'completed' || prog === 'loaded' || prog === 'in_transit' || prog === 'at_delivery' || prog === 'delivered';
+
+      // Rule: Loaded or Drop-off (Delivered) loads can ONLY be deleted by Super Admin
+      if (isLoadedOrDelivered && !STATE.isSuperAdmin) {
+        toast('Super Admin Required', `⚠️ Load #${l.loadNumber || l.id} is ${st.toUpperCase()}. Standard Admins cannot delete active/delivered loads. Only Super Admin has this permission.`);
+        alert(`Access Denied:\n\nLoad #${l.loadNumber || l.id} is currently in '${st.toUpperCase()}' stage.\n\nRegular Admins cannot delete Loaded or Drop-Off loads. Only the Super Admin account has permission to remove active or completed shipments.`);
+        return;
+      }
+
       const dspName = l.dispatcherName || (STATE.dispatchers.find(d => String(d.id) === String(l.dispatcherId)) || {}).name || 'Dispatcher';
       const drvName = l.driverName || (STATE.drivers.find(d => String(d.id) === String(l.driverId)) || {}).name || 'Driver';
+      const actorName = STATE.isSuperAdmin ? 'Super Admin' : (STATE.currentUser ? STATE.currentUser.name : 'Admin');
 
-      const promptMsg = isDelivered
-        ? `⚠️ Load #${l.loadNumber || l.id} is marked as DELIVERED / DROP-OFF.\n\nConfirm deletion? Notifications will be sent to both Dispatcher (${dspName}) and Driver (${drvName}).`
-        : `Confirm deletion of Load #${l.loadNumber || l.id}?\n\nNotifications will be sent to both Dispatcher (${dspName}) and Driver (${drvName}).`;
+      const promptMsg = isLoadedOrDelivered
+        ? `⚠️ [SUPER ADMIN OVERRIDE]\n\nLoad #${l.loadNumber || l.id} is in '${st.toUpperCase()}' stage.\n\nAre you sure you want to permanently delete this load?\n\nImmediate deletion alerts will be sent to Admin, Dispatcher (${dspName}), and Driver (${drvName}).`
+        : `Confirm deletion of Load #${l.loadNumber || l.id}?\n\nAlert notifications will be broadcast to Admin, Dispatcher (${dspName}), and Driver (${drvName}).`;
 
       const ok = confirm(promptMsg);
       if (!ok) return;
 
-      // Send alert notification to Dispatcher
+      // 1. Send broadcast notification to Admin & Dispatcher in the system
       pushNotification(
-        `Load Deleted — #${l.loadNumber || l.id}`,
-        `Admin deleted ${isDelivered ? 'Delivered ' : ''}Load #${l.loadNumber || l.id} (${formatCityStateLane(l.pickup, l.dropoff)}). Assigned Dispatcher: ${dspName}.`,
+        `🚨 Load Deleted by ${actorName} — #${l.loadNumber || l.id}`,
+        `${actorName} deleted ${isLoadedOrDelivered ? '(' + st.toUpperCase() + ') ' : ''}Load #${l.loadNumber || l.id} (${formatCityStateLane(l.pickup, l.dropoff)}). Assigned: ${dspName} / Driver: ${drvName}.`,
         { type: 'load' }
       );
 
-      // Send alert notification to Driver
+      // 2. Send targeted notification to Assigned Driver
       pushNotification(
-        `Load Removed — #${l.loadNumber || l.id}`,
-        `Load #${l.loadNumber || l.id} has been removed by Admin. Assigned Driver: ${drvName}.`,
+        `⚠️ Load #${l.loadNumber || l.id} Removed by ${actorName}`,
+        `Load #${l.loadNumber || l.id} was deleted from the dispatch board by ${actorName}.`,
         { type: 'driver', targetId: l.driverId }
       );
 
-      // Also record driver specific notification if driver portal active
+      // 3. Record in Driver Portal local notification store for the mobile driver view
       if (l.driverId) {
         const drvKey = `dp_notifs_${l.driverId}`;
         try {
           const drvNotifs = JSON.parse(localStorage.getItem(drvKey) || '[]');
           drvNotifs.unshift({
             id: uid('dpn'),
-            title: `Load #${l.loadNumber || l.id} Removed`,
-            body: `Load #${l.loadNumber || l.id} has been deleted by dispatch management.`,
+            title: `Load #${l.loadNumber || l.id} Deleted by ${actorName}`,
+            body: `Load #${l.loadNumber || l.id} (${formatCityStateLane(l.pickup, l.dropoff)}) has been deleted from the schedule by ${actorName}.`,
             at: new Date().toISOString(),
             read: false
           });
@@ -10159,11 +10575,12 @@
         } catch (e) {}
       }
 
-      // Delete load permanently across board
+      // Delete load permanently across state
       STATE.loads = STATE.loads.filter(x => String(x.id) !== String(id));
       persist();
       renderLoadBoard();
-      toast('Load Deleted & Notified', `Load #${l.loadNumber || l.id} removed. Alerts sent to ${dspName} & ${drvName}.`, true);
+      renderDashboard();
+      toast('Load Deleted & Notified', `Load #${l.loadNumber || l.id} deleted by ${actorName}. Notifications broadcast to Admin, Dispatcher & Driver.`, true);
     }
 
     function deleteLoad(id) {
@@ -14069,6 +14486,85 @@ function doPost(e) {
       document.querySelectorAll('[data-view="chat"], .nav-item[onclick*="chat"]').forEach(el => {
         el.addEventListener('click', () => setTimeout(initWaChat, 200));
       });
+    });
+
+    // ============ ABOUT US POPUP MODAL FUNCTIONS ============
+    function openAboutModal() {
+      const modal = document.getElementById('modal-about');
+      if (!modal) return;
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeAboutModal() {
+      const modal = document.getElementById('modal-about');
+      if (!modal) return;
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function handleAboutOverlayClick(e) {
+      if (e.target && e.target.id === 'modal-about') {
+        closeAboutModal();
+      }
+    }
+
+    function copyAboutEmail() {
+      const email = 'haulbox2361@gmail.com';
+      const label = document.getElementById('about-copy-label');
+      const btn = document.getElementById('about-copy-btn');
+      
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(email).then(showCopied).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+
+      function showCopied() {
+        if (label) label.textContent = 'Copied! ✓';
+        if (btn) {
+          btn.style.background = 'rgba(16, 185, 129, 0.12)';
+          btn.style.borderColor = '#10b981';
+          btn.style.color = '#10b981';
+        }
+        if (typeof toast === 'function') {
+          toast('Email Copied', 'haulbox2361@gmail.com copied to clipboard', true);
+        }
+        setTimeout(() => {
+          if (label) label.textContent = 'Copy Email';
+          if (btn) {
+            btn.style.background = '';
+            btn.style.borderColor = '';
+            btn.style.color = '';
+          }
+        }, 2200);
+      }
+
+      function fallbackCopy() {
+        const ta = document.createElement('textarea');
+        ta.value = email;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showCopied();
+        } catch (err) {
+          if (typeof toast === 'function') toast('Email', email);
+        }
+        document.body.removeChild(ta);
+      }
+    }
+
+    // Global ESC key to close About modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        const modal = document.getElementById('modal-about');
+        if (modal && modal.classList.contains('active')) {
+          closeAboutModal();
+        }
+      }
     });
 
     // Auto-restore session and active feature on page load (F5 refresh)

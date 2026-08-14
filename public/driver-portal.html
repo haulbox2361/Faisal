@@ -482,6 +482,242 @@ a{color:inherit;}
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============ ABOUT US POPUP (Glassmorphism & SaaS Theme) ============ */
+.about-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 12, 20, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  opacity: 0;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.about-modal-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+
+.about-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: linear-gradient(135deg, rgba(22, 31, 46, 0.96) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border: 1.5px solid #3B82F6;
+  border-radius: 20px;
+  padding: 24px 20px;
+  box-shadow: 0 20px 50px -10px rgba(59, 130, 246, 0.3), 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  transform: scale(0.92) translateY(12px);
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  color: #f8fafc;
+}
+
+.about-modal-card:hover {
+  border-color: #60a5fa;
+  box-shadow: 0 25px 60px -8px rgba(59, 130, 246, 0.4), 0 0 25px rgba(59, 130, 246, 0.25);
+}
+
+.about-modal-overlay.active .about-modal-card {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+.about-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.about-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+  transform: rotate(90deg) scale(1.05);
+}
+
+.about-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.about-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px -4px rgba(59, 130, 246, 0.5);
+  flex-shrink: 0;
+}
+
+.about-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.about-subtitle {
+  font-size: 12px;
+  color: #60a5fa;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.about-desc-p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin: 0 0 12px;
+}
+
+.about-tags-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 18px;
+}
+
+.about-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+  transition: all 0.2s ease;
+}
+
+.about-tag:hover {
+  background: #3B82F6;
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+.about-contact-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1.5px dashed rgba(59, 130, 246, 0.4);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.25s ease;
+  margin-top: 16px;
+}
+
+.about-contact-card:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3B82F6;
+  border-style: solid;
+  transform: translateY(-2px);
+}
+
+.about-contact-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.about-contact-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #3B82F6;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.about-contact-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #60a5fa;
+}
+
+.about-contact-email {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  word-break: break-all;
+}
+
+.about-contact-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.about-copy-btn, .about-send-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.about-copy-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #f8fafc;
+}
+
+.about-copy-btn:hover {
+  border-color: #3B82F6;
+  color: #60a5fa;
+}
+
+.about-send-btn {
+  background: #3B82F6;
+  border: 1px solid #3B82F6;
+  color: #ffffff;
+}
+
+.about-send-btn:hover {
+  background: #2563eb;
+}
 </style>
 </head>
 <body>
@@ -628,6 +864,82 @@ a{color:inherit;}
     <button class="dp-nav-btn" data-page="profile" onclick="setDriverPortalPage('profile')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6.5 8-6.5s6.5 2 8 6.5"/></svg>Profile</button>
   </nav>
+</div>
+
+<!-- About Us Modern Glassmorphism Popup Modal -->
+<div class="about-modal-overlay" id="modal-about" onclick="handleAboutOverlayClick(event)">
+  <div class="about-modal-card">
+    <button class="about-close-btn" onclick="closeAboutModal()" title="Close (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;">
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </button>
+
+    <div class="about-header">
+      <div class="about-icon-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <h3 class="about-title">About Us</h3>
+        <div class="about-subtitle">Smart Technology &amp; Automation</div>
+      </div>
+    </div>
+
+    <p class="about-desc-p">
+      We help businesses grow through innovative technology and smart automation. Our expertise includes
+      <strong>AI Automation</strong>, <strong>Custom Web Development</strong>, <strong>Web Applications</strong>,
+      <strong>Android Apps</strong>, <strong>Business Software</strong>, <strong>Data Analytics</strong>,
+      <strong>UI/UX Design</strong>, and <strong>Digital Transformation</strong>.
+    </p>
+
+    <div class="about-tags-wrap">
+      <span class="about-tag">⚡ AI Automation</span>
+      <span class="about-tag">🌐 Web Apps</span>
+      <span class="about-tag">📱 Android Apps</span>
+      <span class="about-tag">💼 Logistics Software</span>
+      <span class="about-tag">🔌 API Integrations</span>
+    </div>
+
+    <p class="about-desc-p">
+      Whether you need a custom management system, AI-powered automation, or a modern digital solution, we build scalable products tailored to your needs.
+    </p>
+
+    <!-- Professional Contact Card -->
+    <div class="about-contact-card">
+      <div class="about-contact-left">
+        <div class="about-contact-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+        </div>
+        <div>
+          <div class="about-contact-label">Contact Us</div>
+          <div class="about-contact-email">haulbox2361@gmail.com</div>
+        </div>
+      </div>
+      <div class="about-contact-btns">
+        <button type="button" class="about-copy-btn" onclick="copyAboutEmail()" id="about-copy-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="about-copy-label">Copy Email</span>
+        </button>
+        <a href="mailto:haulbox2361@gmail.com?subject=Inquiry%20%E2%80%94%20HaulBoX&body=Hi%2C%0A%0A" class="about-send-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          Email Us
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Load details modal -->
@@ -2146,6 +2458,7 @@ async function loadProfile(){
     if (docs.canEdit && photos.length < 8) h += '<button class="dp-photo-add" onclick="startUploadProfile(\'truckPhotos\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add</button>';
     h += '</div></div>';
 
+    h += '<button class="dp-btn-sm" style="width:100%;margin-top:10px;padding:12px;border-radius:14px;border:1px solid #3b82f6;background:rgba(59,130,246,0.12);color:#3b82f6;font-weight:700;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="openAboutModal()">✨ About Us &amp; Technology</button>';
     h += '<button class="dp-logout-btn" onclick="logout()">Sign Out</button>';
     el.innerHTML = h;
   } catch(e){ el.innerHTML = '<div class="dp-empty">' + e.message + '</div>'; }
@@ -2605,6 +2918,80 @@ if (document.readyState === 'loading') {
 } else {
   setTimeout(initAllDP3DCubes, 100);
 }
+// ============ ABOUT US POPUP MODAL FUNCTIONS ============
+function openAboutModal() {
+  const modal = document.getElementById('modal-about');
+  if (!modal) return;
+  modal.classList.add('active');
+}
+
+function closeAboutModal() {
+  const modal = document.getElementById('modal-about');
+  if (!modal) return;
+  modal.classList.remove('active');
+}
+
+function handleAboutOverlayClick(e) {
+  if (e.target && e.target.id === 'modal-about') {
+    closeAboutModal();
+  }
+}
+
+function copyAboutEmail() {
+  const email = 'haulbox2361@gmail.com';
+  const label = document.getElementById('about-copy-label');
+  const btn = document.getElementById('about-copy-btn');
+  
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(email).then(showCopied).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+
+  function showCopied() {
+    if (label) label.textContent = 'Copied! ✓';
+    if (btn) {
+      btn.style.borderColor = '#10b981';
+      btn.style.color = '#10b981';
+    }
+    if (typeof toast === 'function') {
+      toast('haulbox2361@gmail.com copied to clipboard');
+    }
+    setTimeout(() => {
+      if (label) label.textContent = 'Copy Email';
+      if (btn) {
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }
+    }, 2200);
+  }
+
+  function fallbackCopy() {
+    const ta = document.createElement('textarea');
+    ta.value = email;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showCopied();
+    } catch (err) {
+      if (typeof toast === 'function') toast(email);
+    }
+    document.body.removeChild(ta);
+  }
+}
+
+// Global ESC listener for Driver Portal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.keyCode === 27) {
+    const modal = document.getElementById('modal-about');
+    if (modal && modal.classList.contains('active')) {
+      closeAboutModal();
+    }
+  }
+});
 </script>
 </body>
 </html>
