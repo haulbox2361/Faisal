@@ -9875,7 +9875,6 @@
       if (body) {
         body.innerHTML = rows.map(l => {
           const lane = formatCityStateLane(l.pickup, l.dropoff);
-          const isLocked = isLoadLockedFromDeletion(l);
           return `
         <tr onclick="openLoadModal('${l.id}')" style="cursor:pointer;">
           <td class="cell-mono cell-strong" style="padding:12px 16px;font-weight:700;color:#0f172a;">${escapeAttr(l.loadNumber)}</td>
@@ -9885,7 +9884,7 @@
           ${isAdmin ? `<td class="cell-dim" data-role-view="admin" style="padding:12px 16px;color:#64748b;">${escapeAttr(l.dispatcherName || '—')}</td>` : ''}
           <td style="padding:12px 16px;">${placard(l.status, l)}</td>
           ${isAdmin ? `<td style="padding:12px 16px;text-align:right;" onclick="event.stopPropagation();">
-            <button class="btn btn-sm btn-ghost" style="color:${isLocked ? '#94a3b8' : '#ef4444'};padding:4px 8px;border-radius:6px;cursor:${isLocked ? 'not-allowed' : 'pointer'};" title="${isLocked ? 'Drop-off / Completed loads cannot be deleted' : 'Delete Load'}" onclick="confirmDeleteLoad('${l.id}')">
+            <button class="btn btn-sm btn-ghost" style="color:#ef4444;padding:4px 8px;border-radius:6px;cursor:pointer;" title="Delete Load" onclick="confirmDeleteLoad('${l.id}')">
               <svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
             </button>
           </td>` : ''}
@@ -9900,27 +9899,52 @@
       const l = STATE.loads.find(x => String(x.id) === String(id));
       if (!l) return;
 
-      // Rule 1: Drop-off / Delivered / Completed loads CANNOT be deleted by anyone!
-      if (isLoadLockedFromDeletion(l)) {
-        return toast('Deletion Blocked 🔒', 'Loads that are Drop-off, Delivered, or Completed cannot be deleted.', false);
+      const isDelivered = String(l.status || '').trim().toLowerCase() === 'drop-off' || String(l.status || '').trim().toLowerCase() === 'completed' || String(l.driverProgress || '').trim().toLowerCase() === 'delivered';
+      const dspName = l.dispatcherName || (STATE.dispatchers.find(d => String(d.id) === String(l.dispatcherId)) || {}).name || 'Dispatcher';
+      const drvName = l.driverName || (STATE.drivers.find(d => String(d.id) === String(l.driverId)) || {}).name || 'Driver';
+
+      const promptMsg = isDelivered
+        ? `⚠️ Load #${l.loadNumber || l.id} is marked as DELIVERED / DROP-OFF.\n\nConfirm deletion? Notifications will be sent to both Dispatcher (${dspName}) and Driver (${drvName}).`
+        : `Confirm deletion of Load #${l.loadNumber || l.id}?\n\nNotifications will be sent to both Dispatcher (${dspName}) and Driver (${drvName}).`;
+
+      const ok = confirm(promptMsg);
+      if (!ok) return;
+
+      // Send alert notification to Dispatcher
+      pushNotification(
+        `Load Deleted — #${l.loadNumber || l.id}`,
+        `Admin deleted ${isDelivered ? 'Delivered ' : ''}Load #${l.loadNumber || l.id} (${formatCityStateLane(l.pickup, l.dropoff)}). Assigned Dispatcher: ${dspName}.`,
+        { type: 'load' }
+      );
+
+      // Send alert notification to Driver
+      pushNotification(
+        `Load Removed — #${l.loadNumber || l.id}`,
+        `Load #${l.loadNumber || l.id} has been removed by Admin. Assigned Driver: ${drvName}.`,
+        { type: 'driver', targetId: l.driverId }
+      );
+
+      // Also record driver specific notification if driver portal active
+      if (l.driverId) {
+        const drvKey = `dp_notifs_${l.driverId}`;
+        try {
+          const drvNotifs = JSON.parse(localStorage.getItem(drvKey) || '[]');
+          drvNotifs.unshift({
+            id: uid('dpn'),
+            title: `Load #${l.loadNumber || l.id} Removed`,
+            body: `Load #${l.loadNumber || l.id} has been deleted by dispatch management.`,
+            at: new Date().toISOString(),
+            read: false
+          });
+          localStorage.setItem(drvKey, JSON.stringify(drvNotifs.slice(0, 30)));
+        } catch (e) {}
       }
 
-      // Rule 2: Dispatcher permission & notification confirmation
-      const dspName = l.dispatcherName || (STATE.dispatchers.find(d => String(d.id) === String(l.dispatcherId)) || {}).name;
-      if (dspName) {
-        const ok = confirm(`Load #${l.loadNumber || l.id} is assigned to Dispatcher ${dspName}.\n\nConfirm deletion and send delete authorization to Dispatcher ${dspName}?`);
-        if (!ok) return;
-        pushNotification(`Delete Request — Load #${l.loadNumber || l.id}`, `Admin deleted load #${l.loadNumber || l.id} (assigned to ${dspName}).`);
-      } else {
-        const ok = confirm(`Are you sure you want to delete Load #${l.loadNumber || l.id}?`);
-        if (!ok) return;
-      }
-
-      // Delete load permanently across board, dispatchers, and drivers
+      // Delete load permanently across board
       STATE.loads = STATE.loads.filter(x => String(x.id) !== String(id));
       persist();
       renderLoadBoard();
-      toast('Load Deleted', `Load #${l.loadNumber || l.id} has been removed from the board.`, true);
+      toast('Load Deleted & Notified', `Load #${l.loadNumber || l.id} removed. Alerts sent to ${dspName} & ${drvName}.`, true);
     }
 
     function deleteLoad(id) {
@@ -10089,6 +10113,15 @@
       <h2>Google Drive</h2>
     </div>
     <div id="drive-uploads-section-${l.id}"><div class="hint">Loading Drive records…</div></div>
+    ${STATE.role === 'admin' ? `
+    <div class="hr"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;">
+      <span class="hint" style="color:var(--text-faint);">Admin Management</span>
+      <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626;border-color:#fca5a5;" onclick="closeModal('modal-load');confirmDeleteLoad('${l.id}')">
+        <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+        Delete Load
+      </button>
+    </div>` : ''}
   `;
       openModal('modal-load');
       // Async-populate the Drive section after modal is open (non-blocking)
