@@ -8059,204 +8059,204 @@
       const ctx = canvas.getContext('2d');
 
       // 1. Deep Obsidian Titanium Gradient Face Background
-      const bgGrad = ctx.createRadialGradient(256, 256, 40, 256, 256, 320);
-      bgGrad.addColorStop(0, '#101d36');
-      bgGrad.addColorStop(0.65, '#081020');
+      const bgGrad = ctx.createRadialGradient(256, 256, 30, 256, 256, 340);
+      bgGrad.addColorStop(0, '#13233f');
+      bgGrad.addColorStop(0.65, '#0a1426');
       bgGrad.addColorStop(1, '#030712');
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, 512, 512);
 
-      // 2. Chamfer Rounded Inner Frame (Metallic Sapphire + Cyan Neon Inset)
-      ctx.lineWidth = 18;
-      ctx.strokeStyle = '#1e3a8a';
-      ctx.strokeRoundRect ? ctx.strokeRoundRect(24, 24, 464, 464, 48) : ctx.strokeRect(24, 24, 464, 464);
+      // 2. Thick Chamfer Rounded Inner Frame (Metallic Sapphire + Cyan Neon Inset)
+      ctx.lineWidth = 22;
+      ctx.strokeStyle = '#1e40af';
+      ctx.strokeRoundRect ? ctx.strokeRoundRect(20, 20, 472, 472, 52) : ctx.strokeRect(20, 20, 472, 472);
 
-      ctx.lineWidth = 8;
+      ctx.lineWidth = 10;
       ctx.strokeStyle = '#00f0ff';
       ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = 24;
-      ctx.strokeRoundRect ? ctx.strokeRoundRect(44, 44, 424, 424, 36) : ctx.strokeRect(44, 44, 424, 424);
+      ctx.shadowBlur = 28;
+      ctx.strokeRoundRect ? ctx.strokeRoundRect(44, 44, 424, 424, 40) : ctx.strokeRect(44, 44, 424, 424);
       ctx.shadowBlur = 0;
 
-      // 3. Draw High-Fidelity Sculpted 3D Icons
+      // 3. Draw Ultra-Bold High-Contrast Sculpted 3D Icons
       ctx.save();
       ctx.translate(256, 256);
 
       if (iconType === 'truck') {
-        // High-Fidelity Glossy White Semi-Truck (Front-Quarter View)
+        // Ultra-Bold Sculpted Pure White Semi-Truck (Front-Quarter View)
         ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 18;
+        ctx.shadowColor = 'rgba(0,240,255,0.9)';
+        ctx.shadowBlur = 24;
 
-        // Cab
+        // Aerodynamic High-Roof Cab Body
         ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(-135, -95, 140, 140, 16) : ctx.rect(-135, -95, 140, 140);
+        ctx.roundRect ? ctx.roundRect(-140, -110, 150, 160, 20) : ctx.rect(-140, -110, 150, 160);
         ctx.fill();
 
-        // Windshield
-        ctx.fillStyle = '#081020';
+        // Dark Panoramic Windshield
+        ctx.fillStyle = '#060d1a';
         ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(-120, -80, 110, 50, 8) : ctx.rect(-120, -80, 110, 50);
+        ctx.roundRect ? ctx.roundRect(-125, -92, 120, 54, 10) : ctx.rect(-125, -92, 120, 54);
         ctx.fill();
 
-        // Cargo Box
-        ctx.fillStyle = '#f1f5f9';
+        // Cargo Trailer Block
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,240,255,0.8)';
+        ctx.shadowBlur = 18;
         ctx.beginPath();
-        ctx.moveTo(15, -115);
-        ctx.lineTo(135, -115);
-        ctx.lineTo(135, 45);
-        ctx.lineTo(15, 45);
-        ctx.closePath();
+        ctx.roundRect ? ctx.roundRect(20, -125, 125, 175, 14) : ctx.rect(20, -125, 125, 175);
         ctx.fill();
 
-        // Grille & Headlight laser
-        ctx.fillStyle = '#00f0ff';
-        ctx.fillRect(-120, -15, 110, 8);
-        ctx.fillRect(-120, 0, 110, 8);
-        ctx.fillRect(-120, 15, 110, 8);
-
-        // Wheels
-        ctx.fillStyle = '#0f172a';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 6;
-        [[-80, 65], [45, 65], [105, 65]].forEach(([wx, wy]) => {
+        // Heavy-duty Dual Axle Wheels
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#020617';
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 8;
+        [[-75, 75], [55, 75], [115, 75]].forEach(([wx, wy]) => {
           ctx.beginPath();
-          ctx.arc(wx, wy, 24, 0, Math.PI * 2);
+          ctx.arc(wx, wy, 28, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
+          // Chrome Wheel Hub
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(wx, wy, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#020617';
         });
-      } else if (iconType === 'ai') {
-        // High-Fidelity Glowing AI Neural Brain Core
-        ctx.strokeStyle = '#00f0ff';
+
+        // Laser Cyan Grille Bars
         ctx.fillStyle = '#00f0ff';
+        ctx.fillRect(-120, -22, 110, 10);
+        ctx.fillRect(-120, -4, 110, 10);
+        ctx.fillRect(-120, 14, 110, 10);
+      } else if (iconType === 'ai') {
+        // Ultra-Bold Glowing AI Neural Brain Core
+        ctx.strokeStyle = '#ffffff';
+        ctx.fillStyle = '#ffffff';
         ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 24;
-        ctx.lineWidth = 8;
+        ctx.shadowBlur = 28;
+        ctx.lineWidth = 12;
         ctx.lineCap = 'round';
 
-        // Outer Brain Lobes
+        // Outer Brain Structure
         ctx.beginPath();
-        ctx.arc(-45, -30, 48, Math.PI * 0.7, Math.PI * 1.8);
-        ctx.arc(0, -65, 40, Math.PI * 1.1, Math.PI * 1.9);
-        ctx.arc(45, -30, 48, Math.PI * 1.2, Math.PI * 2.3);
-        ctx.arc(40, 35, 46, Math.PI * 1.7, Math.PI * 0.4);
-        ctx.arc(0, 70, 36, Math.PI * 1.9, Math.PI * 1.1);
-        ctx.arc(-40, 35, 46, Math.PI * 0.6, Math.PI * 1.3);
+        ctx.arc(-50, -35, 54, Math.PI * 0.7, Math.PI * 1.8);
+        ctx.arc(0, -75, 46, Math.PI * 1.1, Math.PI * 1.9);
+        ctx.arc(50, -35, 54, Math.PI * 1.2, Math.PI * 2.3);
+        ctx.arc(45, 40, 52, Math.PI * 1.7, Math.PI * 0.4);
+        ctx.arc(0, 80, 42, Math.PI * 1.9, Math.PI * 1.1);
+        ctx.arc(-45, 40, 52, Math.PI * 0.6, Math.PI * 1.3);
         ctx.closePath();
         ctx.stroke();
 
-        // Central Processor Chip
+        // Central Processor
         ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 10;
-        ctx.fillRect(-35, -35, 70, 70);
+        ctx.fillRect(-42, -42, 84, 84);
 
-        ctx.font = '900 28px "Inter", sans-serif';
-        ctx.fillStyle = '#081020';
+        ctx.font = '900 36px "Inter", sans-serif';
+        ctx.fillStyle = '#030712';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('AI', 0, 2);
 
-        // Circuit Nodes
-        [[-85, -20], [-70, 45], [85, -20], [70, 45], [0, -95], [0, 95]].forEach(([nx, ny]) => {
+        // Neural Nodes
+        [[-95, -20], [-80, 50], [95, -20], [80, 50], [0, -110], [0, 110]].forEach(([nx, ny]) => {
           ctx.beginPath();
-          ctx.arc(nx, ny, 8, 0, Math.PI * 2);
+          ctx.arc(nx, ny, 11, 0, Math.PI * 2);
           ctx.fillStyle = '#00f0ff';
           ctx.fill();
-          ctx.beginPath();
-          ctx.moveTo(nx > 0 ? 35 : (nx < 0 ? -35 : 0), ny > 0 ? 35 : (ny < 0 ? -35 : 0));
-          ctx.lineTo(nx, ny);
-          ctx.stroke();
         });
       } else if (iconType === 'folder') {
-        // High-Fidelity 3D Document Folder
+        // Ultra-Bold 3D Documents Folder
         ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 20;
-
-        ctx.beginPath();
-        ctx.moveTo(-135, -70);
-        ctx.lineTo(-45, -70);
-        ctx.lineTo(-15, -35);
-        ctx.lineTo(135, -35);
-        ctx.lineTo(135, 95);
-        ctx.lineTo(-135, 95);
-        ctx.closePath();
-        ctx.fill();
-
-        // Front Tab with Cyan Accent
-        ctx.fillStyle = '#0ea5e9';
-        ctx.beginPath();
-        ctx.moveTo(-135, 10);
-        ctx.lineTo(135, 10);
-        ctx.lineTo(120, 95);
-        ctx.lineTo(-120, 95);
-        ctx.closePath();
-        ctx.fill();
-
-        // Document Paper protruding
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(-70, -95, 140, 80);
-      } else if (iconType === 'driver') {
-        // High-Fidelity Aviator Driver Profile
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 20;
-
-        // Head / Helmet
-        ctx.beginPath();
-        ctx.arc(0, -45, 52, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Aviator Visor
-        ctx.fillStyle = '#081020';
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(-42, -55, 84, 30, 10) : ctx.rect(-42, -55, 84, 30);
-        ctx.fill();
-
-        // Shoulders / Jacket
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 110, 95, Math.PI * 1.15, Math.PI * 1.85);
-        ctx.fill();
-      } else if (iconType === 'headset') {
-        // High-Fidelity Dispatch Support Headset
-        ctx.strokeStyle = '#ffffff';
-        ctx.fillStyle = '#ffffff';
-        ctx.lineWidth = 14;
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 20;
-
-        ctx.beginPath();
-        ctx.arc(0, -15, 85, Math.PI, 0);
-        ctx.stroke();
-
-        // Ear Cups
-        ctx.fillRect(-115, -30, 32, 65);
-        ctx.fillRect(83, -30, 32, 65);
-
-        // Mic Arm
-        ctx.beginPath();
-        ctx.moveTo(98, 25);
-        ctx.lineTo(98, 75);
-        ctx.lineTo(25, 75);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(15, 75, 15, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (iconType === 'dollar') {
-        // High-Fidelity Fintech Currency Core
-        ctx.strokeStyle = '#00f0ff';
-        ctx.lineWidth = 10;
         ctx.shadowColor = '#00f0ff';
         ctx.shadowBlur = 24;
 
         ctx.beginPath();
-        ctx.arc(0, 0, 105, 0, Math.PI * 2);
+        ctx.moveTo(-145, -75);
+        ctx.lineTo(-45, -75);
+        ctx.lineTo(-15, -40);
+        ctx.lineTo(145, -40);
+        ctx.lineTo(145, 105);
+        ctx.lineTo(-145, 105);
+        ctx.closePath();
+        ctx.fill();
+
+        // Cyan Front Pocket
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.moveTo(-145, 15);
+        ctx.lineTo(145, 15);
+        ctx.lineTo(130, 105);
+        ctx.lineTo(-130, 105);
+        ctx.closePath();
+        ctx.fill();
+
+        // White Paper Sheet
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(-80, -110, 160, 95);
+      } else if (iconType === 'driver') {
+        // Ultra-Bold Aviator Driver Profile
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 24;
+
+        // Helmet / Head
+        ctx.beginPath();
+        ctx.arc(0, -48, 58, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dark Aviator Visor
+        ctx.fillStyle = '#030712';
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(-46, -60, 92, 34, 12) : ctx.rect(-46, -60, 92, 34);
+        ctx.fill();
+
+        // Broad Driver Shoulders
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, 118, 105, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.fill();
+      } else if (iconType === 'headset') {
+        // Ultra-Bold Dispatch Support Headset
+        ctx.strokeStyle = '#ffffff';
+        ctx.fillStyle = '#ffffff';
+        ctx.lineWidth = 18;
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 24;
+
+        ctx.beginPath();
+        ctx.arc(0, -15, 95, Math.PI, 0);
         ctx.stroke();
 
-        ctx.font = '900 140px "Inter", sans-serif';
+        // Cushioned Ear Cups
+        ctx.fillRect(-125, -35, 36, 75);
+        ctx.fillRect(89, -35, 36, 75);
+
+        // Mic Arm & Capsule
+        ctx.beginPath();
+        ctx.moveTo(107, 25);
+        ctx.lineTo(107, 85);
+        ctx.lineTo(25, 85);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(15, 85, 18, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (iconType === 'dollar') {
+        // Ultra-Bold Fintech Currency Core
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 12;
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 28;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 115, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.font = '900 160px "Inter", sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -8280,12 +8280,12 @@
         new THREE.MeshPhysicalMaterial({ map: createLuxuryDiceFaceTexture('headset'), roughness: 0.15, metalness: 0.85, clearcoat: 1.0 })   // -Z Support
       ];
 
-      const bodyGeom = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+      const bodyGeom = new THREE.BoxGeometry(1.65, 1.65, 1.65);
       const bodyMesh = new THREE.Mesh(bodyGeom, materials);
       diceGroup.add(bodyMesh);
 
       // Glowing outer rounded cyan cage frame
-      const wireGeom = new THREE.BoxGeometry(1.64, 1.64, 1.64);
+      const wireGeom = new THREE.BoxGeometry(1.69, 1.69, 1.69);
       const wireMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.35 });
       const wireCube = new THREE.Mesh(wireGeom, wireMat);
       diceGroup.add(wireCube);
@@ -8303,7 +8303,7 @@
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-      camera.position.z = 4.2;
+      camera.position.z = 4.0;
 
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setSize(width, height);
@@ -8313,22 +8313,24 @@
       container.appendChild(renderer.domElement);
 
       // Luxury Studio Lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1.6);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
       scene.add(ambientLight);
 
-      const keyLight = new THREE.DirectionalLight(0xffffff, 3.4);
+      const keyLight = new THREE.DirectionalLight(0xffffff, 3.8);
       keyLight.position.set(4, 5, 6);
       scene.add(keyLight);
 
-      const rimLight = new THREE.DirectionalLight(0x38bdf8, 2.5);
+      const rimLight = new THREE.DirectionalLight(0x38bdf8, 3.0);
       rimLight.position.set(-4, -3, 3);
       scene.add(rimLight);
 
-      const pointLight = new THREE.PointLight(0x0ea5e9, 3.5, 10);
+      const pointLight = new THREE.PointLight(0x00f0ff, 4.0, 10);
       pointLight.position.set(0, 0, 1.8);
       scene.add(pointLight);
 
       const { diceGroup, wireMat } = buildLuxuryDiceMesh();
+      // Set initial 3/4 isometric perspective matching concept render
+      diceGroup.rotation.set(0.35, -0.55, 0.15);
       scene.add(diceGroup);
 
       let mouseX = 0, mouseY = 0;
@@ -8435,14 +8437,14 @@
 
         if (!isTransitioning) {
           if (isHovered) {
-            diceGroup.rotation.y += (mouseX * 1.0 - diceGroup.rotation.y % (Math.PI * 2)) * 0.05 + 0.002;
-            diceGroup.rotation.x += (mouseY * 1.0 - diceGroup.rotation.x % (Math.PI * 2)) * 0.05;
+            diceGroup.rotation.y += (mouseX * 1.0 - (diceGroup.rotation.y % (Math.PI * 2))) * 0.05 + 0.002;
+            diceGroup.rotation.x += (mouseY * 1.0 - (diceGroup.rotation.x % (Math.PI * 2))) * 0.05;
             diceGroup.scale.set(1.03, 1.03, 1.03);
             pointLight.intensity = 4.8;
           } else {
             // Continuous simultaneous multi-axis living motion
-            diceGroup.rotation.y += 0.004;
-            diceGroup.rotation.x += Math.sin(time * 0.8) * 0.0015;
+            diceGroup.rotation.y += 0.005;
+            diceGroup.rotation.x += Math.sin(time * 0.8) * 0.002;
             diceGroup.rotation.z = Math.sin(time * 0.5) * 0.02;
             diceGroup.scale.set(1, 1, 1);
             pointLight.intensity = 3.4 + Math.sin(time * 2.0) * 0.4;
