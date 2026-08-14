@@ -4954,6 +4954,8 @@ function normalizeOcrDate(s){
   if(!m) return '';
   let [, a, b, y] = m;
   if(y.length===2) y = (parseInt(y,10)<70 ? '20' : '19') + y;
+  return y+'-'+a.padStart(2,'0')+'-'+b.padStart(2,'0');
+}
 function resetLoadForm(){
   document.getElementById('load-form').reset();
   lastMCAutoFilledName = '';
