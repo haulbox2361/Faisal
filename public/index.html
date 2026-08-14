@@ -3855,6 +3855,48 @@ function stateAbbrev(loc){
 }
 // Strips characters that aren't safe in a downloaded filename on Windows/Mac/Linux.
 function sanitizeFilename(name){ return (name||'').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim(); }
+
+/**
+ * Extracts clean "City, ST" from a full address string (e.g., "123 Main St, Houston, TX 77001" -> "Houston, TX")
+ */
+function formatCityState(loc){
+  if(!loc) return '';
+  const s = String(loc).trim();
+  if(!s) return '';
+  
+  // Check if address matches "..., City, ST 12345" or "..., City, ST" or "City, ST"
+  const m = s.match(/(?:^|,\s*)([A-Za-z\s.]+),\s*([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*$/);
+  if(m && m[1] && m[2]){
+    const city = m[1].replace(/^.*[,\n\r]+/, '').trim();
+    const st = m[2].toUpperCase();
+    if(city && st) return city + ', ' + st;
+  }
+
+  // Fallback: try splitting by comma
+  const parts = s.split(',').map(p=>p.trim()).filter(Boolean);
+  if(parts.length >= 2){
+    const stMatch = parts[parts.length-1].match(/([A-Za-z]{2})(?:\s+\d{5})?/);
+    const state = stMatch ? stMatch[1].toUpperCase() : stateAbbrev(s);
+    const city = parts[parts.length-2];
+    if(city && state && state !== 'XX') return city + ', ' + state;
+  }
+
+  const stAbbr = stateAbbrev(s);
+  if(stAbbr && stAbbr !== 'XX' && parts.length > 0){
+    return parts[0] + ', ' + stAbbr;
+  }
+  return s;
+}
+
+/**
+ * Formats a clean "Pickup City, ST → Dropoff City, ST" lane for load board and summary widgets
+ */
+function formatCityStateLane(pickup, dropoff){
+  const pu = formatCityState(pickup);
+  const doo = formatCityState(dropoff);
+  if(pu && doo) return pu + ' → ' + doo;
+  return pu || doo || '—';
+}
 function fmtDate(s){ if(!s) return '—'; const d=new Date(s+'T00:00:00'); if(isNaN(d)) return s; return d.toLocaleDateString(undefined,{month:'2-digit',day:'2-digit',year:'numeric'}); }
 function within(dateStr, range, fromDate, toDate){
   if(range==='all' || !dateStr) return true;
@@ -5116,13 +5158,13 @@ function renderLoadBoard(){
 
   if (body) {
     body.innerHTML = rows.map(l => {
-      const lane = [l.pickup, l.dropoff].filter(Boolean).join(' → ') || '—';
+      const lane = formatCityStateLane(l.pickup, l.dropoff);
       const isLocked = isLoadLockedFromDeletion(l);
       return `
         <tr onclick="openLoadModal('${l.id}')" style="cursor:pointer;">
           <td class="cell-mono cell-strong" style="padding:12px 16px;font-weight:700;color:#0f172a;">${escapeAttr(l.loadNumber)}</td>
           <td style="padding:12px 16px;font-weight:600;color:#334155;">${escapeAttr(l.driverName || '—')}</td>
-          <td class="cell-dim" style="padding:12px 16px;color:#64748b;">${escapeAttr(lane)}</td>
+          <td class="cell-dim" style="padding:12px 16px;color:#64748b;" title="${escapeAttr([l.pickup, l.dropoff].filter(Boolean).join(' → '))}">${escapeAttr(lane)}</td>
           <td class="cell-mono" style="padding:12px 16px;font-weight:700;color:#0f172a;">${money(l.brokerRate)}</td>
           ${isAdmin ? `<td class="cell-dim" data-role-view="admin" style="padding:12px 16px;color:#64748b;">${escapeAttr(l.dispatcherName || '—')}</td>` : ''}
           <td style="padding:12px 16px;">${placard(l.status, l)}</td>
@@ -6545,7 +6587,7 @@ function renderDriverPay(){
     '<td class="cell-mono cell-strong" style="cursor:pointer;" onclick="openLoadModal(\''+l.id+'\')">'+l.loadNumber+'</td>'+
     '<td>'+fmtDate(settlementDateOf(l))+'</td>'+
     '<td>'+(l.driverName||'—')+'</td>'+
-    '<td class="cell-dim">'+l.pickup+' → '+l.dropoff+'</td>'+
+    '<td class="cell-dim" title="'+escapeAttr([l.pickup, l.dropoff].filter(Boolean).join(' → '))+'">'+escapeAttr(formatCityStateLane(l.pickup, l.dropoff))+'</td>'+
     '<td>'+placard(l.status)+'</td>'+
     '<td class="cell-mono">'+money(l.brokerRate)+'</td>'+
     '<td class="cell-mono">'+(l.driverPayPct!=null? l.driverPayPct : driverPayPctFor(l.driverId))+'%</td>'+
@@ -6816,7 +6858,7 @@ function renderStatistics(){
     '<td>'+placard(l.status)+'</td>'+
     '<td>'+l.driverName+'</td>'+
     '<td>'+l.brokerName+'</td>'+
-    '<td class="cell-dim">'+l.pickup+' → '+l.dropoff+'</td>'+
+    '<td class="cell-dim" title="'+escapeAttr([l.pickup, l.dropoff].filter(Boolean).join(' → '))+'">'+escapeAttr(formatCityStateLane(l.pickup, l.dropoff))+'</td>'+
     '<td>'+fmtDate(l.pickupDate)+'</td>'+
     '<td>'+fmtDate(l.deliveryDate)+'</td>'+
     '<td class="cell-mono">'+money(l.brokerRate)+'</td>'+
@@ -6861,7 +6903,7 @@ function renderDocsList(){
   document.getElementById('docs-body').innerHTML = rows.map(l=>{
     const dot = (v)=> v? '<span style="color:var(--green);">●</span>' : '<span style="color:var(--text-faint);">○</span>';
     const anyDocs = l.docs.RC || l.docs.BOL || l.docs.POD || (l.docs.PhotosPU&&l.docs.PhotosPU.length) || (l.docs.PhotosDO&&l.docs.PhotosDO.length) || (l.docs.Extra&&l.docs.Extra.length);
-    return '<tr onclick="openLoadModal(\''+l.id+'\')"><td class="cell-mono cell-strong">'+l.loadNumber+'</td><td>'+l.driverName+'</td><td class="cell-dim">'+l.pickup+' → '+l.dropoff+'</td>'+
+    return '<tr onclick="openLoadModal(\''+l.id+'\')"><td class="cell-mono cell-strong">'+l.loadNumber+'</td><td>'+l.driverName+'</td><td class="cell-dim" title="'+escapeAttr([l.pickup, l.dropoff].filter(Boolean).join(' → '))+'">'+escapeAttr(formatCityStateLane(l.pickup, l.dropoff))+'</td>'+
     '<td>'+dot(l.docs.RC)+'</td><td>'+dot(l.docs.PhotosPU&&l.docs.PhotosPU.length)+'</td><td>'+dot(l.docs.PhotosDO&&l.docs.PhotosDO.length)+'</td><td>'+dot(l.docs.BOL)+'</td><td>'+dot(l.docs.POD)+'</td><td>'+dot(l.docs.Extra&&l.docs.Extra.length)+'</td>'+
     '<td>'+(anyDocs? '<a href="#" onclick="event.stopPropagation();downloadPackage(\''+l.id+'\')" style="color:var(--blue);">Download</a>' : '<span class="cell-faint" style="color:var(--text-faint);">—</span>')+'</td>'+
     '<td onclick="event.stopPropagation()"><button class="btn btn-sm" onclick="openLoadModal(\''+l.id+'\')">Manage</button></td></tr>';
