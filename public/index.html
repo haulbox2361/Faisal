@@ -7710,8 +7710,8 @@
         load.brokerName || '',
         mcDigitsOnly(load.brokerMC),
         load.driverName || '',
-        load.pickup || '',
-        load.dropoff || '',
+        formatCityStateZip(load.pickup) || load.pickup || '',
+        formatCityStateZip(load.dropoff) || load.dropoff || '',
         toMMDDYYYY(load.pickupDate),
         toMMDDYYYY(load.deliveryDate),
         load.brokerRate != null ? money(load.brokerRate) : '',
@@ -7934,15 +7934,27 @@
     function sanitizeFilename(name) { return (name || '').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim(); }
 
     /**
-     * Extracts clean "City, ST" from a full address string (e.g., "123 Main St, Houston, TX 77001" -> "Houston, TX")
+     * Extracts clean "City, ST Zip" or "City, ST" from a full address or location string
+     * e.g., "123 Main St, Houston, TX 77001" -> "Houston, TX 77001"
+     * e.g., "Dallas, TX 75001" -> "Dallas, TX 75001"
+     * e.g., "Chicago, IL" -> "Chicago, IL"
      */
-    function formatCityState(loc) {
+    function formatCityStateZip(loc) {
       if (!loc) return '';
       const s = String(loc).trim();
       if (!s) return '';
 
-      // Check if address matches "..., City, ST 12345" or "..., City, ST" or "City, ST"
-      const m = s.match(/(?:^|,\s*)([A-Za-z\s.]+),\s*([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*$/);
+      // Check if address matches "..., City, ST 12345" or "City, ST 12345"
+      const mZip = s.match(/(?:^|,\s*)([A-Za-z\s.]+),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)\s*$/);
+      if (mZip && mZip[1] && mZip[2] && mZip[3]) {
+        const city = mZip[1].replace(/^.*[,\n\r]+/, '').trim();
+        const st = mZip[2].toUpperCase();
+        const zip = mZip[3].trim();
+        if (city && st) return city + ', ' + st + ' ' + zip;
+      }
+
+      // Check if address matches "..., City, ST" or "City, ST"
+      const m = s.match(/(?:^|,\s*)([A-Za-z\s.]+),\s*([A-Za-z]{2})\s*$/);
       if (m && m[1] && m[2]) {
         const city = m[1].replace(/^.*[,\n\r]+/, '').trim();
         const st = m[2].toUpperCase();
@@ -7952,10 +7964,14 @@
       // Fallback: try splitting by comma
       const parts = s.split(',').map(p => p.trim()).filter(Boolean);
       if (parts.length >= 2) {
-        const stMatch = parts[parts.length - 1].match(/([A-Za-z]{2})(?:\s+\d{5})?/);
-        const state = stMatch ? stMatch[1].toUpperCase() : stateAbbrev(s);
-        const city = parts[parts.length - 2];
-        if (city && state && state !== 'XX') return city + ', ' + state;
+        const lastPart = parts[parts.length - 1];
+        const stMatch = lastPart.match(/([A-Za-z]{2})(?:\s+(\d{5}(?:-\d{4})?))?/);
+        if (stMatch) {
+          const state = stMatch[1].toUpperCase();
+          const zip = stMatch[2] ? ' ' + stMatch[2] : '';
+          const city = parts[parts.length - 2].replace(/^.*[,\n\r]+/, '').trim();
+          if (city && state && state !== 'XX') return city + ', ' + state + zip;
+        }
       }
 
       const stAbbr = stateAbbrev(s);
@@ -7966,11 +7982,19 @@
     }
 
     /**
-     * Formats a clean "Pickup City, ST → Dropoff City, ST" lane for load board and summary widgets
+     * Extracts clean "City, ST" from a full address string
+     */
+    function formatCityState(loc) {
+      const csz = formatCityStateZip(loc);
+      return csz.replace(/\s+\d{5}(?:-\d{4})?$/, '');
+    }
+
+    /**
+     * Formats a clean "Pickup City, ST Zip → Dropoff City, ST Zip" lane for load board and summary widgets
      */
     function formatCityStateLane(pickup, dropoff) {
-      const pu = formatCityState(pickup);
-      const doo = formatCityState(dropoff);
+      const pu = formatCityStateZip(pickup);
+      const doo = formatCityStateZip(dropoff);
       if (pu && doo) return pu + ' → ' + doo;
       return pu || doo || '—';
     }
@@ -9373,8 +9397,8 @@
         const prompt = 'This is a freight broker Rate Confirmation (RC) document. Read it carefully and return ONLY a valid JSON object ' +
           '(no markdown blocks, no text before or after) with exactly these keys: ' +
           '{"load_number":"","pickup_date":"YYYY-MM-DD or empty","delivery_date":"YYYY-MM-DD or empty",' +
-          '"pickup_address":"","pickup_city":"","pickup_state":"2-letter state code",' +
-          '"delivery_address":"","dropoff_city":"","dropoff_state":"2-letter state code",' +
+          '"pickup_address":"","pickup_city":"","pickup_state":"2-letter state code","pickup_zip":"5-digit zip code or empty",' +
+          '"delivery_address":"","dropoff_city":"","dropoff_state":"2-letter state code","delivery_zip":"5-digit zip code or empty",' +
           '"miles":number or null,"rate":number or null,"broker_name":"","broker_mc":"","notes":""}.';
 
         console.log('[RC-EXTRACTION] 📄 Starting document extraction for:', file.name, { isPdf, mediaType, size: file.size });
@@ -9506,13 +9530,23 @@
         setField('f-deliverydate', String(d.delivery_date).trim(), 'Delivery date', 'delivery_date');
       }
 
-      const puParts = [d.pickup_address, d.pickup_city, d.pickup_state, d.pickup_zip].filter(Boolean);
-      const pu = puParts.length ? puParts.join(', ') : [d.pickup_city, d.pickup_state].filter(Boolean).join(', ');
-      const doParts = [d.delivery_address, d.dropoff_city, d.dropoff_state, d.delivery_zip].filter(Boolean);
-      const doo = doParts.length ? doParts.join(', ') : [d.dropoff_city, d.dropoff_state].filter(Boolean).join(', ');
+      // Format Pickup & Dropoff strictly as City, State Zip (or City, State)
+      let pu = '';
+      if (d.pickup_city && d.pickup_state) {
+        pu = d.pickup_city.trim() + ', ' + d.pickup_state.trim().toUpperCase() + (d.pickup_zip ? (' ' + d.pickup_zip.trim()) : '');
+      } else if (d.pickup_address) {
+        pu = formatCityStateZip(d.pickup_address);
+      }
 
-      if (pu) setField('f-pickup', pu.trim(), 'Pickup location', 'pickup');
-      if (doo) setField('f-dropoff', doo.trim(), 'Drop-off location', 'dropoff');
+      let doo = '';
+      if (d.dropoff_city && d.dropoff_state) {
+        doo = d.dropoff_city.trim() + ', ' + d.dropoff_state.trim().toUpperCase() + (d.delivery_zip ? (' ' + d.delivery_zip.trim()) : '');
+      } else if (d.delivery_address) {
+        doo = formatCityStateZip(d.delivery_address);
+      }
+
+      if (pu) setField('f-pickup', pu.trim(), 'Pickup (City, State Zip)', 'pickup');
+      if (doo) setField('f-dropoff', doo.trim(), 'Drop-off (City, State Zip)', 'dropoff');
 
       if (d.broker_mc && document.getElementById('f-brokermc')) {
         setField('f-brokermc', String(d.broker_mc).trim(), 'Broker MC', 'broker_mc');
