@@ -657,6 +657,25 @@ a{color:inherit;}
   </div>
 </div>
 
+<!-- Full-screen document preview (RC, BOL, POD) -->
+<div class="dp-modal-overlay" id="dp-doc-modal">
+  <div class="dp-modal" style="max-width:900px; width:95vw; height:90vh; max-height:90vh; display:flex; flex-direction:column;">
+    <div class="dp-modal-head">
+      <div>
+        <div class="dp-modal-head-sub" id="dp-doc-modal-sub">Document</div>
+        <h3 id="dp-doc-modal-title">Rate Confirmation</h3>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <a class="dp-btn-sm primary" id="dp-doc-download-btn" target="_blank" download="document">Download / Open</a>
+        <button class="dp-modal-close" onclick="closeModal('dp-doc-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+    </div>
+    <div style="flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; background:var(--bg); padding:0;" id="dp-doc-container">
+      <iframe id="dp-doc-frame" style="width:100%; height:100%; border:none;" src=""></iframe>
+    </div>
+  </div>
+</div>
+
 
 
 <!-- WhatsApp-style Chat thread overlay -->
@@ -2151,12 +2170,35 @@ function startUploadDoc(loadId, key) {
 
 async function viewLoadDoc(loadId, key, index) {
   try {
+    toast('Opening document…');
     const res = await api('/api/driver/doc', {
       method: 'POST',
       body: JSON.stringify({ loadId, key, index })
     });
     if (res.data) {
-      window.open(res.data, '_blank');
+      const docTitle = (DOC_LABELS[key] || key) + (res.name ? ` — ${res.name}` : '');
+      const dataUri = res.data;
+      const isImg = dataUri.startsWith('data:image/') || (res.name && /\.(png|jpg|jpeg|webp|gif)$/i.test(res.name));
+
+      if (isImg) {
+        document.getElementById('dp-photo-title').textContent = docTitle;
+        document.getElementById('dp-photo-img').src = dataUri;
+        const delBtn = document.getElementById('dp-photo-delete-btn');
+        if (delBtn) delBtn.style.display = (key === 'PhotosPU' || key === 'PhotosDO' || key === 'Extra') ? 'block' : 'none';
+        document.getElementById('dp-photo-modal').classList.add('active');
+      } else {
+        // PDF or other document format
+        document.getElementById('dp-doc-modal-title').textContent = res.name || (DOC_LABELS[key] || key);
+        document.getElementById('dp-doc-modal-sub').textContent = DOC_LABELS[key] || 'Document';
+        const dlBtn = document.getElementById('dp-doc-download-btn');
+        if (dlBtn) {
+          dlBtn.href = dataUri;
+          dlBtn.download = res.name || `${key}_document.pdf`;
+        }
+        const frame = document.getElementById('dp-doc-frame');
+        if (frame) frame.src = dataUri;
+        document.getElementById('dp-doc-modal').classList.add('active');
+      }
     } else {
       toast('Document file data not available.');
     }

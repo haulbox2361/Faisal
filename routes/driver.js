@@ -147,19 +147,45 @@ function requirePermission(res, driver, key, label) {
 // Shapes a load down to only what a driver should ever see about their own
 // run — no dispatch revenue, no broker rate, no other drivers' pay, nothing
 function shapeLoadForDriver(l) {
-  const docs = l.documents || {};
-  const singleMeta = (doc) => (doc && doc.hasFile ? { hasFile: true, fileName: doc.fileName || null, mimeType: doc.mimeType || null } : { hasFile: false });
-  const arrMeta = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && x.hasFile).map((x) => ({ hasFile: true, fileName: x.fileName || null, mimeType: x.mimeType || null })) : []);
+  const docs = l.docs || l.documents || {};
+  const singleMeta = (doc) => {
+    if (!doc) return { hasFile: false };
+    if (typeof doc === 'object' && (doc.hasFile || doc.name || doc.data || doc.fileName)) {
+      return { hasFile: true, name: doc.name || doc.fileName || 'Document', fileName: doc.fileName || doc.name || null, mimeType: doc.mimeType || null };
+    }
+    return { hasFile: false };
+  };
+  const arrMeta = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && (x.hasFile || x.name || x.data || x.fileName)).map((x) => ({ hasFile: true, name: x.name || x.fileName || 'Photo', fileName: x.fileName || x.name || null, mimeType: x.mimeType || null })) : []);
+
+  const shapedDocs = {
+    RC: singleMeta(docs.RC),
+    BOL: singleMeta(docs.BOL),
+    POD: singleMeta(docs.POD),
+    PhotosPU: arrMeta(docs.PhotosPU),
+    PhotosDO: arrMeta(docs.PhotosDO),
+    Extra: arrMeta(docs.Extra),
+  };
 
   return {
     id: l.id,
     loadNumber: l.loadNumber,
+    brokerName: l.brokerName,
+    driverPay: l.driverPay,
     status: l.status,
-    driverCheckpoint: l.driverCheckpoint || null,
+    driverProgress: l.driverProgress || l.driverCheckpoint || 'ASSIGNED',
+    driverCheckpoint: l.driverProgress || l.driverCheckpoint || null,
     pickup: l.pickup,
     dropoff: l.dropoff,
     pickupDate: l.pickupDate,
+    pickupTime: l.pickupTime,
     deliveryDate: l.deliveryDate,
+    deliveryTime: l.deliveryTime,
+    miles: l.miles,
+    milesRemaining: l.milesRemaining,
+    eta: l.eta,
+    driverManualEta: l.driverManualEta,
+    pickupEta: l.pickupEta,
+    timestamps: l.timestamps || {},
     pickupAddress: l.pickupAddress || null,
     pickupContact: l.pickupContact || null,
     pickupPhone: l.pickupPhone || null,
@@ -170,14 +196,8 @@ function shapeLoadForDriver(l) {
     weight: l.weight || null,
     commodity: l.commodity || null,
     trailerType: l.trailerType || null,
-    documents: {
-      RC: singleMeta(docs.RC),
-      BOL: singleMeta(docs.BOL),
-      POD: singleMeta(docs.POD),
-      PhotosPU: arrMeta(docs.PhotosPU),
-      PhotosDO: arrMeta(docs.PhotosDO),
-      Extra: arrMeta(docs.Extra),
-    },
+    docs: shapedDocs,
+    documents: shapedDocs,
   };
 }
 
