@@ -979,37 +979,42 @@
     .field input,
     .field select,
     .field textarea {
-      background: var(--bg-elev2);
+      background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 9px 11px;
+      border-radius: 8px;
+      padding: 10px 13px;
       color: var(--text);
-      font-size: 13px;
+      font-size: 13.5px;
       outline: none;
       width: 100%;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
     .field input:focus,
     .field select:focus,
     .field textarea:focus {
       border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    .field input[readonly] {
-      color: var(--text-faint);
-      background: var(--bg-elev1);
+    .field input[readonly],
+    .field textarea[readonly] {
+      color: var(--text) !important;
+      background: var(--bg-elev2) !important;
+      border: 1px solid var(--border) !important;
+      cursor: default;
     }
 
     .field .hint {
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--text-faint);
     }
 
     .field-computed {
       background: var(--accent-soft);
       border: 1px dashed var(--accent);
-      border-radius: 6px;
-      padding: 9px 11px;
+      border-radius: 8px;
+      padding: 10px 13px;
       font-family: 'IBM Plex Mono', monospace;
       font-weight: 600;
       color: var(--accent);
@@ -9701,7 +9706,7 @@
       if (mcHintEl) mcHintEl.textContent = '';
       setRcAiStatus(null);
       onRcPicked(document.getElementById('f-rc'));
-      document.getElementById('f-systemdate').value = '';
+      document.getElementById('f-systemdate').value = getTodayIsoString();
       document.getElementById('f-feepct').value = STATE.settings.defaultFeePct || 10;
       const dpDefEl = document.getElementById('f-driverpaypct'); if (dpDefEl) dpDefEl.value = defaultDriverPayPct();
       document.getElementById('f-revenue').textContent = '$0.00';
@@ -13789,6 +13794,4 @@ function doPost(e) {
     })();
   </script>
 </body>
-
 </html>
-https://127.0.0.1:56340/static/artifacts/0d04fdbe-1803-4784-ac19-1c89a149461a/haulbox_dice_concept_3_1786724778108.jpg?csrf=cb7901b5-0806-4c90-90ca-281fbbe5d022
