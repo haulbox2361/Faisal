@@ -4524,26 +4524,30 @@ async function extractRcWithAI(file){
       '"pickup_address":"","pickup_city":"","pickup_state":"2-letter state code",'+
       '"delivery_address":"","dropoff_city":"","dropoff_state":"2-letter state code",'+
       '"miles":number or null,"rate":number or null,"broker_name":"","broker_mc":"","notes":""}.';
+    
+    console.log('[RC-EXTRACTION] 📄 Starting document extraction for:', file.name, { isPdf, mediaType, size: file.size });
+
     let parsed = null;
+    let extractionError = null;
     try {
       parsed = await callClaudeForDoc(base64, mediaType, isPdf, prompt, 'rc');
+      console.log('[RC-EXTRACTION] ✅ AI Provider returned parsed result:', parsed);
     } catch(aiErr) {
-      console.warn('AI API extraction failed, using native OCR text extraction fallback:', aiErr.message);
-      let rawText = '';
-      try {
-        rawText = atob(base64);
-      } catch(e) { rawText = file.name; }
-      parsed = extractRcFieldsFromText(rawText);
-      if (!parsed.load_number) {
-        const numMatch = file.name.match(/(\d{4,8})/);
-        parsed.load_number = numMatch ? numMatch[1] : ('LOAD-' + Math.floor(1000 + Math.random() * 9000));
-      }
+      extractionError = aiErr;
+      console.warn('[RC-EXTRACTION] ⚠️ AI extraction failed:', aiErr.message);
     }
-    const filled = applyExtractedRcData(parsed);
-    setRcAiStatus('ok', filled.length ? ('Auto-filled from RC: '+filled.join(', ')+'. Please review before booking.') : 'RC uploaded — load fields updated.');
+
+    if (parsed) {
+      const filled = applyExtractedRcData(parsed);
+      console.log('[RC-EXTRACTION] ✍️ Auto-filled fields:', filled);
+      setRcAiStatus('ok', filled.length ? ('Auto-filled from RC: '+filled.join(', ')+'. Please review before booking.') : 'RC parsed — no structured fields detected.');
+    } else {
+      console.error('[RC-EXTRACTION] ❌ Extraction failed completely:', extractionError ? extractionError.message : 'Unknown error');
+      setRcAiStatus('err', 'AI Extraction failed: ' + (extractionError ? extractionError.message : 'Could not parse document. Please fill fields manually.'));
+    }
   } catch(err){
-    console.error('RC AI extraction fallback', err);
-    setRcAiStatus('ok', 'Uploaded RC document successfully.');
+    console.error('[RC-EXTRACTION] ❌ File reading/processing error:', err);
+    setRcAiStatus('err', 'Could not read document: ' + (err.message || 'Unknown error'));
   }
 }
 function safeParseJsonFromAi(rawContent) {
@@ -4819,6 +4823,7 @@ async function callMistralForDoc(base64, mediaType, isPdf, prompt){
   if(!model || model==='mistral-small-latest' || model==='mistral-tiny' || model==='mistral-medium'){
     model = 'pixtral-12b-2409';
   }
+  console.log('[MISTRAL-CLIENT] 🚀 Dispatching extraction request to /api/ai/mistral-extract', { model, isPdf, mediaType, promptLength: prompt.length });
   const resp = await fetch('/api/ai/mistral-extract', {
     method:'POST',
     headers: {'Content-Type':'application/json'},
@@ -4827,10 +4832,15 @@ async function callMistralForDoc(base64, mediaType, isPdf, prompt){
   let data = {};
   try { data = await resp.json(); } catch(e){}
   if(!resp.ok){
+    console.error('[MISTRAL-CLIENT] ❌ Request failed with status', resp.status, data);
     throw new Error(data.error || ('Mistral API error ' + resp.status));
   }
   const content = data.content;
-  if(!content) throw new Error('No response text from Mistral');
+  if(!content) {
+    console.error('[MISTRAL-CLIENT] ❌ Empty content payload in response', data);
+    throw new Error('No response text from Mistral');
+  }
+  console.log('[MISTRAL-CLIENT] 📥 Response received, parsing JSON payload...');
   return safeParseJsonFromAi(content);
 }
 async function callOcrSpaceForDoc(base64, mediaType, isPdf, kind){
@@ -5214,31 +5224,129 @@ function renderModalTrackingSection(l){
   </div>`;
 }
 
+/**
+ * Robust address normalization and comparison engine
+ */
+function normalizeAddressString(str) {
+  if (!str) return '';
+  return String(str).toLowerCase()
+    .replace(/\b(street|st|road|rd|avenue|ave|drive|dr|lane|ln|boulevard|blvd|court|ct|parkway|pkwy|highway|hwy|suite|ste|unit|apt|building|bldg|north|south|east|west|n|s|e|w)\b/gi, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeStateCode(s) {
+  if (!s) return '';
+  const clean = String(s).trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(clean)) return clean;
+  const stateMap = {
+    'ALABAMA':'AL','ALASKA':'AK','ARIZONA':'AZ','ARKANSAS':'AR','CALIFORNIA':'CA','COLORADO':'CO',
+    'CONNECTICUT':'CT','DELAWARE':'DE','FLORIDA':'FL','GEORGIA':'GA','HAWAII':'HI','IDAHO':'ID',
+    'ILLINOIS':'IL','INDIANA':'IN','IOWA':'IA','KANSAS':'KS','KENTUCKY':'KY','LOUISIANA':'LA',
+    'MAINE':'ME','MARYLAND':'MD','MASSACHUSETTS':'MA','MICHIGAN':'MI','MINNESOTA':'MN',
+    'MISSISSIPPI':'MS','MISSOURI':'MO','MONTANA':'MT','NEBRASKA':'NE','NEVADA':'NV',
+    'NEW HAMPSHIRE':'NH','NEW JERSEY':'NJ','NEW MEXICO':'NM','NEW YORK':'NY',
+    'NORTH CAROLINA':'NC','NORTH DAKOTA':'ND','OHIO':'OH','OKLAHOMA':'OK','OREGON':'OR',
+    'PENNSYLVANIA':'PA','RHODE ISLAND':'RI','SOUTH CAROLINA':'SC','SOUTH DAKOTA':'SD',
+    'TENNESSEE':'TN','TEXAS':'TX','UTAH':'UT','VERMONT':'VT','VIRGINIA':'VA',
+    'WASHINGTON':'WA','WEST VIRGINIA':'WV','WISCONSIN':'WI','WYOMING':'WY'
+  };
+  return stateMap[clean] || clean.slice(0, 2);
+}
+
+function compareAddressObjects(targetStr, docAddr) {
+  if (!targetStr || !docAddr) {
+    return { status: 'UNKNOWN', match: true, score: 0, reason: 'Awaiting document or target address' };
+  }
+
+  const targetLower = targetStr.toLowerCase();
+  const docCity = (docAddr.city || '').trim().toLowerCase();
+  const docState = normalizeStateCode(docAddr.state || '');
+  const docZip = (docAddr.zip || '').trim();
+  const docStreet = normalizeAddressString(docAddr.street || '');
+  const normTarget = normalizeAddressString(targetStr);
+
+  let stateMatch = false;
+  if (docState) {
+    const stateRegex = new RegExp(`\\b${docState}\\b`, 'i');
+    stateMatch = stateRegex.test(targetStr);
+  }
+
+  let cityMatch = false;
+  if (docCity) {
+    cityMatch = targetLower.includes(docCity) || normTarget.includes(normalizeAddressString(docCity));
+  }
+
+  let zipMatch = false;
+  if (docZip && docZip.length >= 5) {
+    zipMatch = targetStr.includes(docZip.slice(0, 5));
+  }
+
+  let streetMatch = false;
+  if (docStreet && docStreet.length > 3) {
+    streetMatch = normTarget.includes(docStreet);
+  }
+
+  console.log('[ADDR-COMPARE] Evaluation:', { targetStr, docAddr, cityMatch, stateMatch, zipMatch, streetMatch });
+
+  if (cityMatch && stateMatch) {
+    return { status: 'MATCH', match: true, score: 100, reason: `City (${docAddr.city}) and State (${docState}) match` + (zipMatch ? ` with ZIP (${docZip})` : '') };
+  }
+  if (cityMatch && !stateMatch && !docState) {
+    return { status: 'MATCH', match: true, score: 90, reason: `City (${docAddr.city}) matches load route` };
+  }
+  if (cityMatch && !stateMatch && docState) {
+    return { status: 'POSSIBLE_MATCH', match: true, score: 70, reason: `City matches (${docAddr.city}), state (${docState}) differs from route` };
+  }
+  if (streetMatch || zipMatch) {
+    return { status: 'POSSIBLE_MATCH', match: true, score: 75, reason: zipMatch ? `ZIP code matches (${docZip})` : `Street address matches (${docAddr.street})` };
+  }
+  if (stateMatch && !cityMatch && docCity) {
+    return { status: 'MISMATCH', match: false, score: 30, reason: `State matches (${docState}), but city (${docAddr.city}) does not match load address` };
+  }
+
+  return { status: 'MISMATCH', match: false, score: 10, reason: `Document location (${docAddr.city || ''}, ${docState || ''}) does not match load address (${targetStr})` };
+}
+
 function renderSideBySideValidationPanel(l) {
   const ocrVal = l.ocrValidation || {};
   const isApproved = ocrVal.adminApproved;
-  const isPickupMatch = ocrVal.pickupMatch !== false;
-  const isDeliveryMatch = ocrVal.deliveryMatch !== false;
 
-  const puStatusBadge = isPickupMatch
-    ? '<span style="font-weight:700;color:var(--green,#10b981);">✅ Match</span>'
-    : '<span style="font-weight:700;color:var(--red,#ef4444);">⚠️ Pickup Address Mismatch</span>';
+  const puComp = ocrVal.bolAddress ? compareAddressObjects(l.pickup, ocrVal.bolAddress) : null;
+  const doComp = ocrVal.podAddress ? compareAddressObjects(l.dropoff, ocrVal.podAddress) : null;
 
-  const doStatusBadge = isDeliveryMatch
-    ? '<span style="font-weight:700;color:var(--green,#10b981);">✅ Match</span>'
-    : '<span style="font-weight:700;color:var(--red,#ef4444);">⚠️ Delivery Address Mismatch</span>';
+  const getStatusBadge = (comp, isMatchFallback) => {
+    if (!comp) {
+      return '<span style="font-size:11px;color:var(--text-faint);">Awaiting scan</span>';
+    }
+    if (comp.status === 'MATCH') {
+      return '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.12);padding:2px 8px;border-radius:10px;">✅ Match</span>';
+    }
+    if (comp.status === 'POSSIBLE_MATCH') {
+      return '<span style="font-weight:700;color:var(--warning,#f59e0b);background:rgba(245,158,11,0.12);padding:2px 8px;border-radius:10px;">⚠️ Possible Match</span>';
+    }
+    return '<span style="font-weight:700;color:var(--red,#ef4444);background:rgba(239,68,68,0.12);padding:2px 8px;border-radius:10px;">❌ Mismatch</span>';
+  };
+
+  const isPickupOk = puComp ? puComp.match : (ocrVal.pickupMatch !== false);
+  const isDeliveryOk = doComp ? doComp.match : (ocrVal.deliveryMatch !== false);
 
   const overallBadge = isApproved
     ? '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:12px;">✅ Admin Approved</span>'
-    : (isPickupMatch && isDeliveryMatch)
-    ? '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:12px;">✅ Processed</span>'
+    : (isPickupOk && isDeliveryOk)
+    ? '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:12px;">✅ Verified</span>'
     : '<span style="font-weight:700;color:var(--warning,#f59e0b);background:rgba(245,158,11,0.1);padding:3px 10px;border-radius:12px;">⚠️ Needs Review</span>';
 
   const rcPu = l.pickup || '—';
-  const bolPu = (ocrVal.bolAddress && ocrVal.bolAddress.city) ? [ocrVal.bolAddress.street, ocrVal.bolAddress.city, ocrVal.bolAddress.state, ocrVal.bolAddress.zip].filter(Boolean).join(', ') : (l.docs && l.docs.BOL && l.docs.BOL.hasFile ? 'Uploaded (Awaiting verification)' : 'BOL Not Uploaded');
+  const bolPu = (ocrVal.bolAddress && ocrVal.bolAddress.city)
+    ? [ocrVal.bolAddress.street, ocrVal.bolAddress.city, ocrVal.bolAddress.state, ocrVal.bolAddress.zip].filter(Boolean).join(', ')
+    : (l.docs && l.docs.BOL && (l.docs.BOL.hasFile || l.docs.BOL.data) ? 'Uploaded (Awaiting OCR verification)' : 'BOL Not Uploaded');
 
   const rcDo = l.dropoff || '—';
-  const podDo = (ocrVal.podAddress && ocrVal.podAddress.city) ? [ocrVal.podAddress.street, ocrVal.podAddress.city, ocrVal.podAddress.state, ocrVal.podAddress.zip].filter(Boolean).join(', ') : (l.docs && l.docs.POD && l.docs.POD.hasFile ? 'Uploaded (Awaiting verification)' : 'POD Not Uploaded');
+  const podDo = (ocrVal.podAddress && ocrVal.podAddress.city)
+    ? [ocrVal.podAddress.street, ocrVal.podAddress.city, ocrVal.podAddress.state, ocrVal.podAddress.zip].filter(Boolean).join(', ')
+    : (l.docs && l.docs.POD && (l.docs.POD.hasFile || l.docs.POD.data) ? 'Uploaded (Awaiting OCR verification)' : 'POD Not Uploaded');
 
   let h = `<div style="margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -5247,30 +5355,32 @@ function renderSideBySideValidationPanel(l) {
     </div>
     
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-      <div style="background:var(--bg-card);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+      <div style="background:var(--bg-card,#1e293b);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;">
-          <b>📍 Pickup Address Comparison</b>
-          <div>${puStatusBadge}</div>
+          <b>📍 Pickup Address (RC vs BOL)</b>
+          <div>${getStatusBadge(puComp, ocrVal.pickupMatch)}</div>
         </div>
         <div style="font-size:11px;color:var(--text-dim);">
           <div style="margin-bottom:4px;"><b>RC Pickup:</b> ${escapeAttr(rcPu)}</div>
-          <div><b>BOL Pickup:</b> ${escapeAttr(bolPu)}</div>
+          <div style="margin-bottom:4px;"><b>BOL Pickup:</b> ${escapeAttr(bolPu)}</div>
+          ${puComp ? `<div style="font-size:10.5px;color:var(--text-faint);margin-top:4px;font-style:italic;">Note: ${escapeAttr(puComp.reason)}</div>` : ''}
         </div>
       </div>
 
-      <div style="background:var(--bg-card);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
+      <div style="background:var(--bg-card,#1e293b);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;">
-          <b>🏁 Delivery Address Comparison</b>
-          <div>${doStatusBadge}</div>
+          <b>🏁 Delivery Address (RC vs POD)</b>
+          <div>${getStatusBadge(doComp, ocrVal.deliveryMatch)}</div>
         </div>
         <div style="font-size:11px;color:var(--text-dim);">
           <div style="margin-bottom:4px;"><b>RC Delivery:</b> ${escapeAttr(rcDo)}</div>
-          <div><b>POD Delivery:</b> ${escapeAttr(podDo)}</div>
+          <div style="margin-bottom:4px;"><b>POD Delivery:</b> ${escapeAttr(podDo)}</div>
+          ${doComp ? `<div style="font-size:10.5px;color:var(--text-faint);margin-top:4px;font-style:italic;">Note: ${escapeAttr(doComp.reason)}</div>` : ''}
         </div>
       </div>
     </div>`;
 
-  if (STATE.role === 'admin' && (!isPickupMatch || !isDeliveryMatch) && !isApproved) {
+  if (STATE.role === 'admin' && (!isPickupOk || !isDeliveryOk) && !isApproved) {
     h += `<div style="display:flex;justify-content:flex-end;">
       <button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:700;" onclick="approveOcrMismatch('${l.id}')">Approve & Override Mismatch</button>
     </div>`;
@@ -5499,10 +5609,9 @@ async function handleDocUpload(loadId, key, input){
     const label = key==='BOL' ? 'pickup' : 'drop-off';
     try{
       const result = await verifyDocAddress(file, dataUrl, key);
-      if(result && (result.city || result.state)){
-        const found = [result.street, result.city, result.state, result.zip].filter(Boolean).join(', ');
-        const norm = s => (s||'').toLowerCase().replace(/[^a-z]/g,'');
-        const isMatch = against && (norm(against).includes(norm(result.city)) || norm(against).includes(norm(result.state)));
+      if(result && (result.city || result.state || result.street)){
+        const comp = compareAddressObjects(against, result);
+        const isMatch = comp.match;
 
         if (key === 'BOL') {
           l.ocrValidation.bolAddress = result;
@@ -5512,9 +5621,7 @@ async function handleDocUpload(loadId, key, input){
           l.ocrValidation.deliveryMatch = isMatch;
         }
 
-        addressNote = isMatch
-          ? ' — address checks out against the load\'s '+label+' ('+against+').'
-          : ' — heads up: document shows "'+found+'", but load '+label+' is "'+(against||'not set')+'".';
+        addressNote = ' — ' + comp.reason;
       }
     } catch(err){
       console.warn('OCR verification note:', err.message);
