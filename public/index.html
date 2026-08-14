@@ -4634,9 +4634,9 @@
   <!-- ============ LOGIN GATE (mock Google OAuth) ============ -->
   <div id="login-gate">
     <div class="login-card">
-      <div style="width:140px;height:140px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;position:relative;">
-        <img src="assets/haulbox-3d-dice-hero.png" alt="HaulBoX 3D Dice" class="haulbox-floating-dice" style="width:130px;height:130px;object-fit:contain;filter:drop-shadow(0 12px 28px rgba(0,240,255,0.35));transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);cursor:pointer;" onmouseenter="this.style.transform='scale(1.08) translateY(-4px)'" onmouseleave="this.style.transform='scale(1) translateY(0)'">
-      </div>
+      <div id="haulbox-3d-cube-login"
+        style="width:140px;height:140px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;"
+        title="Interactive 3D HaulBoX Navigation Dice"></div>
       <div style="font-family:'Inter',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.02em;line-height:1;margin-bottom:18px;color:var(--text,#ffffff);">
         Haul<span style="color:#0284c7;">BoX</span></div>
       <button class="google-btn" id="google-signin-btn" onclick="mockGoogleLogin()">
@@ -4663,9 +4663,9 @@
   <!-- ============ DRIVER LOGIN GATE ============ -->
   <div id="driver-login-gate" style="display:none;">
     <div class="login-card">
-      <div style="width:140px;height:140px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;position:relative;">
-        <img src="assets/haulbox-3d-dice-hero.png" alt="HaulBoX 3D Dice" class="haulbox-floating-dice" style="width:130px;height:130px;object-fit:contain;filter:drop-shadow(0 12px 28px rgba(0,240,255,0.35));transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);cursor:pointer;" onmouseenter="this.style.transform='scale(1.08) translateY(-4px)'" onmouseleave="this.style.transform='scale(1) translateY(0)'">
-      </div>
+      <div id="haulbox-3d-cube-driver-login"
+        style="width:130px;height:130px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;"
+        title="Interactive 3D HaulBoX Navigation Dice"></div>
       <div
         style="font-family:'Inter',sans-serif;font-weight:800;font-size:24px;letter-spacing:-0.02em;line-height:1;margin-bottom:18px;color:var(--text,#ffffff);">
         Haul<span style="color:#0284c7;">BoX</span></div>
@@ -4715,16 +4715,16 @@
         <div class="drv-section-title">This Week</div>
         <div class="drv-stat-row">
           <div class="drv-summary-card">
-            <div class="drv-summary-num" id="drv-sum-active">0</div>
-            <div class="drv-summary-label">Active</div>
+            <div class="drv-summary-num" id="drv-stat-loads">0</div>
+            <div class="drv-summary-label">Loads</div>
           </div>
           <div class="drv-summary-card">
-            <div class="drv-summary-num" id="drv-sum-completed">0</div>
-            <div class="drv-summary-label">Completed</div>
+            <div class="drv-summary-num" id="drv-stat-miles">0</div>
+            <div class="drv-summary-label">Miles</div>
           </div>
           <div class="drv-summary-card">
-            <div class="drv-summary-num" id="drv-sum-total">$0</div>
-            <div class="drv-summary-label">Total Pay</div>
+            <div class="drv-summary-num" id="drv-stat-gross">$0</div>
+            <div class="drv-summary-label">Gross Pay</div>
           </div>
         </div>
       </section>
@@ -4920,9 +4920,9 @@
     <aside id="sidebar" style="background:#0F172A;border-right:1px solid #1E293B;color:#F8FAFC;">
       <div class="brand"
         style="padding:16px 10px 14px;border-bottom:1px solid #1E293B;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
-        <div style="width:90px;height:90px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="HaulBoX 3D Navigation Dice">
-          <img src="assets/haulbox-3d-dice-hero.png" alt="HaulBoX 3D Dice" class="haulbox-floating-dice" style="width:84px;height:84px;object-fit:contain;filter:drop-shadow(0 8px 20px rgba(0,240,255,0.4));transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);" onmouseenter="this.style.transform='scale(1.1) translateY(-3px)'" onmouseleave="this.style.transform='scale(1) translateY(0)'">
-        </div>
+        <div id="haulbox-3d-cube-container"
+          style="width:95px;height:95px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;"
+          title="Interactive 3D HaulBoX Navigation Dice"></div>
         <div
           style="font-family:'Inter',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.02em;line-height:1;margin-top:6px;color:#ffffff;">
           Haul<span style="color:#0284c7;">BoX</span></div>

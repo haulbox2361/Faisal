@@ -490,9 +490,7 @@ a{color:inherit;}
 
 <div id="login-screen">
   <div class="login-card">
-    <div style="width:140px;height:140px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;position:relative;">
-      <img src="assets/haulbox-3d-dice-hero.png" alt="HaulBoX 3D Dice" class="haulbox-floating-dice" style="width:130px;height:130px;object-fit:contain;filter:drop-shadow(0 12px 28px rgba(0,240,255,0.35));transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);cursor:pointer;" onmouseenter="this.style.transform='scale(1.08) translateY(-4px)'" onmouseleave="this.style.transform='scale(1) translateY(0)'">
-    </div>
+    <div id="dp-3d-cube-login" style="width:140px;height:140px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
     <div class="login-field"><label>Driver ID</label><input id="li-driverid" autocomplete="username" placeholder="e.g. D1023" onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()"></div>
     <div class="login-field"><label>PIN</label><input id="li-pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="login-btn" id="li-btn" onclick="doLogin()">Sign In</button>
@@ -504,9 +502,7 @@ a{color:inherit;}
 <div id="app">
   <header id="dp-header">
     <div class="dp-header-left">
-      <div style="width:48px;height:48px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;">
-        <img src="assets/haulbox-3d-dice-hero.png" alt="HaulBoX 3D Dice" class="haulbox-floating-dice" style="width:42px;height:42px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(0,240,255,0.4));">
-      </div>
+      <div id="dp-3d-cube-header" style="width:48px;height:48px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
     </div>
     <div class="dp-header-right">
       <button class="dp-icon-btn" onclick="togglePortalTheme()" aria-label="Toggle Theme" title="Toggle Light/Dark Theme">
