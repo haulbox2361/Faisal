@@ -853,8 +853,11 @@ async function doLogin(){
     if (!res.ok) throw new Error(data.error || 'Login failed');
     TOKEN = data.token; localStorage.setItem('hb_driver_token', TOKEN);
     ME = data.driver; localStorage.setItem('hb_driver_me', JSON.stringify(ME));
+    SESSION = { settings: data.settings || {} };
+    localStorage.setItem('hb_driver_settings', JSON.stringify(data.settings || {}));
     PERMS = data.permissions || {};
     document.getElementById('dp-subtitle').textContent = data.companyName || 'Driver Portal';
+    applyDriverPortalFeatureVisibility();
     boot();
   } catch(e){
     errEl.textContent = e.message || 'Login failed';
@@ -868,12 +871,20 @@ async function tryResumeSession(){
   try {
     const data = await api('/api/driver/me');
     ME = data.driver; PERMS = data.permissions || {};
+    SESSION = { settings: data.settings || {} };
     localStorage.setItem('hb_driver_me', JSON.stringify(ME));
+    localStorage.setItem('hb_driver_settings', JSON.stringify(data.settings || {}));
+    applyDriverPortalFeatureVisibility();
     return true;
   } catch(e){
     const savedMe = localStorage.getItem('hb_driver_me');
     if (savedMe) {
-      try { ME = JSON.parse(savedMe); return true; } catch(_){}
+      try { 
+        ME = JSON.parse(savedMe); 
+        SESSION = { settings: JSON.parse(localStorage.getItem('hb_driver_settings') || '{}') };
+        applyDriverPortalFeatureVisibility();
+        return true; 
+      } catch(_){}
     }
     TOKEN = null; localStorage.removeItem('hb_driver_token'); return false;
   }
@@ -887,6 +898,7 @@ function logout(){
 }
 
 async function boot(){
+  applyDriverPortalFeatureVisibility();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   const name = (ME && ME.name) || 'Driver';
@@ -920,13 +932,24 @@ function startChatPolling() {
 
 // ---------------- Nav ----------------
 function setDriverPortalPage(page){
+  // Check permission / feature toggle before switching
+  const s = (SESSION && SESSION.settings) || {};
+  if (page === 'chat' && s.driver_chat_enabled === false) {
+    alert('Driver Chat is currently disabled by administrator.');
+    return;
+  }
+  if (page === 'payments' && (s.driver_payments_enabled === false && s.driver_earnings_enabled === false)) {
+    alert('Driver Payments & Earnings are currently disabled by administrator.');
+    return;
+  }
+
   localStorage.setItem('hb_driver_active_page', page);
   document.querySelectorAll('.dp-nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.page===page));
   document.getElementById('dp-nav-current').classList.toggle('active', page==='current');
   document.querySelectorAll('.dp-page').forEach(el=>{
     const isActive = el.id==='dp-page-'+page;
     el.classList.toggle('active', isActive);
-    if (isActive) {
+    if (el.id === 'dp-page-chat') {
       // Chat page uses flex column layout; all others use block
       el.style.display = (page==='chat' && isActive) ? 'flex' : '';
     } else {
@@ -939,6 +962,19 @@ function setDriverPortalPage(page){
   else if (page==='chat') loadChats();
   else if (page==='profile') loadProfile();
 }
+
+function applyDriverPortalFeatureVisibility() {
+  const s = (SESSION && SESSION.settings) || {};
+  
+  // Chat Tab
+  const chatNavBtn = document.querySelector('.dp-nav-btn[data-page="chat"]');
+  if (chatNavBtn) chatNavBtn.style.display = s.driver_chat_enabled === false ? 'none' : 'flex';
+
+  // Payments Tab
+  const payNavBtn = document.querySelector('.dp-nav-btn[data-page="payments"]');
+  if (payNavBtn) payNavBtn.style.display = (s.driver_payments_enabled === false && s.driver_earnings_enabled === false) ? 'none' : 'flex';
+}
+
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
 function updateChatNavBadge(count){
   const b = document.getElementById('dp-chat-nav-badge');

@@ -6367,6 +6367,77 @@
               </div>
 
               <div class="settings-block">
+                <h3>Driver Portal Configuration <span class="cell-dim" style="font-weight:400;font-size:10.5px;">· Admin only</span></h3>
+                <div class="panel panel-pad" style="border-left: 3px solid #0284c7;">
+                  <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 14px;">
+                    Control whether the mobile Driver Portal (<span class="mono">/driver</span>) and driver-facing features are active. When disabled, HaulBoX operates as a streamlined <b>Dispatcher-Only System</b>.
+                  </p>
+
+                  <div class="field span-2" style="margin-bottom:14px;background:var(--bg-elev2);padding:12px 14px;border-radius:8px;border:1px solid var(--border);">
+                    <label style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
+                      <span>Enable Driver Portal (Master Switch)</span>
+                      <span id="dp-master-pill" class="status-pill connected" style="font-size:11px;">Enabled</span>
+                    </label>
+                    <div class="hint" style="margin-bottom:8px;">When OFF, all driver logins, mobile app links, and driver portal access are blocked immediately across the platform.</div>
+                    <select id="s-dp-master-enabled" onchange="saveSettingsField('driver_portal_enabled', this.value==='on'); updateDriverPortalUI();" style="font-weight:700;">
+                      <option value="on">Enabled — Drivers can log in, view loads, track GPS, and upload docs</option>
+                      <option value="off">Disabled — Dispatcher-only mode (Driver Portal completely deactivated)</option>
+                    </select>
+                  </div>
+
+                  <div id="dp-advanced-controls" style="border-top:1px solid var(--border-soft);padding-top:12px;margin-top:8px;">
+                    <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-dim);margin-bottom:10px;">
+                      Advanced Feature Controls
+                    </div>
+                    <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;">
+                      <div class="field" style="margin-bottom:0;">
+                        <label>Driver Chat</label>
+                        <select id="s-dp-chat-enabled" onchange="saveSettingsField('driver_chat_enabled', this.value==='on')">
+                          <option value="on">On (Enabled)</option>
+                          <option value="off">Off (Disabled)</option>
+                        </select>
+                      </div>
+                      <div class="field" style="margin-bottom:0;">
+                        <label>Driver Document Uploads</label>
+                        <select id="s-dp-upload-enabled" onchange="saveSettingsField('driver_upload_enabled', this.value==='on')">
+                          <option value="on">On (Enabled)</option>
+                          <option value="off">Off (Disabled)</option>
+                        </select>
+                      </div>
+                      <div class="field" style="margin-bottom:0;">
+                        <label>Driver GPS / Location Tracking</label>
+                        <select id="s-dp-tracking-enabled" onchange="saveSettingsField('driver_tracking_enabled', this.value==='on')">
+                          <option value="on">On (Enabled)</option>
+                          <option value="off">Off (Disabled)</option>
+                        </select>
+                      </div>
+                      <div class="field" style="margin-bottom:0;">
+                        <label>Driver Earnings Dashboard</label>
+                        <select id="s-dp-earnings-enabled" onchange="saveSettingsField('driver_earnings_enabled', this.value==='on')">
+                          <option value="on">On (Enabled)</option>
+                          <option value="off">Off (Disabled)</option>
+                        </select>
+                      </div>
+                      <div class="field" style="margin-bottom:0;">
+                        <label>Driver Payment Center</label>
+                        <select id="s-dp-payments-enabled" onchange="saveSettingsField('driver_payments_enabled', this.value==='on')">
+                          <option value="on">On (Enabled)</option>
+                          <option value="off">Off (Disabled)</option>
+                        </select>
+                      </div>
+                      <div class="field" style="margin-bottom:0;">
+                        <label>Driver Notifications</label>
+                        <select id="s-dp-notifs-enabled" onchange="saveSettingsField('driver_notifications_enabled', this.value==='on')">
+                          <option value="on">On (Enabled)</option>
+                          <option value="off">Off (Disabled)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-block">
                 <h3>Load Email Settings</h3>
                 <div class="panel panel-pad">
                   <p style="font-size:11.5px;color:var(--text-faint);margin:0 0 12px;">Variables: <span
@@ -11452,7 +11523,7 @@
 
     /* ================= SETTINGS ================= */
     function renderSettings() {
-      const s = STATE.settings;
+      const s = STATE.settings || {};
       document.getElementById('s-companyname').value = s.companyName || '';
       updateBranding();
       document.getElementById('s-defaultfee').value = s.defaultFeePct || 10;
@@ -11474,6 +11545,25 @@
       document.getElementById('s-ai-mistral-wrap').style.display = provider === 'mistral' ? 'block' : 'none';
       document.getElementById('s-ai-mistralmodel-wrap').style.display = provider === 'mistral' ? 'block' : 'none';
       document.getElementById('s-ai-ocrspace-wrap').style.display = provider === 'ocrspace' ? 'block' : 'none';
+
+      // Driver Portal Module Configuration
+      const dpMaster = document.getElementById('s-dp-master-enabled');
+      if (dpMaster) dpMaster.value = s.driver_portal_enabled === false ? 'off' : 'on';
+      const dpChat = document.getElementById('s-dp-chat-enabled');
+      if (dpChat) dpChat.value = s.driver_chat_enabled === false ? 'off' : 'on';
+      const dpUpload = document.getElementById('s-dp-upload-enabled');
+      if (dpUpload) dpUpload.value = s.driver_upload_enabled === false ? 'off' : 'on';
+      const dpTracking = document.getElementById('s-dp-tracking-enabled');
+      if (dpTracking) dpTracking.value = s.driver_tracking_enabled === false ? 'off' : 'on';
+      const dpEarnings = document.getElementById('s-dp-earnings-enabled');
+      if (dpEarnings) dpEarnings.value = s.driver_earnings_enabled === false ? 'off' : 'on';
+      const dpPayments = document.getElementById('s-dp-payments-enabled');
+      if (dpPayments) dpPayments.value = s.driver_payments_enabled === false ? 'off' : 'on';
+      const dpNotifs = document.getElementById('s-dp-notifs-enabled');
+      if (dpNotifs) dpNotifs.value = s.driver_notifications_enabled === false ? 'off' : 'on';
+
+      updateDriverPortalUI();
+
       document.getElementById('tmpl-rc-subject').value = s.rcSubject || '';
       document.getElementById('tmpl-rc-body').value = s.rcBody || '';
       document.getElementById('tmpl-bol-subject').value = s.bolSubject || '';
@@ -11561,7 +11651,48 @@
       persist(); renderDispatchersPage(); populateDropdowns(); populateStatFilters(); populateViewAsField(); renderChat();
       toast('Dispatcher removed', '', true);
     }
-    function saveSettingsField(key, val) { STATE.settings[key] = val; persist(); }
+    function saveSettingsField(key, val) { 
+      STATE.settings[key] = val; 
+      persist(); 
+      if (key === 'driver_portal_enabled') updateDriverPortalUI();
+    }
+
+    // Controls client-side UI visibility and gating based on driver portal module settings
+    function updateDriverPortalUI() {
+      const s = STATE.settings || {};
+      const isPortalEnabled = s.driver_portal_enabled !== false;
+      const isChatEnabled = s.driver_chat_enabled !== false;
+
+      // Update Settings Pills and Subsections
+      const pill = document.getElementById('dp-master-pill');
+      if (pill) {
+        pill.textContent = isPortalEnabled ? 'Enabled' : 'Disabled (Off)';
+        pill.className = 'status-pill ' + (isPortalEnabled ? 'connected' : 'off');
+      }
+      const advWrap = document.getElementById('dp-advanced-controls');
+      if (advWrap) advWrap.style.opacity = isPortalEnabled ? '1' : '0.45';
+
+      // Login Gate: Hide/Show Driver Login link
+      const driverLoginLink = document.querySelector('#login-gate a[onclick*="showDriverLogin"]');
+      if (driverLoginLink && driverLoginLink.parentElement) {
+        driverLoginLink.parentElement.style.display = isPortalEnabled ? 'block' : 'none';
+      }
+
+      // Add/Edit Driver Modal: Hide/Show "Driver App Login" section
+      const driverAppLoginTitle = document.querySelector('#modal-driver .form-section-title[data-role-view="admin"]');
+      const driverAppLoginGrid = document.querySelector('#modal-driver .form-grid[data-role-view="admin"]:nth-of-type(2)');
+      if (driverAppLoginTitle) driverAppLoginTitle.style.display = isPortalEnabled ? '' : 'none';
+      if (driverAppLoginGrid) driverAppLoginGrid.style.display = isPortalEnabled ? '' : 'none';
+
+      // Driver App Login Details in Add/Edit Driver Modal
+      const driverLoginShareBlock = document.getElementById('d-driver-link');
+      if (driverLoginShareBlock && driverLoginShareBlock.parentElement) {
+        driverLoginShareBlock.parentElement.style.display = isPortalEnabled ? '' : 'none';
+      }
+
+      // Sidebar Chat Nav Item (Hide when chat or portal is OFF for non-admins if desired, or keep team chat)
+      // When Driver portal is off, driver-only app screens never load.
+    }
     async function handleLogoUpload(input) {
       if (!input.files || !input.files.length) return;
       const file = input.files[0];
@@ -13796,6 +13927,7 @@ function doPost(e) {
     (async function bootApp() {
       try {
         if (!STATE._loaded) { await loadState(); STATE._loaded = true; }
+        updateDriverPortalUI();
         const restored = await restoreSession();
         if (!restored) {
           const params = new URLSearchParams(window.location.search);
@@ -13810,6 +13942,7 @@ function doPost(e) {
               document.getElementById('user-email').textContent = STATE.currentUser.email;
               document.getElementById('user-avatar').textContent = STATE.currentUser.initials;
               init();
+              updateDriverPortalUI();
             }
           } else if (params.get('view') === 'readonly') {
             document.getElementById('login-gate').style.display = 'none';
@@ -13819,7 +13952,10 @@ function doPost(e) {
             document.getElementById('user-email').textContent = STATE.currentUser.email;
             document.getElementById('user-avatar').textContent = STATE.currentUser.initials;
             init();
+            updateDriverPortalUI();
           }
+        } else {
+          updateDriverPortalUI();
         }
       } catch (e) {
         console.error('bootApp session restore error:', e);

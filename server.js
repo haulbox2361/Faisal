@@ -39,7 +39,44 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/driver', (req, res) => {
+app.get('/driver', async (req, res) => {
+  try {
+    const kv = require('./lib/kvstore');
+    const raw = await kv.get('haulline:state').catch(() => null);
+    const state = raw ? JSON.parse(raw) : null;
+    if (state && state.settings && state.settings.driver_portal_enabled === false) {
+      return res.status(403).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Driver Portal Disabled — HaulBoX</title>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+          <style>
+            body { font-family: 'Inter', sans-serif; background: #0B0D10; color: #F8FAFC; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+            .card { max-width: 440px; background: #0F172A; border: 1px solid #1E293B; border-radius: 16px; padding: 36px 28px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+            .icon { font-size: 44px; margin-bottom: 16px; }
+            h1 { font-size: 22px; font-weight: 800; margin: 0 0 10px; color: #fff; }
+            p { font-size: 14px; color: #94A3B8; line-height: 1.5; margin: 0 0 24px; }
+            a { display: inline-block; background: #0284c7; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 13px; }
+            a:hover { background: #0369a1; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">🚫</div>
+            <h1>Driver Portal Inactive</h1>
+            <p>The Driver Mobile Portal has been disabled by the system administrator. Please contact your dispatch team or management for assistance.</p>
+            <a href="/">← Return to Staff Sign-In</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  } catch (err) {
+    console.error('Error checking driver_portal_enabled on /driver:', err);
+  }
   res.sendFile(path.join(__dirname, 'public', 'driver-portal.html'));
 });
 

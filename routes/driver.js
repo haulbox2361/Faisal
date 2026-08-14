@@ -113,6 +113,13 @@ async function requireDriver(req, res) {
     state = { drivers: [], loads: [], settings: {} };
   }
 
+  // System-level Master Toggle Check
+  const s = state.settings || {};
+  if (s.driver_portal_enabled === false) {
+    res.status(403).json({ error: 'Driver Portal is currently disabled by administrator.' });
+    return null;
+  }
+
   const authHeader = String(req.headers.authorization || '');
   const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
 
@@ -139,6 +146,19 @@ async function requireDriver(req, res) {
 function requirePermission(res, driver, key, label) {
   if (!permissionsFor(driver)[key]) {
     res.status(403).json({ error: (label || 'This feature') + ' is not enabled for your account. Contact your administrator.' });
+    return false;
+  }
+  return true;
+}
+
+function requireModuleEnabled(req, res, state, settingKey, featureName) {
+  const s = state.settings || {};
+  if (s.driver_portal_enabled === false) {
+    res.status(403).json({ error: 'Driver Portal is currently disabled by administrator.' });
+    return false;
+  }
+  if (s[settingKey] === false) {
+    res.status(403).json({ error: `${featureName || 'This feature'} is currently disabled by administrator.` });
     return false;
   }
   return true;
@@ -220,6 +240,12 @@ router.post('/api/driver/login', async (req, res) => {
     let state = await loadFullState().catch(() => null);
     if (!state) state = { drivers: [], loads: [], settings: {} };
 
+    // Master switch check
+    const s = state.settings || {};
+    if (s.driver_portal_enabled === false) {
+      return res.status(403).json({ error: 'Driver Portal is currently disabled by administrator.' });
+    }
+
     // Auto-seed sample driver if state has no drivers at all
     if (!state.drivers || state.drivers.length === 0) {
       const defaultDriver = {
@@ -277,6 +303,15 @@ router.post('/api/driver/login', async (req, res) => {
       driver: { id: driver.id, name: driver.name, truck: driver.truck, phone: driver.phone, company: driver.company },
       permissions: permissionsFor(driver),
       companyName: (state.settings && state.settings.companyName) || 'HaulBoX',
+      settings: {
+        driver_portal_enabled: state.settings?.driver_portal_enabled !== false,
+        driver_chat_enabled: state.settings?.driver_chat_enabled !== false,
+        driver_upload_enabled: state.settings?.driver_upload_enabled !== false,
+        driver_tracking_enabled: state.settings?.driver_tracking_enabled !== false,
+        driver_earnings_enabled: state.settings?.driver_earnings_enabled !== false,
+        driver_payments_enabled: state.settings?.driver_payments_enabled !== false,
+        driver_notifications_enabled: state.settings?.driver_notifications_enabled !== false,
+      },
       loads,
     });
   } catch (e) {
@@ -297,10 +332,19 @@ router.post('/api/driver/logout', async (req, res) => {
 router.get('/api/driver/me', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
-  const { driver } = ctx;
+  const { driver, state } = ctx;
   res.json({
     driver: { id: driver.id, name: driver.name, truck: driver.truck, phone: driver.phone, email: driver.email || null, company: driver.company, status: isDisabled(driver) ? 'Inactive' : 'Active' },
     permissions: permissionsFor(driver),
+    settings: {
+      driver_portal_enabled: state.settings?.driver_portal_enabled !== false,
+      driver_chat_enabled: state.settings?.driver_chat_enabled !== false,
+      driver_upload_enabled: state.settings?.driver_upload_enabled !== false,
+      driver_tracking_enabled: state.settings?.driver_tracking_enabled !== false,
+      driver_earnings_enabled: state.settings?.driver_earnings_enabled !== false,
+      driver_payments_enabled: state.settings?.driver_payments_enabled !== false,
+      driver_notifications_enabled: state.settings?.driver_notifications_enabled !== false,
+    },
   });
 });
 
@@ -309,6 +353,7 @@ router.get('/api/driver/me', async (req, res) => {
 router.post('/api/driver/location', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_tracking_enabled', 'Driver GPS Tracking')) return;
   const { latitude, longitude, speed, heading, loadId, sharingMode } = req.body || {};
   if (latitude == null || longitude == null) {
     return res.status(400).json({ error: 'Missing latitude or longitude' });
@@ -746,6 +791,7 @@ router.post('/api/driver/upload-doc', async (req, res) => {
 
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_upload_enabled', 'Driver Document Uploads')) return;
   if (!requirePermission(res, ctx.driver, 'canUploadDocuments', 'Uploading documents')) return;
   const { state, driver } = ctx;
   const { loadId } = req.body || {};
@@ -902,35 +948,52 @@ function toTransaction(l) {
     paidDate: l.driverPaidDate || null,
     markedPaidAt: l.markedPaidAt || null,
     markedPaidBy: l.markedPaidBy || null,
-    confirmedAt: l.confirmedAt || l.driverPayAcceptedAt || null,
+    pickup: l.pickup,
+    dropoff: l.dropoff,
+    pickupDate: l.pickupDate,
+    deliveryDate: l.deliveryDate,
+    driverPay: Number(l.driverPay) || 0,
+    driverPaid: !!l.driverPaid,
+    driverPaidDate: l.driverPaidDate || null,
+    paymentStatus: l.paymentStatus || (l.driverPaid ? 'PAID_CONFIRMED' : 'UNPAID'),
+    markedPaidAt: l.markedPaidAt || (l.driverPaid ? l.driverPaidDate : null),
+    confirmedAt: l.confirmedAt || (l.driverPayAccepted ? l.driverPayAcceptedAt : null),
     disputedAt: l.disputedAt || null,
-    note: l.driverPayNote || l.driverPaySettlementNote || null,
-    accepted: !!(l.driverPayAccepted || ps === 'PAID_CONFIRMED'),
-    acceptedAt: l.driverPayAcceptedAt || l.confirmedAt || null,
-    acceptanceStatus: ps === 'PAID_CONFIRMED' ? 'Confirmed' : (ps === 'PAYMENT_DISPUTED' ? 'Disputed' : (ps === 'PAYMENT_PENDING_CONFIRMATION' ? 'Pending Confirmation' : 'Unpaid')),
   };
 }
 
-// GET /api/driver/transactions
+// GET /api/driver/transactions?filter=all|pending|paid&period=all|weekly|monthly|yearly|custom&from&to
 router.get('/api/driver/transactions', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_payments_enabled', 'Driver Payment Center')) return;
   if (!requirePermission(res, ctx.driver, 'canViewTransactions', 'Transactions')) return;
-  const loads = driverLoads(ctx.state, ctx.driver.id);
-  const txns = loads
+  const { state, driver } = ctx;
+  const filter = String(req.query.filter || 'all').toLowerCase();
+  const range = periodRange(String(req.query.period || 'all').toLowerCase(), req.query.from, req.query.to);
+  let loads = driverLoads(state, driver.id);
+  if (filter === 'pending') loads = loads.filter((l) => !l.driverPaid);
+  else if (filter === 'paid') loads = loads.filter((l) => l.driverPaid);
+  loads = loads.filter((l) => inRange(l, range));
+
+  const transactions = loads
     .sort((a, b) => String(b.deliveryDate || b.pickupDate || '').localeCompare(String(a.deliveryDate || a.pickupDate || '')))
     .map(toTransaction);
-  const totalEarnings = txns.reduce((s, t) => s + t.amount, 0);
-  const paidTxns = txns.filter((t) => t.paymentStatus === 'PAID_CONFIRMED' || t.status === 'PAID');
-  const paid = paidTxns.reduce((s, t) => s + t.amount, 0);
-  const pending = totalEarnings - paid;
-  res.json({ summary: { totalEarnings, paid, pending, totalPaymentsReceived: paidTxns.length, totalAmountReceived: paid }, transactions: txns });
+
+  const totalPaid = loads.filter((l) => l.driverPaid).reduce((s, l) => s + (Number(l.driverPay) || 0), 0);
+  const totalPending = loads.filter((l) => !l.driverPaid).reduce((s, l) => s + (Number(l.driverPay) || 0), 0);
+
+  res.json({
+    transactions,
+    summary: { totalPaid, totalPending, count: transactions.length },
+  });
 });
 
 // GET /api/driver/transactions/:loadId
 router.get('/api/driver/transactions/:loadId', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_payments_enabled', 'Driver Payment Center')) return;
   if (!requirePermission(res, ctx.driver, 'canViewTransactions', 'Transactions')) return;
   const load = (ctx.state.loads || []).find((l) => l.id === req.params.loadId && l.driverId === ctx.driver.id);
   if (!load) return res.status(404).json({ error: 'Transaction not found' });
@@ -941,6 +1004,7 @@ router.get('/api/driver/transactions/:loadId', async (req, res) => {
 router.post('/api/driver/transactions/:loadId/accept', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_payments_enabled', 'Driver Payment Center')) return;
   if (!requirePermission(res, ctx.driver, 'canViewTransactions', 'Transactions')) return;
   const { state, driver } = ctx;
   const load = (state.loads || []).find((l) => l.id === req.params.loadId && l.driverId === driver.id);
@@ -980,6 +1044,7 @@ router.post('/api/driver/transactions/:loadId/accept', async (req, res) => {
 router.post('/api/driver/transactions/:loadId/dispute', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_payments_enabled', 'Driver Payment Center')) return;
   if (!requirePermission(res, ctx.driver, 'canViewTransactions', 'Transactions')) return;
   const { state, driver } = ctx;
   const load = (state.loads || []).find((l) => l.id === req.params.loadId && l.driverId === driver.id);
@@ -1201,6 +1266,7 @@ router.post('/api/driver/truck', async (req, res) => {
 router.get('/api/driver/notifications', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_notifications_enabled', 'Driver Notifications')) return;
   try {
     const list = await notifications.listFor('driver', ctx.driver.id, { unreadOnly: req.query.unread === '1' });
     res.json({ notifications: list });
@@ -1214,6 +1280,7 @@ router.get('/api/driver/notifications', async (req, res) => {
 router.post('/api/driver/notifications/:id/read', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_notifications_enabled', 'Driver Notifications')) return;
   try {
     const ok = await notifications.markRead('driver', ctx.driver.id, Number(req.params.id));
     res.json({ ok });
@@ -1248,6 +1315,7 @@ function isAllowedContact(driver, party) {
 router.get('/api/driver/chats/contacts', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_chat_enabled', 'Driver Chat')) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   const { state, driver } = ctx;
   const contacts = [];
@@ -1269,6 +1337,7 @@ router.get('/api/driver/chats/contacts', async (req, res) => {
 router.get('/api/driver/chats', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_chat_enabled', 'Driver Chat')) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   try {
     const convos = await chat.listConversationsFor({ type: 'driver', id: ctx.driver.id });
@@ -1284,6 +1353,7 @@ router.get('/api/driver/chats', async (req, res) => {
 router.post('/api/driver/chats/start', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_chat_enabled', 'Driver Chat')) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   const { withType, withId } = req.body || {};
   const party = { type: withType, id: String(withId) };
@@ -1314,6 +1384,7 @@ router.post('/api/driver/chats/start', async (req, res) => {
 router.get('/api/driver/chats/:id/messages', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_chat_enabled', 'Driver Chat')) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   const conversationId = Number(req.params.id);
   const me = { type: 'driver', id: ctx.driver.id };
@@ -1334,6 +1405,7 @@ router.get('/api/driver/chats/:id/messages', async (req, res) => {
 router.post('/api/driver/chats/:id/messages', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
+  if (!requireModuleEnabled(req, res, ctx.state, 'driver_chat_enabled', 'Driver Chat')) return;
   if (!requirePermission(res, ctx.driver, 'canChat', 'Chat')) return;
   const text = String((req.body || {}).body || '').trim();
   if (!text) return res.status(400).json({ error: 'Message cannot be empty' });
