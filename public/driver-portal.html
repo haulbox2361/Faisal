@@ -475,6 +475,71 @@ a{color:inherit;}
   }
 }
 
+.haulbox-brand-text {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-transform: none;
+}
+
+.haulbox-ai-shimmer {
+  background: linear-gradient(135deg, #ffffff 0%, #38bdf8 35%, #00f0ff 50%, #38bdf8 65%, #ffffff 100%);
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: dpAiTextShimmer 4s linear infinite;
+  filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.6));
+}
+
+.haulbox-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  margin-left: 6px;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(0, 240, 255, 0.15));
+  border: 1px solid rgba(0, 240, 255, 0.5);
+  color: #00f0ff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  animation: dpAiBadgePulse 2.5s ease-in-out infinite;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+
+.haulbox-ai-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00f0ff;
+  box-shadow: 0 0 8px #00f0ff;
+}
+
+@keyframes dpAiTextShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes dpAiBadgePulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3), inset 0 0 8px rgba(0, 240, 255, 0.2);
+    border-color: rgba(0, 240, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.7), inset 0 0 12px rgba(0, 240, 255, 0.4);
+    border-color: rgba(0, 240, 255, 0.9);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
@@ -490,7 +555,11 @@ a{color:inherit;}
 
 <div id="login-screen">
   <div class="login-card">
-    <div id="dp-3d-cube-login" style="width:140px;height:140px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
+    <div id="dp-3d-cube-login" style="width:145px;height:145px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
+    <div class="haulbox-brand-text" style="font-size:34px;margin-bottom:20px;">
+      <span class="haulbox-ai-shimmer">Haul</span><span style="color:#0284c7;text-shadow:0 0 18px rgba(0,240,255,0.7);">BoX</span>
+      <span class="haulbox-ai-badge"><span class="haulbox-ai-dot"></span>AI</span>
+    </div>
     <div class="login-field"><label>Driver ID</label><input id="li-driverid" autocomplete="username" placeholder="e.g. D1023" onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()"></div>
     <div class="login-field"><label>PIN</label><input id="li-pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="login-btn" id="li-btn" onclick="doLogin()">Sign In</button>
@@ -501,8 +570,12 @@ a{color:inherit;}
 
 <div id="app">
   <header id="dp-header">
-    <div class="dp-header-left">
-      <div id="dp-3d-cube-header" style="width:48px;height:48px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
+    <div class="dp-header-left" style="display:flex;align-items:center;gap:10px;">
+      <div id="dp-3d-cube-header" style="width:44px;height:44px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
+      <div class="haulbox-brand-text" style="font-size:20px;letter-spacing:-0.03em;cursor:pointer;" onclick="setDriverPortalPage('current')">
+        <span class="haulbox-ai-shimmer">Haul</span><span style="color:#0284c7;text-shadow:0 0 14px rgba(0,240,255,0.7);">BoX</span>
+        <span class="haulbox-ai-badge" style="font-size:8.5px;padding:2px 5px;"><span class="haulbox-ai-dot"></span>AI</span>
+      </div>
     </div>
     <div class="dp-header-right">
       <button class="dp-icon-btn" onclick="togglePortalTheme()" aria-label="Toggle Theme" title="Toggle Light/Dark Theme">
