@@ -555,11 +555,8 @@ a{color:inherit;}
 
 <div id="login-screen">
   <div class="login-card">
-    <div id="dp-3d-cube-login" style="width:145px;height:145px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
-    <div class="haulbox-brand-text" style="font-size:34px;margin-bottom:20px;">
-      <span class="haulbox-ai-shimmer">Haul</span><span style="color:#0284c7;text-shadow:0 0 18px rgba(0,240,255,0.7);">BoX</span>
-      <span class="haulbox-ai-badge"><span class="haulbox-ai-dot"></span>AI</span>
-    </div>
+    <div style="font-family:'Inter',sans-serif;font-weight:900;font-size:36px;letter-spacing:-0.04em;line-height:1;margin-bottom:24px;color:#ffffff;text-shadow:0 2px 12px rgba(0,0,0,0.5);">
+      Haul<span style="color:#0284c7;text-shadow:0 0 16px rgba(2,132,199,0.5);">BoX</span></div>
     <div class="login-field"><label>Driver ID</label><input id="li-driverid" autocomplete="username" placeholder="e.g. D1023" onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()"></div>
     <div class="login-field"><label>PIN</label><input id="li-pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="login-btn" id="li-btn" onclick="doLogin()">Sign In</button>
@@ -570,11 +567,32 @@ a{color:inherit;}
 
 <div id="app">
   <header id="dp-header">
-    <div class="dp-header-left" style="display:flex;align-items:center;gap:10px;">
-      <div id="dp-3d-cube-header" style="width:44px;height:44px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;" title="Interactive 3D HaulBoX Navigation Dice"></div>
-      <div class="haulbox-brand-text" style="font-size:20px;letter-spacing:-0.03em;cursor:pointer;" onclick="setDriverPortalPage('current')">
-        <span class="haulbox-ai-shimmer">Haul</span><span style="color:#0284c7;text-shadow:0 0 14px rgba(0,240,255,0.7);">BoX</span>
-        <span class="haulbox-ai-badge" style="font-size:8.5px;padding:2px 5px;"><span class="haulbox-ai-dot"></span>AI</span>
+    <div class="dp-header-left" style="display:flex;align-items:center;">
+      <!-- Living AI Network Wordmark in Header -->
+      <div class="haulbox-living-network-wrap" style="padding:4px 10px;height:44px;position:relative;" onclick="setDriverPortalPage('current')" title="HaulBoX Connected Living AI Intelligence Network">
+        <svg class="hb-network-svg" viewBox="0 0 140 40" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+          <line x1="8" y1="8" x2="60" y2="20" class="hb-network-line active" stroke="rgba(0,240,255,0.4)" stroke-width="1.2" stroke-dasharray="3 3" />
+          <line x1="130" y1="8" x2="80" y2="20" class="hb-network-line" stroke="rgba(56,189,248,0.3)" stroke-width="1.2" stroke-dasharray="3 3" />
+          <line x1="12" y1="34" x2="60" y2="20" class="hb-network-line" stroke="rgba(56,189,248,0.3)" stroke-width="1.2" stroke-dasharray="3 3" />
+          <line x1="128" y1="34" x2="80" y2="20" class="hb-network-line active" stroke="rgba(0,240,255,0.4)" stroke-width="1.2" stroke-dasharray="3 3" />
+          
+          <circle fill="#00f0ff" r="2">
+            <animateMotion path="M 8 8 L 60 20" dur="2.2s" repeatCount="indefinite" />
+          </circle>
+          <circle fill="#00f0ff" r="2">
+            <animateMotion path="M 130 8 L 80 20" dur="2.5s" repeatCount="indefinite" />
+          </circle>
+          <circle fill="#00f0ff" r="2">
+            <animateMotion path="M 12 34 L 60 20" dur="2.0s" repeatCount="indefinite" />
+          </circle>
+          <circle fill="#00f0ff" r="2">
+            <animateMotion path="M 128 34 L 80 20" dur="2.4s" repeatCount="indefinite" />
+          </circle>
+        </svg>
+        <div class="hb-living-brand-text" style="font-size:22px;">
+          <span class="hb-text-haul">Haul</span><span class="hb-text-box">BoX</span>
+          <span class="hb-ai-core-badge" style="font-size:8.5px;padding:2px 5px;"><span class="hb-ai-dot"></span>AI</span>
+        </div>
       </div>
     </div>
     <div class="dp-header-right">
