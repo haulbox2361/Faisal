@@ -1347,6 +1347,215 @@ table.data tbody td{padding:13px 13px;}
   #wa-chat-pane { width: 100%; }
   #wa-sidebar.mobile-show { display: flex; position: absolute; z-index: 10; top: 0; bottom: 0; }
 }
+
+/* =========================================================================
+   ENTERPRISE SAAS MICRO-ANIMATIONS (Linear / Ramp / Stripe Aesthetic)
+   ========================================================================= */
+
+/* 1. Dashboard & General Stat Cards */
+.kpi-card, .stat-card, #stat-grid > div {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+  will-change: transform, box-shadow;
+  animation: cardFadeUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.kpi-card:hover, .stat-card:hover, #stat-grid > div:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(37, 99, 235, 0.18) !important;
+}
+
+/* Stagger card load animations */
+#stat-grid > div:nth-child(1) { animation-delay: 0.04s; }
+#stat-grid > div:nth-child(2) { animation-delay: 0.10s; }
+#stat-grid > div:nth-child(3) { animation-delay: 0.16s; }
+#stat-grid > div:nth-child(4) { animation-delay: 0.22s; }
+#stat-grid > div:nth-child(5) { animation-delay: 0.28s; }
+
+@keyframes cardFadeUp {
+  0% { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* 2. Sidebar Navigation */
+.nav-item {
+  transition: background 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), padding 0.18s ease !important;
+  will-change: transform, background;
+}
+.nav-item svg {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease !important;
+}
+.nav-item:hover {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.nav-item:hover svg {
+  transform: scale(1.08);
+}
+.nav-item.active {
+  background: #2563eb !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transform: translateX(0);
+}
+.nav-item.active svg {
+  transform: scale(1.05);
+}
+
+/* 3. Page Transitions */
+.view {
+  display: none;
+}
+.view.active {
+  display: block;
+  animation: pageEnter 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+@keyframes pageEnter {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* 4. Global Interactive Buttons */
+.btn, .google-btn, .login-btn, .icon-btn, .tab-btn {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), background 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, opacity 0.16s ease !important;
+  will-change: transform;
+}
+.btn:active, .google-btn:active, .login-btn:active, .tab-btn:active {
+  transform: scale(0.97) !important;
+}
+.btn-accent:hover {
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+  filter: brightness(1.05);
+}
+
+/* 5. Notification Bell & Dropdown Panel */
+#notif-bell-btn:hover svg {
+  animation: bellShake 0.45s ease-in-out;
+  transform-origin: top center;
+}
+@keyframes bellShake {
+  0% { transform: rotate(0); }
+  20% { transform: rotate(14deg); }
+  40% { transform: rotate(-12deg); }
+  60% { transform: rotate(8deg); }
+  80% { transform: rotate(-4deg); }
+  100% { transform: rotate(0); }
+}
+#notif-badge, .drv-nav-badge, #chat-sidebar-badge {
+  animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes badgePop {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); }
+}
+#notif-panel {
+  transform-origin: top right;
+  animation: dropdownSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes dropdownSlide {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 6. Modal Transitions */
+.modal-overlay {
+  transition: opacity 0.2s ease, backdrop-filter 0.2s ease;
+}
+.modal-overlay.active .modal {
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes modalScaleIn {
+  0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* 7. Status Dot Live Glow Pulse */
+.dot, .role-dot, .activity-dot, .dp-icon-dot {
+  position: relative;
+}
+.pl-green .dot, .role-dot {
+  animation: liveDotPulse 2.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+@keyframes liveDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  50% { opacity: 0.85; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+}
+.pl-yellow .dot {
+  animation: warnDotPulse 2.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+@keyframes warnDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+  50% { opacity: 0.85; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
+}
+
+/* 8. Table Rows Smooth Hover and Entry */
+table.data tbody tr {
+  transition: background 0.14s ease, transform 0.14s ease !important;
+}
+table.data tbody tr:hover {
+  background: var(--panel-hi, #f8fafc) !important;
+}
+table.data tbody tr.new-row-animate {
+  animation: rowSlideIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes rowSlideIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* 9. Loading Shimmer Skeletons */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.5) 25%, rgba(241, 245, 249, 0.85) 50%, rgba(226, 232, 240, 0.5) 75%);
+  background-size: 200% 100%;
+  animation: shimmerSweep 1.6s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 6px;
+}
+[data-theme="dark"] .skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.6) 25%, rgba(51, 65, 85, 0.85) 50%, rgba(30, 41, 59, 0.6) 75%);
+  background-size: 200% 100%;
+}
+@keyframes shimmerSweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 10. Chat Message Bubbles & Typing */
+.wa-msg-wrap, .drv-msg {
+  animation: chatMsgAppear 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes chatMsgAppear {
+  0% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+}
+.typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint, #94a3b8);
+  animation: typingBounce 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(1) { animation-delay: 0s; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Accessibility: Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -1656,7 +1865,7 @@ table.data tbody td{padding:13px 13px;}
             </div>
             <div>
               <div style="font-size:12px;font-weight:600;color:#64748b;">Available Drivers</div>
-              <div style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">4 / 7</div>
+              <div class="kpi-num" data-countup="4" data-suffix=" / 7" style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">4 / 7</div>
               <div style="font-size:11px;color:#94a3b8;font-weight:500;">4 available • 3 on road</div>
             </div>
           </div>
@@ -1668,7 +1877,7 @@ table.data tbody td{padding:13px 13px;}
             </div>
             <div>
               <div style="font-size:12px;font-weight:600;color:#64748b;">Active Loads Today</div>
-              <div style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">18</div>
+              <div class="kpi-num" data-countup="18" style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">18</div>
               <div style="font-size:11px;color:#16a34a;font-weight:600;">↗ 3 from yesterday</div>
             </div>
           </div>
@@ -1680,7 +1889,7 @@ table.data tbody td{padding:13px 13px;}
             </div>
             <div>
               <div style="font-size:12px;font-weight:600;color:#64748b;">Today's Pickups</div>
-              <div style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">7</div>
+              <div class="kpi-num" data-countup="7" style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">7</div>
               <div style="font-size:11px;color:#16a34a;font-weight:600;">↗ 2 from yesterday</div>
             </div>
           </div>
@@ -1692,7 +1901,7 @@ table.data tbody td{padding:13px 13px;}
             </div>
             <div>
               <div style="font-size:12px;font-weight:600;color:#64748b;">Today's Deliveries</div>
-              <div style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">5</div>
+              <div class="kpi-num" data-countup="5" style="font-size:26px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">5</div>
               <div style="font-size:11px;color:#16a34a;font-weight:600;">↗ 1 from yesterday</div>
             </div>
           </div>
@@ -1704,7 +1913,7 @@ table.data tbody td{padding:13px 13px;}
             </div>
             <div>
               <div style="font-size:12px;font-weight:600;color:#64748b;">Weekly Gross</div>
-              <div style="font-size:24px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">$42,650</div>
+              <div class="kpi-num" data-countup="42650" data-prefix="$" style="font-size:24px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">$42,650</div>
               <div style="font-size:11px;color:#16a34a;font-weight:600;">↗ 12.5% from last week</div>
             </div>
           </div>
@@ -4092,7 +4301,35 @@ function openDriverTrackingModal(){
   }, 100);
 }
 
+function triggerCountUpAnimations(){
+  const els = document.querySelectorAll('.kpi-num[data-countup]');
+  els.forEach(el => {
+    const target = parseFloat(el.getAttribute('data-countup'));
+    if(isNaN(target)) return;
+    const prefix = el.getAttribute('data-prefix') || '';
+    const suffix = el.getAttribute('data-suffix') || '';
+    const duration = 1200; // 1.2s smooth duration
+    const startTime = performance.now();
+
+    function update(now){
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(target * ease);
+      el.textContent = prefix + (current >= 1000 ? current.toLocaleString() : current) + suffix;
+      if(progress < 1){
+        requestAnimationFrame(update);
+      } else {
+        el.textContent = prefix + (target >= 1000 ? target.toLocaleString() : target) + suffix;
+      }
+    }
+    requestAnimationFrame(update);
+  });
+}
+
 function renderDashboard(){
+  triggerCountUpAnimations();
   setTimeout(()=>{
     const select = document.getElementById('tracking-driver-select');
     const curVal = select ? select.value : 'driver-1';
