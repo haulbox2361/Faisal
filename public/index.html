@@ -4327,117 +4327,157 @@
     }
 
     /* =========================================================================
-       3.5. HaulBoX Living AI Network Enterprise Wordmark Logo System
+       3.5. HaulBoX Living AI Neural Core Enterprise Identity (Stripe / OpenAI grade)
        ========================================================================= */
     .haulbox-living-network-wrap {
       position: relative;
-      display: inline-flex;
+      display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px 18px;
+      width: 100%;
+      min-height: 100px;
+      padding: 12px 14px 10px;
       cursor: pointer;
       user-select: none;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      border-radius: 14px;
+      background: radial-gradient(circle at 50% 50%, rgba(2, 132, 199, 0.12) 0%, rgba(15, 23, 42, 0) 72%);
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: visible;
     }
 
-    .haulbox-living-network-wrap:hover .hb-network-svg line {
-      stroke-opacity: 0.85;
-      filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.9));
-    }
-
-    .haulbox-living-network-wrap:hover .hb-network-node {
-      transform: scale(1.15);
-      box-shadow: 0 0 16px rgba(0, 240, 255, 0.95);
+    .haulbox-living-network-wrap:hover {
+      background: radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.22) 0%, rgba(15, 23, 42, 0.05) 80%);
     }
 
     .haulbox-living-network-wrap:hover .hb-living-brand-text {
-      filter: drop-shadow(0 0 24px rgba(2, 132, 199, 0.9)) drop-shadow(0 0 8px rgba(0, 240, 255, 0.8));
+      transform: scale(1.03);
+      filter: drop-shadow(0 0 28px rgba(0, 240, 255, 0.95)) drop-shadow(0 0 10px rgba(56, 189, 248, 0.9));
     }
 
-    .haulbox-living-network-wrap:hover .hb-pulse-particle {
-      animation-duration: 1.4s !important;
+    .haulbox-living-network-wrap:hover .hb-node-chip {
+      transform: translateY(-2px) scale(1.12);
+      border-color: #00f0ff;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.8), inset 0 0 10px rgba(0, 240, 255, 0.5);
+    }
+
+    /* Living Canvas / SVG Mesh */
+    .hb-neural-canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
     }
 
     .hb-living-brand-text {
       position: relative;
-      z-index: 5;
+      z-index: 10;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       font-weight: 900;
       letter-spacing: -0.04em;
       line-height: 1;
       display: inline-flex;
       align-items: center;
-      transition: filter 0.3s ease;
+      transition: all 0.3s ease;
+      filter: drop-shadow(0 0 16px rgba(2, 132, 199, 0.6));
     }
 
     .hb-text-haul {
       color: #ffffff;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
     }
 
     .hb-text-box {
-      color: #0284c7;
-      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 50%, #00f0ff 100%);
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #38bdf8 0%, #00f0ff 50%, #0284c7 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      text-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
-      filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.4));
+      filter: drop-shadow(0 0 12px rgba(0, 240, 255, 0.6));
     }
 
-    .hb-ai-core-badge {
+    .hb-ai-pill {
       display: inline-flex;
       align-items: center;
       gap: 4px;
       padding: 2.5px 7px;
       margin-left: 6px;
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 900;
-      letter-spacing: 0.08em;
-      border-radius: 5px;
-      background: linear-gradient(135deg, rgba(2, 132, 199, 0.3), rgba(0, 240, 255, 0.2));
-      border: 1px solid rgba(0, 240, 255, 0.6);
+      letter-spacing: 0.1em;
+      border-radius: 6px;
+      background: linear-gradient(135deg, rgba(2, 132, 199, 0.35), rgba(0, 240, 255, 0.2));
+      border: 1px solid rgba(0, 240, 255, 0.7);
       color: #00f0ff;
-      box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
-      animation: hbAiBadgeBreathe 2.8s ease-in-out infinite;
-      text-transform: uppercase;
-      z-index: 6;
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.45);
+      animation: hbAiPillGlow 2.5s ease-in-out infinite;
     }
 
-    .hb-ai-dot {
+    .hb-ai-beacon {
       width: 5px;
       height: 5px;
       border-radius: 50%;
       background: #00f0ff;
       box-shadow: 0 0 6px #00f0ff, 0 0 12px #00f0ff;
-      animation: hbDotBlink 1.4s ease-in-out infinite;
+      animation: hbBeaconBlink 1.4s ease-in-out infinite;
     }
 
-    /* SVG Neural Network Background Layer */
-    .hb-network-svg {
-      position: absolute;
-      inset: 0;
+    /* Satellite AI Node Row (Integrated High-Tech Cluster) */
+    .hb-node-cluster-top,
+    .hb-node-cluster-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
       width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 1;
-      overflow: visible;
+      position: relative;
+      z-index: 8;
     }
 
-    .hb-network-line {
-      stroke: rgba(56, 189, 248, 0.35);
-      stroke-width: 1.5;
-      stroke-dasharray: 4 4;
-      animation: hbLineDash 3s linear infinite;
+    .hb-node-cluster-top { margin-bottom: 6px; }
+    .hb-node-cluster-bottom { margin-top: 6px; }
+
+    .hb-node-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #94a3b8;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 0 6px rgba(2, 132, 199, 0.15);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      animation: hbNodeFloat 3.2s ease-in-out infinite alternate;
     }
 
-    .hb-network-line.active {
-      stroke: rgba(0, 240, 255, 0.55);
-      filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.5));
+    .hb-node-chip .emoji { font-size: 11px; }
+    .hb-node-chip .label { font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #cbd5e1; }
+
+    .hb-node-chip:nth-child(1) { animation-delay: 0s; }
+    .hb-node-chip:nth-child(2) { animation-delay: 0.8s; }
+    .hb-node-chip:nth-child(3) { animation-delay: 1.6s; }
+
+    @keyframes hbNodeFloat {
+      0% { transform: translateY(0); border-color: rgba(56, 189, 248, 0.35); box-shadow: 0 0 6px rgba(2, 132, 199, 0.2); }
+      100% { transform: translateY(-2.5px); border-color: rgba(0, 240, 255, 0.75); box-shadow: 0 0 12px rgba(0, 240, 255, 0.5), inset 0 0 8px rgba(0, 240, 255, 0.25); color: #ffffff; }
     }
 
-    .hb-pulse-particle {
-      fill: #00f0ff;
-      filter: drop-shadow(0 0 6px #00f0ff) drop-shadow(0 0 12px #38bdf8);
+    @keyframes hbAiPillGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(0, 240, 255, 0.35); border-color: rgba(0, 240, 255, 0.6); }
+      50% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.85), inset 0 0 10px rgba(0, 240, 255, 0.4); border-color: rgba(0, 240, 255, 1); }
+    }
+
+    @keyframes hbBeaconBlink {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(0.6); opacity: 0.35; }
     }
 
     /* Satellite Living AI Nodes */
@@ -5073,66 +5113,30 @@
     <!-- ============ SIDEBAR ============ -->
     <aside id="sidebar" style="background:#0F172A;border-right:1px solid #1E293B;color:#F8FAFC;">
       <div class="brand"
-        style="padding:22px 12px 20px;border-bottom:1px solid #1E293B;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
-        <!-- HaulBoX Living AI Network Enterprise Wordmark -->
-        <div class="haulbox-living-network-wrap" style="width:100%;height:84px;position:relative;" title="HaulBoX Connected Living AI Intelligence Network">
-          <!-- Animated Neural SVG Circuit Mesh & Flowing Data Packets -->
-          <svg class="hb-network-svg" viewBox="0 0 200 90" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="hbGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.8" />
-                <stop offset="100%" stop-color="#0284c7" stop-opacity="0.3" />
-              </linearGradient>
-            </defs>
-            <!-- Neural Connection Lines converging on HaulBoX Core -->
-            <line x1="20" y1="12" x2="90" y2="45" class="hb-network-line active" />
-            <line x1="100" y1="8" x2="100" y2="45" class="hb-network-line" />
-            <line x1="180" y1="12" x2="110" y2="45" class="hb-network-line active" />
-            <line x1="25" y1="78" x2="90" y2="45" class="hb-network-line" />
-            <line x1="100" y1="82" x2="100" y2="45" class="hb-network-line active" />
-            <line x1="175" y1="78" x2="110" y2="45" class="hb-network-line" />
+        style="padding:14px 10px 14px;border-bottom:1px solid #1E293B;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+        <!-- HaulBoX Living AI Network Enterprise Wordmark Core -->
+        <div class="haulbox-living-network-wrap" id="haulbox-living-brand-card" title="HaulBoX Enterprise AI Logistics Operating System">
+          <!-- Real-Time 60FPS Neural Canvas Physics Layer -->
+          <canvas id="hb-living-neural-canvas" class="hb-neural-canvas-container" width="220" height="110"></canvas>
 
-            <!-- Continuously Moving Data Packet Pulses -->
-            <!-- 🚚 Loads -> HaulBoX -->
-            <circle class="hb-pulse-particle" r="2.5">
-              <animateMotion path="M 20 12 L 90 45" dur="2.4s" repeatCount="indefinite" />
-            </circle>
-            <!-- 🤖 AI -> HaulBoX -->
-            <circle class="hb-pulse-particle" r="2.5">
-              <animateMotion path="M 100 8 L 100 45" dur="1.9s" repeatCount="indefinite" />
-            </circle>
-            <!-- 👨‍✈️ Drivers -> HaulBoX -->
-            <circle class="hb-pulse-particle" r="2.5">
-              <animateMotion path="M 180 12 L 110 45" dur="2.7s" repeatCount="indefinite" />
-            </circle>
-            <!-- 📁 Docs -> HaulBoX -->
-            <circle class="hb-pulse-particle" r="2.5">
-              <animateMotion path="M 25 78 L 90 45" dur="2.2s" repeatCount="indefinite" />
-            </circle>
-            <!-- 💰 Payments -> HaulBoX -->
-            <circle class="hb-pulse-particle" r="2.5">
-              <animateMotion path="M 100 82 L 100 45" dur="2.0s" repeatCount="indefinite" />
-            </circle>
-            <!-- 📊 Reports -> HaulBoX -->
-            <circle class="hb-pulse-particle" r="2.5">
-              <animateMotion path="M 175 78 L 110 45" dur="2.6s" repeatCount="indefinite" />
-            </circle>
-          </svg>
-
-          <!-- Satellite AI Module Nodes -->
-          <div class="hb-satellite-nodes">
-            <div class="hb-node" title="Loads & Dispatch">🚚</div>
-            <div class="hb-node" title="HaulBoX AI Neural Engine">🤖</div>
-            <div class="hb-node" title="Driver Fleet Management">👨‍✈️</div>
-            <div class="hb-node" title="Documents & BOL/POD Records">📁</div>
-            <div class="hb-node" title="Payments & Settlements">💰</div>
-            <div class="hb-node" title="Analytics & Real-time Reports">📊</div>
+          <!-- Top AI Satellite Node Cluster (Loads, AI Engine, Drivers) -->
+          <div class="hb-node-cluster-top">
+            <div class="hb-node-chip" title="Loads & Live Dispatch"><span class="emoji">🚚</span><span class="label">Loads</span></div>
+            <div class="hb-node-chip" style="border-color:rgba(0,240,255,0.6);" title="Autonomous HaulBoX AI Brain"><span class="emoji">🤖</span><span class="label" style="color:#00f0ff;">AI</span></div>
+            <div class="hb-node-chip" title="Driver Fleet Telemetry"><span class="emoji">👨‍✈️</span><span class="label">Drivers</span></div>
           </div>
 
           <!-- Central Living Wordmark -->
-          <div class="hb-living-brand-text" style="font-size:28px;">
+          <div class="hb-living-brand-text">
             <span class="hb-text-haul">Haul</span><span class="hb-text-box">BoX</span>
-            <span class="hb-ai-core-badge"><span class="hb-ai-dot"></span>AI</span>
+            <span class="hb-ai-pill"><span class="hb-ai-beacon"></span>CORE</span>
+          </div>
+
+          <!-- Bottom AI Satellite Node Cluster (Docs, Payments, Analytics) -->
+          <div class="hb-node-cluster-bottom">
+            <div class="hb-node-chip" title="Digital Documents & PODs"><span class="emoji">📁</span><span class="label">Docs</span></div>
+            <div class="hb-node-chip" title="Fintech Settlements & Pay"><span class="emoji">💰</span><span class="label">Pay</span></div>
+            <div class="hb-node-chip" title="Operations & Reports"><span class="emoji">📊</span><span class="label">Stats</span></div>
           </div>
         </div>
       </div>
@@ -8387,454 +8391,136 @@
     }
 
     /* =========================================================================
-       LUXURY 3D HAULBOX NAVIGATION DICE (Genuine Extruded 3D Raised Geometry)
-       6 Platform Module Faces:
-       1: Truck (Loads / Freight / Dispatch -> loadboard)
-       2: AI Brain / Core (HaulBoX AI -> dashboard)
-       3: Documents Folder (Documents / BOL / POD -> documents)
-       4: Driver Aviator (Driver Portal / Management -> drivers)
-       5: Support Headset (Dispatch Support / Chat -> chat)
-       6: Currency Dollar (Payments / Settlements -> driverpay)
+       HaulBoX Living AI Neural Core Engine (60 FPS Interactive Particle Canvas)
        ========================================================================= */
-
-    const CUBE_FACES = [
-      { name: 'Loads', view: 'loadboard', rot: { x: 0, y: -Math.PI / 2, z: 0 } },        // +X Right
-      { name: 'Drivers', view: 'drivers', rot: { x: 0, y: Math.PI / 2, z: 0 } },          // -X Left
-      { name: 'Payments', view: 'driverpay', rot: { x: Math.PI / 2, y: 0, z: 0 } },        // +Y Top
-      { name: 'Documents', view: 'documents', rot: { x: -Math.PI / 2, y: 0, z: 0 } },     // -Y Bottom
-      { name: 'HaulBoX AI', view: 'dashboard', rot: { x: 0, y: 0, z: 0 } },               // +Z Front
-      { name: 'Support', view: 'chat', rot: { x: 0, y: Math.PI, z: 0 } }                  // -Z Back
-    ];
-
-    let ACTIVE_DICE_INSTANCES = [];
-
-    function createLuxuryDiceFaceTexture(iconType) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
+    function initLivingNeuralCanvas() {
+      const canvas = document.getElementById('hb-living-neural-canvas');
+      if (!canvas) return;
       const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-      // 1. Deep Obsidian Titanium Gradient Face Background
-      const bgGrad = ctx.createRadialGradient(256, 256, 30, 256, 256, 340);
-      bgGrad.addColorStop(0, '#13233f');
-      bgGrad.addColorStop(0.65, '#0a1426');
-      bgGrad.addColorStop(1, '#030712');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, 512, 512);
+      const container = document.getElementById('haulbox-living-brand-card');
+      let width = canvas.width = (container ? container.clientWidth : 220) || 220;
+      let height = canvas.height = (container ? container.clientHeight : 110) || 110;
 
-      // 2. Thick Chamfer Rounded Inner Frame (Metallic Sapphire + Cyan Neon Inset)
-      ctx.lineWidth = 22;
-      ctx.strokeStyle = '#1e40af';
-      ctx.strokeRoundRect ? ctx.strokeRoundRect(20, 20, 472, 472, 52) : ctx.strokeRect(20, 20, 472, 472);
+      window.addEventListener('resize', () => {
+        if (container) {
+          width = canvas.width = container.clientWidth || 220;
+          height = canvas.height = container.clientHeight || 110;
+        }
+      });
 
-      ctx.lineWidth = 10;
-      ctx.strokeStyle = '#00f0ff';
-      ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = 28;
-      ctx.strokeRoundRect ? ctx.strokeRoundRect(44, 44, 424, 424, 40) : ctx.strokeRect(44, 44, 424, 424);
-      ctx.shadowBlur = 0;
-
-      // 3. Draw Ultra-Bold High-Contrast Sculpted 3D Icons
-      ctx.save();
-      ctx.translate(256, 256);
-
-      if (iconType === 'truck') {
-        // Ultra-Bold Sculpted Pure White Semi-Truck (Front-Quarter View)
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = 'rgba(0,240,255,0.9)';
-        ctx.shadowBlur = 24;
-
-        // Aerodynamic High-Roof Cab Body
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(-140, -110, 150, 160, 20) : ctx.rect(-140, -110, 150, 160);
-        ctx.fill();
-
-        // Dark Panoramic Windshield
-        ctx.fillStyle = '#060d1a';
-        ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(-125, -92, 120, 54, 10) : ctx.rect(-125, -92, 120, 54);
-        ctx.fill();
-
-        // Cargo Trailer Block
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = 'rgba(0,240,255,0.8)';
-        ctx.shadowBlur = 18;
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(20, -125, 125, 175, 14) : ctx.rect(20, -125, 125, 175);
-        ctx.fill();
-
-        // Heavy-duty Dual Axle Wheels
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#020617';
-        ctx.strokeStyle = '#00f0ff';
-        ctx.lineWidth = 8;
-        [[-75, 75], [55, 75], [115, 75]].forEach(([wx, wy]) => {
-          ctx.beginPath();
-          ctx.arc(wx, wy, 28, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          // Chrome Wheel Hub
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(wx, wy, 10, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#020617';
-        });
-
-        // Laser Cyan Grille Bars
-        ctx.fillStyle = '#00f0ff';
-        ctx.fillRect(-120, -22, 110, 10);
-        ctx.fillRect(-120, -4, 110, 10);
-        ctx.fillRect(-120, 14, 110, 10);
-      } else if (iconType === 'ai') {
-        // Ultra-Bold Glowing AI Neural Brain Core
-        ctx.strokeStyle = '#ffffff';
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 28;
-        ctx.lineWidth = 12;
-        ctx.lineCap = 'round';
-
-        // Outer Brain Structure
-        ctx.beginPath();
-        ctx.arc(-50, -35, 54, Math.PI * 0.7, Math.PI * 1.8);
-        ctx.arc(0, -75, 46, Math.PI * 1.1, Math.PI * 1.9);
-        ctx.arc(50, -35, 54, Math.PI * 1.2, Math.PI * 2.3);
-        ctx.arc(45, 40, 52, Math.PI * 1.7, Math.PI * 0.4);
-        ctx.arc(0, 80, 42, Math.PI * 1.9, Math.PI * 1.1);
-        ctx.arc(-45, 40, 52, Math.PI * 0.6, Math.PI * 1.3);
-        ctx.closePath();
-        ctx.stroke();
-
-        // Central Processor
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-42, -42, 84, 84);
-
-        ctx.font = '900 36px "Inter", sans-serif';
-        ctx.fillStyle = '#030712';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('AI', 0, 2);
-
-        // Neural Nodes
-        [[-95, -20], [-80, 50], [95, -20], [80, 50], [0, -110], [0, 110]].forEach(([nx, ny]) => {
-          ctx.beginPath();
-          ctx.arc(nx, ny, 11, 0, Math.PI * 2);
-          ctx.fillStyle = '#00f0ff';
-          ctx.fill();
-        });
-      } else if (iconType === 'folder') {
-        // Ultra-Bold 3D Documents Folder
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 24;
-
-        ctx.beginPath();
-        ctx.moveTo(-145, -75);
-        ctx.lineTo(-45, -75);
-        ctx.lineTo(-15, -40);
-        ctx.lineTo(145, -40);
-        ctx.lineTo(145, 105);
-        ctx.lineTo(-145, 105);
-        ctx.closePath();
-        ctx.fill();
-
-        // Cyan Front Pocket
-        ctx.fillStyle = '#0284c7';
-        ctx.beginPath();
-        ctx.moveTo(-145, 15);
-        ctx.lineTo(145, 15);
-        ctx.lineTo(130, 105);
-        ctx.lineTo(-130, 105);
-        ctx.closePath();
-        ctx.fill();
-
-        // White Paper Sheet
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(-80, -110, 160, 95);
-      } else if (iconType === 'driver') {
-        // Ultra-Bold Aviator Driver Profile
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 24;
-
-        // Helmet / Head
-        ctx.beginPath();
-        ctx.arc(0, -48, 58, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Dark Aviator Visor
-        ctx.fillStyle = '#030712';
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(-46, -60, 92, 34, 12) : ctx.rect(-46, -60, 92, 34);
-        ctx.fill();
-
-        // Broad Driver Shoulders
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 118, 105, Math.PI * 1.15, Math.PI * 1.85);
-        ctx.fill();
-      } else if (iconType === 'headset') {
-        // Ultra-Bold Dispatch Support Headset
-        ctx.strokeStyle = '#ffffff';
-        ctx.fillStyle = '#ffffff';
-        ctx.lineWidth = 18;
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 24;
-
-        ctx.beginPath();
-        ctx.arc(0, -15, 95, Math.PI, 0);
-        ctx.stroke();
-
-        // Cushioned Ear Cups
-        ctx.fillRect(-125, -35, 36, 75);
-        ctx.fillRect(89, -35, 36, 75);
-
-        // Mic Arm & Capsule
-        ctx.beginPath();
-        ctx.moveTo(107, 25);
-        ctx.lineTo(107, 85);
-        ctx.lineTo(25, 85);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(15, 85, 18, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (iconType === 'dollar') {
-        // Ultra-Bold Fintech Currency Core
-        ctx.strokeStyle = '#00f0ff';
-        ctx.lineWidth = 12;
-        ctx.shadowColor = '#00f0ff';
-        ctx.shadowBlur = 28;
-
-        ctx.beginPath();
-        ctx.arc(0, 0, 115, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.font = '900 160px "Inter", sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('$', 0, 8);
-      }
-
-      ctx.restore();
-      return new THREE.CanvasTexture(canvas);
-    }
-
-    // Builds a genuine rounded luxury tech dice with high-fidelity textures
-    function buildLuxuryDiceMesh() {
-      const diceGroup = new THREE.Group();
-
-      const materials = [
-        new THREE.MeshPhysicalMaterial({ map: createLuxuryDiceFaceTexture('truck'), roughness: 0.15, metalness: 0.85, clearcoat: 1.0 }),   // +X Loads
-        new THREE.MeshPhysicalMaterial({ map: createLuxuryDiceFaceTexture('driver'), roughness: 0.15, metalness: 0.85, clearcoat: 1.0 }),  // -X Drivers
-        new THREE.MeshPhysicalMaterial({ map: createLuxuryDiceFaceTexture('dollar'), roughness: 0.15, metalness: 0.85, clearcoat: 1.0 }),  // +Y Payments
-        new THREE.MeshPhysicalMaterial({ map: createLuxuryDiceFaceTexture('folder'), roughness: 0.15, metalness: 0.85, clearcoat: 1.0 }),  // -Y Documents
-        new THREE.MeshPhysicalMaterial({ map: createLuxuryDiceFaceTexture('ai'), roughness: 0.15, metalness: 0.85, clearcoat: 1.0 }),      // +Z AI / Intelligence
-        new THREE.MeshPhysicalMaterial({ map: createLuxuryDiceFaceTexture('headset'), roughness: 0.15, metalness: 0.85, clearcoat: 1.0 })   // -Z Support
+      // 6 Defined Strategic Satellite Hubs (matching the 6 UI modules)
+      const hubs = [
+        { x: width * 0.18, y: height * 0.18, name: 'Loads', color: '#38bdf8' },
+        { x: width * 0.50, y: height * 0.12, name: 'AI', color: '#00f0ff' },
+        { x: width * 0.82, y: height * 0.18, name: 'Drivers', color: '#38bdf8' },
+        { x: width * 0.18, y: height * 0.82, name: 'Docs', color: '#38bdf8' },
+        { x: width * 0.50, y: height * 0.88, name: 'Pay', color: '#00f0ff' },
+        { x: width * 0.82, y: height * 0.82, name: 'Stats', color: '#38bdf8' }
       ];
 
-      const bodyGeom = new THREE.BoxGeometry(1.65, 1.65, 1.65);
-      const bodyMesh = new THREE.Mesh(bodyGeom, materials);
-      diceGroup.add(bodyMesh);
+      const center = { x: width * 0.50, y: height * 0.50 };
 
-      // Glowing outer rounded cyan cage frame
-      const wireGeom = new THREE.BoxGeometry(1.69, 1.69, 1.69);
-      const wireMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.35 });
-      const wireCube = new THREE.Mesh(wireGeom, wireMat);
-      diceGroup.add(wireCube);
+      // Flowing Synaptic Energy Packets
+      const packets = [];
+      for (let i = 0; i < 14; i++) {
+        packets.push({
+          hubIdx: i % hubs.length,
+          t: Math.random(),
+          speed: 0.006 + Math.random() * 0.007,
+          toCenter: Math.random() > 0.35, // True: Hub -> Center (Data input), False: Center -> Hub (AI Dispatch output)
+          size: 1.8 + Math.random() * 1.6
+        });
+      }
 
-      return { diceGroup, wireMat };
-    }
-
-    function init3DCubeInstance(containerId, size) {
-      const container = document.getElementById(containerId);
-      if (!container || !window.THREE) return;
-      container.innerHTML = '';
-
-      const width = size || container.clientWidth || 100;
-      const height = size || container.clientHeight || 100;
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1000);
-      camera.position.z = 4.0;
-
-      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-      renderer.setSize(width, height);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.domElement.style.outline = 'none';
-      renderer.domElement.style.cursor = 'pointer';
-      container.appendChild(renderer.domElement);
-
-      // Luxury Studio Lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
-      scene.add(ambientLight);
-
-      const keyLight = new THREE.DirectionalLight(0xffffff, 3.8);
-      keyLight.position.set(4, 5, 6);
-      scene.add(keyLight);
-
-      const rimLight = new THREE.DirectionalLight(0x38bdf8, 3.0);
-      rimLight.position.set(-4, -3, 3);
-      scene.add(rimLight);
-
-      const pointLight = new THREE.PointLight(0x00f0ff, 4.0, 10);
-      pointLight.position.set(0, 0, 1.8);
-      scene.add(pointLight);
-
-      const { diceGroup, wireMat } = buildLuxuryDiceMesh();
-      // Set initial 3/4 isometric perspective matching concept render
-      diceGroup.rotation.set(0.35, -0.55, 0.15);
-      scene.add(diceGroup);
-
-      let mouseX = 0, mouseY = 0;
       let isHovered = false;
-      let isTransitioning = false;
-      let activeView = 'dashboard';
-
-      container.addEventListener('mouseenter', () => { isHovered = true; });
-      container.addEventListener('mouseleave', () => { isHovered = false; mouseX = 0; mouseY = 0; });
-      container.addEventListener('mousemove', (e) => {
-        const rect = container.getBoundingClientRect();
-        mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.5;
-        mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.5;
-      });
-
-      // Smooth rotation directly to target face on page change
-      function rotateToFace(targetView) {
-        activeView = targetView;
-        if (isTransitioning) return;
-        const face = CUBE_FACES.find(f => f.view === targetView) || CUBE_FACES[4];
-        isTransitioning = true;
-
-        const startX = diceGroup.rotation.x;
-        const startY = diceGroup.rotation.y;
-        const startZ = diceGroup.rotation.z;
-        const startTime = performance.now();
-        const duration = 650; // Smooth 650ms enterprise transition
-
-        wireMat.opacity = 0.8;
-        pointLight.intensity = 5.5;
-
-        function anim(now) {
-          const elapsed = now - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          const ease = 1 - Math.pow(1 - progress, 3);
-          diceGroup.rotation.x = startX + (face.rot.x - startX) * ease;
-          diceGroup.rotation.y = startY + (face.rot.y - startY) * ease;
-          diceGroup.rotation.z = startZ + (0 - startZ) * ease;
-
-          if (progress < 1) {
-            requestAnimationFrame(anim);
-          } else {
-            diceGroup.rotation.x = face.rot.x;
-            diceGroup.rotation.y = face.rot.y;
-            diceGroup.rotation.z = 0;
-            wireMat.opacity = 0.35;
-            pointLight.intensity = 3.5;
-            isTransitioning = false;
-          }
-        }
-        requestAnimationFrame(anim);
+      if (container) {
+        container.addEventListener('mouseenter', () => { isHovered = true; });
+        container.addEventListener('mouseleave', () => { isHovered = false; });
       }
 
-      // Click on dice triggers a smooth multi-axis 360 rotation and returns to current active face
-      container.addEventListener('click', () => {
-        if (isTransitioning) return;
-        isTransitioning = true;
+      function drawLivingNeuralMesh() {
+        ctx.clearRect(0, 0, width, height);
 
-        const face = CUBE_FACES.find(f => f.view === activeView) || CUBE_FACES[4];
-        const startX = diceGroup.rotation.x;
-        const startY = diceGroup.rotation.y;
-        const startZ = diceGroup.rotation.z;
-        const destX = face.rot.x + Math.PI * 2;
-        const destY = face.rot.y + Math.PI * 2;
-        const startTime = performance.now();
-        const duration = 750;
+        // Update hub positions dynamically on resize
+        hubs[0].x = width * 0.18; hubs[0].y = height * 0.18;
+        hubs[1].x = width * 0.50; hubs[1].y = height * 0.12;
+        hubs[2].x = width * 0.82; hubs[2].y = height * 0.18;
+        hubs[3].x = width * 0.18; hubs[3].y = height * 0.82;
+        hubs[4].x = width * 0.50; hubs[4].y = height * 0.88;
+        hubs[5].x = width * 0.82; hubs[5].y = height * 0.82;
+        center.x = width * 0.50; center.y = height * 0.50;
 
-        wireMat.opacity = 0.95;
-        pointLight.intensity = 6.5;
+        const time = Date.now() * 0.002;
 
-        function animClick(now) {
-          const elapsed = now - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          const ease = 1 - Math.pow(1 - progress, 3);
-          diceGroup.rotation.x = startX + (destX - startX) * ease;
-          diceGroup.rotation.y = startY + (destY - startY) * ease;
-          diceGroup.rotation.z = startZ + Math.sin(progress * Math.PI) * 0.4;
+        // 1. Draw High-Tech Laser Synaptic Connection Traces
+        hubs.forEach((hub, idx) => {
+          ctx.beginPath();
+          ctx.moveTo(hub.x, hub.y);
+          ctx.lineTo(center.x, center.y);
+          
+          const alpha = (isHovered ? 0.45 : 0.22) + Math.sin(time + idx) * 0.08;
+          ctx.strokeStyle = idx === 1 || idx === 4 ? `rgba(0, 240, 255, ${alpha + 0.1})` : `rgba(56, 189, 248, ${alpha})`;
+          ctx.lineWidth = isHovered ? 1.6 : 1.2;
+          ctx.setLineDash([4, 4]);
+          ctx.lineDashOffset = -time * 15;
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
 
-          const scale = 1 + Math.sin(progress * Math.PI) * 0.12;
-          diceGroup.scale.set(scale, scale, scale);
-
-          if (progress < 1) {
-            requestAnimationFrame(animClick);
-          } else {
-            diceGroup.rotation.x = face.rot.x;
-            diceGroup.rotation.y = face.rot.y;
-            diceGroup.rotation.z = 0;
-            diceGroup.scale.set(1, 1, 1);
-            wireMat.opacity = 0.35;
-            pointLight.intensity = 3.5;
-            isTransitioning = false;
-          }
+        // 2. Draw Synaptic Inter-Hub Ring Links
+        for (let i = 0; i < hubs.length; i++) {
+          const next = hubs[(i + 1) % hubs.length];
+          ctx.beginPath();
+          ctx.moveTo(hubs[i].x, hubs[i].y);
+          ctx.lineTo(next.x, next.y);
+          ctx.strokeStyle = isHovered ? 'rgba(56, 189, 248, 0.22)' : 'rgba(56, 189, 248, 0.10)';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
         }
-        requestAnimationFrame(animClick);
-      });
 
-      // Continuous simultaneous idle floating + multi-axis breathing motion
-      function animate() {
-        requestAnimationFrame(animate);
-        const time = Date.now() * 0.0012;
-
-        // Continuous subtle floating & breathing
-        diceGroup.position.y = Math.sin(time * 1.5) * 0.05;
-
-        if (!isTransitioning) {
-          if (isHovered) {
-            diceGroup.rotation.y += (mouseX * 1.0 - (diceGroup.rotation.y % (Math.PI * 2))) * 0.05 + 0.002;
-            diceGroup.rotation.x += (mouseY * 1.0 - (diceGroup.rotation.x % (Math.PI * 2))) * 0.05;
-            diceGroup.scale.set(1.03, 1.03, 1.03);
-            pointLight.intensity = 4.8;
-          } else {
-            // Continuous simultaneous multi-axis living motion
-            diceGroup.rotation.y += 0.005;
-            diceGroup.rotation.x += Math.sin(time * 0.8) * 0.002;
-            diceGroup.rotation.z = Math.sin(time * 0.5) * 0.02;
-            diceGroup.scale.set(1, 1, 1);
-            pointLight.intensity = 3.4 + Math.sin(time * 2.0) * 0.4;
+        // 3. Draw & Advance Flowing Glowing Packets (Continuous 60 FPS Flow)
+        packets.forEach(p => {
+          const hub = hubs[p.hubIdx];
+          const speedMultiplier = isHovered ? 2.0 : 1.0;
+          p.t += p.speed * speedMultiplier;
+          if (p.t > 1) {
+            p.t = 0;
+            p.hubIdx = (p.hubIdx + 1) % hubs.length;
+            p.toCenter = Math.random() > 0.35;
           }
-        }
-        renderer.render(scene, camera);
+
+          let px, py;
+          if (p.toCenter) {
+            px = hub.x + (center.x - hub.x) * p.t;
+            py = hub.y + (center.y - hub.y) * p.t;
+          } else {
+            px = center.x + (hub.x - center.x) * p.t;
+            py = center.y + (hub.y - center.y) * p.t;
+          }
+
+          // Quantum Glowing Pulse Particle
+          ctx.beginPath();
+          ctx.arc(px, py, p.size * (isHovered ? 1.3 : 1.0), 0, Math.PI * 2);
+          ctx.fillStyle = '#00f0ff';
+          ctx.shadowColor = '#00f0ff';
+          ctx.shadowBlur = isHovered ? 14 : 8;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        });
+
+        requestAnimationFrame(drawLivingNeuralMesh);
       }
-      animate();
 
-      const instance = { rotateToFace };
-      ACTIVE_DICE_INSTANCES.push(instance);
-      return instance;
+      drawLivingNeuralMesh();
     }
 
-    function rotateActiveDiceToView(viewName) {
-      ACTIVE_DICE_INSTANCES.forEach(inst => {
-        if (inst && typeof inst.rotateToFace === 'function') {
-          inst.rotateToFace(viewName);
-        }
-      });
-    }
-
-    function initAllHaulbox3DCubes() {
-      ACTIVE_DICE_INSTANCES = [];
-      init3DCubeInstance('haulbox-3d-cube-container', 95);
-      init3DCubeInstance('haulbox-3d-cube-login', 130);
-      init3DCubeInstance('haulbox-3d-cube-driver-login', 120);
-    }
-
-    // Auto-boot 3D cubes once DOM ready
+    // Auto-boot Living Neural Engine once DOM ready
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => setTimeout(initAllHaulbox3DCubes, 100));
+      document.addEventListener('DOMContentLoaded', () => setTimeout(initLivingNeuralCanvas, 100));
     } else {
-      setTimeout(initAllHaulbox3DCubes, 100);
+      setTimeout(initLivingNeuralCanvas, 100);
     }
 
     function getTodayIsoString() {
