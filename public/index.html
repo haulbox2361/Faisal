@@ -3913,10 +3913,6 @@ function within(dateStr, range, fromDate, toDate){
 }
 
 function placard(status, l){
-  if (l && l.ocrValidation && (l.ocrValidation.pickupMatch === false || l.ocrValidation.deliveryMatch === false) && !l.ocrValidation.adminApproved) {
-    return '<span class="placard pl-red" style="font-weight:700;"><span class="dot"></span>Issue</span>';
-  }
-
   const st = l ? (l.driverProgress || l.status || status) : status;
   if (st === 'Booked' || st === 'Pending RC' || st === 'ACCEPTED' || st === 'Accepted') {
     return '<span class="placard pl-white" style="font-weight:700;"><span class="dot"></span>Booked / Accepted</span>';
@@ -4958,21 +4954,6 @@ function normalizeOcrDate(s){
   if(!m) return '';
   let [, a, b, y] = m;
   if(y.length===2) y = (parseInt(y,10)<70 ? '20' : '19') + y;
-  return y+'-'+a.padStart(2,'0')+'-'+b.padStart(2,'0');
-}
-async function verifyDocAddress(file, dataUrl, key){
-  const isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name);
-  const isImg = /^image\//.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name);
-  if(!isPdf && !isImg) return null;
-  const base64 = dataUrl.split(',')[1];
-  const mediaType = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
-  const docLabel = key==='BOL' ? 'Bill of Lading' : 'Proof of Delivery';
-  const whichLoc = key==='BOL' ? 'pickup/origin' : 'delivery/destination';
-  const prompt = 'This is a freight '+docLabel+'. Return ONLY a raw JSON object (no markdown, no commentary) '+
-    'with exactly these keys: {"street":"","city":"","state":"2-letter US state code","zip":""} for the '+whichLoc+' location shown on the document. '+
-    'Leave a field empty if it cannot be found — never guess.';
-  return await callClaudeForDoc(base64, mediaType, isPdf, prompt, 'address');
-}
 function resetLoadForm(){
   document.getElementById('load-form').reset();
   lastMCAutoFilledName = '';
@@ -5124,16 +5105,6 @@ function inDateRange(dateStr, from, to){
   if(to && d > new Date(to+'T23:59:59')) return false;
   return true;
 }
-function ocrStatusPlacard(l){
-  const ocr = l.ocrValidation || {};
-  if (ocr.adminApproved || (ocr.pickupMatch !== false && ocr.deliveryMatch !== false)) {
-    return '<span class="placard pl-green" style="font-size:10.5px;padding:2px 6px;" title="OCR verification passed"><span class="dot"></span>Processed</span>';
-  }
-  if (ocr.pickupMatch === false || ocr.deliveryMatch === false) {
-    return '<span class="placard pl-yellow" style="font-size:10.5px;padding:2px 6px;" title="Address mismatch detected"><span class="dot"></span>Needs Review</span>';
-  }
-  return '<span class="placard pl-gray" style="font-size:10.5px;padding:2px 6px;"><span class="dot"></span>Processed</span>';
-}
 
 function isLoadLockedFromDeletion(l) {
   if (!l) return false;
@@ -5266,185 +5237,6 @@ function renderModalTrackingSection(l){
   </div>`;
 }
 
-/**
- * Robust address normalization and comparison engine
- */
-function normalizeAddressString(str) {
-  if (!str) return '';
-  return String(str).toLowerCase()
-    .replace(/\b(street|st|road|rd|avenue|ave|drive|dr|lane|ln|boulevard|blvd|court|ct|parkway|pkwy|highway|hwy|suite|ste|unit|apt|building|bldg|north|south|east|west|n|s|e|w)\b/gi, '')
-    .replace(/[^a-z0-9]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function normalizeStateCode(s) {
-  if (!s) return '';
-  const clean = String(s).trim().toUpperCase();
-  if (/^[A-Z]{2}$/.test(clean)) return clean;
-  const stateMap = {
-    'ALABAMA':'AL','ALASKA':'AK','ARIZONA':'AZ','ARKANSAS':'AR','CALIFORNIA':'CA','COLORADO':'CO',
-    'CONNECTICUT':'CT','DELAWARE':'DE','FLORIDA':'FL','GEORGIA':'GA','HAWAII':'HI','IDAHO':'ID',
-    'ILLINOIS':'IL','INDIANA':'IN','IOWA':'IA','KANSAS':'KS','KENTUCKY':'KY','LOUISIANA':'LA',
-    'MAINE':'ME','MARYLAND':'MD','MASSACHUSETTS':'MA','MICHIGAN':'MI','MINNESOTA':'MN',
-    'MISSISSIPPI':'MS','MISSOURI':'MO','MONTANA':'MT','NEBRASKA':'NE','NEVADA':'NV',
-    'NEW HAMPSHIRE':'NH','NEW JERSEY':'NJ','NEW MEXICO':'NM','NEW YORK':'NY',
-    'NORTH CAROLINA':'NC','NORTH DAKOTA':'ND','OHIO':'OH','OKLAHOMA':'OK','OREGON':'OR',
-    'PENNSYLVANIA':'PA','RHODE ISLAND':'RI','SOUTH CAROLINA':'SC','SOUTH DAKOTA':'SD',
-    'TENNESSEE':'TN','TEXAS':'TX','UTAH':'UT','VERMONT':'VT','VIRGINIA':'VA',
-    'WASHINGTON':'WA','WEST VIRGINIA':'WV','WISCONSIN':'WI','WYOMING':'WY'
-  };
-  return stateMap[clean] || clean.slice(0, 2);
-}
-
-function compareAddressObjects(targetStr, docAddr) {
-  if (!targetStr || !docAddr) {
-    return { status: 'UNKNOWN', match: true, score: 0, reason: 'Awaiting document or target address' };
-  }
-
-  const targetLower = targetStr.toLowerCase();
-  const docCity = (docAddr.city || '').trim().toLowerCase();
-  const docState = normalizeStateCode(docAddr.state || '');
-  const docZip = (docAddr.zip || '').trim();
-  const docStreet = normalizeAddressString(docAddr.street || '');
-  const normTarget = normalizeAddressString(targetStr);
-
-  let stateMatch = false;
-  if (docState) {
-    const stateRegex = new RegExp(`\\b${docState}\\b`, 'i');
-    stateMatch = stateRegex.test(targetStr);
-  }
-
-  let cityMatch = false;
-  if (docCity) {
-    cityMatch = targetLower.includes(docCity) || normTarget.includes(normalizeAddressString(docCity));
-  }
-
-  let zipMatch = false;
-  if (docZip && docZip.length >= 5) {
-    zipMatch = targetStr.includes(docZip.slice(0, 5));
-  }
-
-  let streetMatch = false;
-  if (docStreet && docStreet.length > 3) {
-    streetMatch = normTarget.includes(docStreet);
-  }
-
-  console.log('[ADDR-COMPARE] Evaluation:', { targetStr, docAddr, cityMatch, stateMatch, zipMatch, streetMatch });
-
-  if (cityMatch && stateMatch) {
-    return { status: 'MATCH', match: true, score: 100, reason: `City (${docAddr.city}) and State (${docState}) match` + (zipMatch ? ` with ZIP (${docZip})` : '') };
-  }
-  if (cityMatch && !stateMatch && !docState) {
-    return { status: 'MATCH', match: true, score: 90, reason: `City (${docAddr.city}) matches load route` };
-  }
-  if (cityMatch && !stateMatch && docState) {
-    return { status: 'POSSIBLE_MATCH', match: true, score: 70, reason: `City matches (${docAddr.city}), state (${docState}) differs from route` };
-  }
-  if (streetMatch || zipMatch) {
-    return { status: 'POSSIBLE_MATCH', match: true, score: 75, reason: zipMatch ? `ZIP code matches (${docZip})` : `Street address matches (${docAddr.street})` };
-  }
-  if (stateMatch && !cityMatch && docCity) {
-    return { status: 'MISMATCH', match: false, score: 30, reason: `State matches (${docState}), but city (${docAddr.city}) does not match load address` };
-  }
-
-  return { status: 'MISMATCH', match: false, score: 10, reason: `Document location (${docAddr.city || ''}, ${docState || ''}) does not match load address (${targetStr})` };
-}
-
-function renderSideBySideValidationPanel(l) {
-  const ocrVal = l.ocrValidation || {};
-  const isApproved = ocrVal.adminApproved;
-
-  const puComp = ocrVal.bolAddress ? compareAddressObjects(l.pickup, ocrVal.bolAddress) : null;
-  const doComp = ocrVal.podAddress ? compareAddressObjects(l.dropoff, ocrVal.podAddress) : null;
-
-  const getStatusBadge = (comp, isMatchFallback) => {
-    if (!comp) {
-      return '<span style="font-size:11px;color:var(--text-faint);">Awaiting scan</span>';
-    }
-    if (comp.status === 'MATCH') {
-      return '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.12);padding:2px 8px;border-radius:10px;">✅ Match</span>';
-    }
-    if (comp.status === 'POSSIBLE_MATCH') {
-      return '<span style="font-weight:700;color:var(--warning,#f59e0b);background:rgba(245,158,11,0.12);padding:2px 8px;border-radius:10px;">⚠️ Possible Match</span>';
-    }
-    return '<span style="font-weight:700;color:var(--red,#ef4444);background:rgba(239,68,68,0.12);padding:2px 8px;border-radius:10px;">❌ Mismatch</span>';
-  };
-
-  const isPickupOk = puComp ? puComp.match : (ocrVal.pickupMatch !== false);
-  const isDeliveryOk = doComp ? doComp.match : (ocrVal.deliveryMatch !== false);
-
-  const overallBadge = isApproved
-    ? '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:12px;">✅ Admin Approved</span>'
-    : (isPickupOk && isDeliveryOk)
-    ? '<span style="font-weight:700;color:var(--green,#10b981);background:rgba(16,185,129,0.1);padding:3px 10px;border-radius:12px;">✅ Verified</span>'
-    : '<span style="font-weight:700;color:var(--warning,#f59e0b);background:rgba(245,158,11,0.1);padding:3px 10px;border-radius:12px;">⚠️ Needs Review</span>';
-
-  const rcPu = l.pickup || '—';
-  const bolPu = (ocrVal.bolAddress && ocrVal.bolAddress.city)
-    ? [ocrVal.bolAddress.street, ocrVal.bolAddress.city, ocrVal.bolAddress.state, ocrVal.bolAddress.zip].filter(Boolean).join(', ')
-    : (l.docs && l.docs.BOL && (l.docs.BOL.hasFile || l.docs.BOL.data) ? 'Uploaded (Awaiting OCR verification)' : 'BOL Not Uploaded');
-
-  const rcDo = l.dropoff || '—';
-  const podDo = (ocrVal.podAddress && ocrVal.podAddress.city)
-    ? [ocrVal.podAddress.street, ocrVal.podAddress.city, ocrVal.podAddress.state, ocrVal.podAddress.zip].filter(Boolean).join(', ')
-    : (l.docs && l.docs.POD && (l.docs.POD.hasFile || l.docs.POD.data) ? 'Uploaded (Awaiting OCR verification)' : 'POD Not Uploaded');
-
-  let h = `<div style="margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <h3 style="margin:0;font-size:13px;font-weight:700;">🔍 OCR Validation & Address Matching</h3>
-      <div>${overallBadge}</div>
-    </div>
-    
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-      <div style="background:var(--bg-card,#1e293b);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;">
-          <b>📍 Pickup Address (RC vs BOL)</b>
-          <div>${getStatusBadge(puComp, ocrVal.pickupMatch)}</div>
-        </div>
-        <div style="font-size:11px;color:var(--text-dim);">
-          <div style="margin-bottom:4px;"><b>RC Pickup:</b> ${escapeAttr(rcPu)}</div>
-          <div style="margin-bottom:4px;"><b>BOL Pickup:</b> ${escapeAttr(bolPu)}</div>
-          ${puComp ? `<div style="font-size:10.5px;color:var(--text-faint);margin-top:4px;font-style:italic;">Note: ${escapeAttr(puComp.reason)}</div>` : ''}
-        </div>
-      </div>
-
-      <div style="background:var(--bg-card,#1e293b);border:1px solid var(--border-soft);border-radius:8px;padding:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:11.5px;">
-          <b>🏁 Delivery Address (RC vs POD)</b>
-          <div>${getStatusBadge(doComp, ocrVal.deliveryMatch)}</div>
-        </div>
-        <div style="font-size:11px;color:var(--text-dim);">
-          <div style="margin-bottom:4px;"><b>RC Delivery:</b> ${escapeAttr(rcDo)}</div>
-          <div style="margin-bottom:4px;"><b>POD Delivery:</b> ${escapeAttr(podDo)}</div>
-          ${doComp ? `<div style="font-size:10.5px;color:var(--text-faint);margin-top:4px;font-style:italic;">Note: ${escapeAttr(doComp.reason)}</div>` : ''}
-        </div>
-      </div>
-    </div>`;
-
-  if (STATE.role === 'admin' && (!isPickupOk || !isDeliveryOk) && !isApproved) {
-    h += `<div style="display:flex;justify-content:flex-end;">
-      <button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:700;" onclick="approveOcrMismatch('${l.id}')">Approve & Override Mismatch</button>
-    </div>`;
-  }
-
-  h += `</div>`;
-  return h;
-}
-
-function approveOcrMismatch(loadId) {
-  const l = STATE.loads.find(x => x.id === loadId);
-  if (!l) return;
-  if (!l.ocrValidation) l.ocrValidation = {};
-  l.ocrValidation.adminApproved = true;
-  l.ocrValidation.approvedBy = STATE.currentUser ? STATE.currentUser.name : 'Admin';
-  l.ocrValidation.approvedAt = new Date().toISOString();
-  persist();
-  toast('OCR Mismatch Approved', 'Admin manually approved address match for Load #' + l.loadNumber);
-  openLoadModal(loadId);
-  renderLoadBoard();
-}
-
 function openLoadModal(id){
   const l = STATE.loads.find(x=>x.id===id);
   if(!l) return;
@@ -5507,7 +5299,6 @@ function openLoadModal(id){
   document.getElementById('load-modal-body').innerHTML = `
     ${renderModalTimelineHtml(l)}
     ${renderModalTrackingSection(l)}
-    ${renderSideBySideValidationPanel(l)}
     <div class="form-grid" style="margin-bottom:6px;">
       <div class="field"><label>Status</label><div style="padding-top:4px;">${placard(l.status)} <span class="hint" style="display:block;margin-top:5px;">${nextHint}</span></div></div>
       <div class="field"><label>Dispatcher</label><input value="${l.dispatcherName||'—'}" readonly></div>
@@ -5641,35 +5432,6 @@ async function handleDocUpload(loadId, key, input){
   }
   const rec = {name:file.name, data:dataUrl};
 
-  // BOL should reflect the load's pickup address, POD the drop-off address — check with AI
-  // where possible. This never blocks the upload; it's just a heads-up either way.
-  if (!l.ocrValidation) l.ocrValidation = { pickupMatch: true, deliveryMatch: true, adminApproved: false };
-
-  let addressNote = '';
-  if((key==='BOL' || key==='POD') && dataUrl){
-    const against = key==='BOL' ? l.pickup : l.dropoff;
-    const label = key==='BOL' ? 'pickup' : 'drop-off';
-    try{
-      const result = await verifyDocAddress(file, dataUrl, key);
-      if(result && (result.city || result.state || result.street)){
-        const comp = compareAddressObjects(against, result);
-        const isMatch = comp.match;
-
-        if (key === 'BOL') {
-          l.ocrValidation.bolAddress = result;
-          l.ocrValidation.pickupMatch = isMatch;
-        } else {
-          l.ocrValidation.podAddress = result;
-          l.ocrValidation.deliveryMatch = isMatch;
-        }
-
-        addressNote = ' — ' + comp.reason;
-      }
-    } catch(err){
-      console.warn('OCR verification note:', err.message);
-    }
-  }
-
   l.docs[key] = rec;
   const prevStatus = l.status;
   l.status = computeStatus(l);
@@ -5677,7 +5439,7 @@ async function handleDocUpload(loadId, key, input){
   if(l.status!=='Drop-off') l.payment = null;
   syncLoadToSheet(l);
   persist();
-  toast('Document attached', file.name+addressNote, true);
+  toast('Document attached', file.name, true);
   if(l.status!==prevStatus) toast('Status updated', l.loadNumber+' → '+l.status, true);
   // Auto-upload individual RC, BOL, POD to Drive in background (non-blocking)
   if(['RC','BOL','POD'].includes(key)){

@@ -765,11 +765,6 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
   }
 
-  // Initialize OCR Validation structure on load
-  if (!load.ocrValidation) {
-    load.ocrValidation = { pickupMatch: true, deliveryMatch: true, adminApproved: false };
-  }
-
   try {
     await saveFullState(state);
     await history.record(load.id, `${key}_UPLOADED`, fileName, { type: 'driver', id: driver.id, name: driver.name });
@@ -783,73 +778,6 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     await notifications.create('admin', 'admin', notifPayload);
     if (load.dispatcherId) {
       await notifications.create('dispatcher', load.dispatcherId, notifPayload);
-    }
-
-    // Trigger AI OCR extraction and address comparison for BOL / POD in background
-    if ((key === 'BOL' || key === 'POD') && rec.data) {
-      (async () => {
-        try {
-          console.log(`[DRIVER-DOC] 🔍 Starting OCR Address Extraction for driver-uploaded ${key} on Load #${load.loadNumber}`);
-          const isPdf = /\.pdf$/i.test(fileName) || (rec.data && rec.data.startsWith('data:application/pdf'));
-          const mediaType = isPdf ? 'application/pdf' : 'image/jpeg';
-          const base64Data = rec.data.includes(',') ? rec.data.split(',')[1] : rec.data;
-          const whichLoc = key === 'BOL' ? 'pickup/origin' : 'delivery/destination';
-          const prompt = `This is a freight ${key === 'BOL' ? 'Bill of Lading' : 'Proof of Delivery'}. Return ONLY a raw JSON object (no markdown, no commentary) with exactly these keys: {"street":"","city":"","state":"2-letter US state code","zip":""} for the ${whichLoc} location shown on the document. Leave a field empty if it cannot be found — never guess.`;
-
-          const mistralKey = process.env.MISTRAL_API_KEY || (state.settings && state.settings.aiMistralKey);
-          if (mistralKey) {
-            const mistralResp = await fetch('https://api.mistral.ai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: 'Bearer ' + mistralKey.trim(),
-              },
-              body: JSON.stringify({
-                model: 'pixtral-12b-2409',
-                messages: [{
-                  role: 'user',
-                  content: [
-                    { type: 'text', text: prompt },
-                    { type: isPdf ? 'document_url' : 'image_url', [isPdf ? 'document_url' : 'image_url']: (isPdf ? ('data:application/pdf;base64,' + base64Data) : { url: 'data:' + mediaType + ';base64,' + base64Data }) }
-                  ]
-                }],
-                response_format: { type: 'json_object' },
-              }),
-            });
-
-            if (mistralResp.ok) {
-              const resJson = await mistralResp.json();
-              const msgContent = resJson.choices && resJson.choices[0] && resJson.choices[0].message && resJson.choices[0].message.content;
-              if (msgContent) {
-                let parsedAddr = null;
-                try {
-                  parsedAddr = typeof msgContent === 'string' ? JSON.parse(msgContent.replace(/```(?:json)?/g, '').trim()) : msgContent;
-                } catch (e) {}
-
-                if (parsedAddr && (parsedAddr.city || parsedAddr.state)) {
-                  console.log(`[DRIVER-DOC] ✅ Extracted ${key} address:`, parsedAddr);
-                  const freshState = await loadFullState();
-                  if (freshState && freshState.loads) {
-                    const lFresh = freshState.loads.find((x) => x.id === load.id);
-                    if (lFresh) {
-                      lFresh.ocrValidation = lFresh.ocrValidation || { pickupMatch: true, deliveryMatch: true, adminApproved: false };
-                      if (key === 'BOL') {
-                        lFresh.ocrValidation.bolAddress = parsedAddr;
-                      } else {
-                        lFresh.ocrValidation.podAddress = parsedAddr;
-                      }
-                      await saveFullState(freshState);
-                      console.log(`[DRIVER-DOC] 💾 Saved OCR validation results to Load #${load.loadNumber}`);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } catch (ocrErr) {
-          console.warn(`[DRIVER-DOC] Background OCR address verification note:`, ocrErr.message);
-        }
-      })();
     }
 
     // Auto-upload BOL and POD to Google Drive using the admin's connected
