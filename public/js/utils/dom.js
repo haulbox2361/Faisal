@@ -43,12 +43,22 @@ function uid(prefix) {
 function openModal(id) {
   const el = document.getElementById(id);
   if (el) el.classList.add('active');
+  if (typeof SessionManager !== 'undefined' && id !== 'modal-settings-pin') {
+    SessionManager.saveUiState({ activeModalId: id });
+  }
 }
 
 function closeModal(id) {
   const el = document.getElementById(id);
   if (el) el.classList.remove('active');
+  if (typeof SessionManager !== 'undefined') {
+    const current = SessionManager.loadUiState();
+    if (current && current.activeModalId === id) {
+      SessionManager.saveUiState({ activeModalId: null, modalContextId: null });
+    }
+  }
 }
+
 
 function showLoginStatus(msg, isError) {
   const el = document.getElementById('login-status');

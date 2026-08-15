@@ -316,8 +316,11 @@
     // Which signed-in Google account this browser last got into HaulBoX with
     const SESSION_KEY = 'haulbox_session_email';
     async function restoreSession() {
-      let savedEmail = '';
-      try { savedEmail = localStorage.getItem(SESSION_KEY) || ''; } catch (e) { }
+      const session = (typeof SessionManager !== 'undefined') ? SessionManager.loadSession() : null;
+      let savedEmail = session ? session.email : '';
+      if (!savedEmail) {
+        try { savedEmail = localStorage.getItem(SESSION_KEY) || ''; } catch (e) { }
+      }
       if (!savedEmail) return false;
 
       const adminEmails = await loadAdminEmailConfig();
@@ -329,6 +332,9 @@
         STATE.currentDispatcherId = matchedDispatcher.id;
         STATE.viewAs = null;
         STATE.currentUser = { name: matchedDispatcher.name, email: matchedDispatcher.googleAccountEmail || savedEmail, initials: initials(matchedDispatcher.name) };
+        if (typeof SessionManager !== 'undefined') {
+          SessionManager.saveSession(savedEmail, 'dispatcher', STATE.currentUser, matchedDispatcher.id, false);
+        }
         enterApp();
         return true;
       }
@@ -338,9 +344,13 @@
         STATE.currentDispatcherId = null;
         STATE.viewAs = null;
         STATE.currentUser = { name: (STATE.isSuperAdmin ? 'Super Admin' : (STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin')), email: STATE.settings.googleAccountEmail || savedEmail, initials: initials(savedEmail.split('@')[0]) };
+        if (typeof SessionManager !== 'undefined') {
+          SessionManager.saveSession(savedEmail, 'admin', STATE.currentUser, null, STATE.isSuperAdmin);
+        }
         enterApp();
         return true;
       }
+      if (typeof SessionManager !== 'undefined') SessionManager.clearSession();
       try { localStorage.removeItem(SESSION_KEY); } catch (e) { }
       return false;
     }
@@ -415,7 +425,11 @@
         matchedDispatcher.gmailConnectionStatus = 'Connected';
         matchedDispatcher.gmailLastSync = new Date().toISOString();
         STATE.currentUser = { name: matchedDispatcher.name, email: result.email, initials: initials(matchedDispatcher.name) };
-        try { localStorage.setItem(SESSION_KEY, email); } catch (e) { }
+        if (typeof SessionManager !== 'undefined') {
+          SessionManager.saveSession(email, 'dispatcher', STATE.currentUser, matchedDispatcher.id, false);
+        } else {
+          try { localStorage.setItem(SESSION_KEY, email); } catch (e) { }
+        }
         persist();
         enterApp();
         return;
@@ -435,7 +449,11 @@
         STATE.settings.gmailConnectionStatus = 'Connected';
         STATE.settings.gmailLastSync = new Date().toISOString();
         STATE.currentUser = { name: (STATE.isSuperAdmin ? 'Super Admin' : (STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin')), email: result.email, initials: initials(result.email.split('@')[0]) };
-        try { localStorage.setItem(SESSION_KEY, email); } catch (e) { }
+        if (typeof SessionManager !== 'undefined') {
+          SessionManager.saveSession(email, 'admin', STATE.currentUser, null, STATE.isSuperAdmin);
+        } else {
+          try { localStorage.setItem(SESSION_KEY, email); } catch (e) { }
+        }
         persist();
         enterApp();
         return;
@@ -448,9 +466,9 @@
       document.getElementById('login-gate').innerHTML =
         '<div class="login-card">' +
         '<div class="login-mark" style="background:var(--red-soft);"><svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg></div>' +
-        '<h1 class="font-display">ACCESS DENIED</h1>' +
-        '<p>' + escapeAttr(result.email) + ' isn\'t registered as an Admin or Dispatcher in HaulBoX. Ask your Admin to add you as a dispatcher with this exact email address, then try again.</p>' +
-        '<button class="btn btn-accent" style="margin-top:14px;" onclick="window.location.reload()">Try a different account</button>' +
+        '<h1 class="font-display">ACCESS RESTRICTED</h1>' +
+        '<p><b>' + result.email + '</b> is not authorized. Sign in with your registered account.</p>' +
+        '<button class="btn btn-primary" onclick="window.location.reload()">Back to Sign In</button>' +
         '</div>';
     }
     // Small status line shown under the Sign in button while the popup/matching is in flight.
@@ -475,11 +493,19 @@
 
     function init() {
       let savedView = 'dashboard';
-      try { savedView = localStorage.getItem('haulbox_active_view') || 'dashboard'; } catch (e) { }
+      const uiState = (typeof SessionManager !== 'undefined') ? SessionManager.loadUiState() : {};
+      try { savedView = uiState.activeView || localStorage.getItem('haulbox_active_view') || 'dashboard'; } catch (e) { }
       if (savedView === 'settings' && !IS_SETTINGS_PIN_UNLOCKED) {
         savedView = 'dashboard';
       }
       switchView(savedView);
+
+      // Restore active modal state if refreshing while viewing a load
+      if (uiState.activeModalId === 'modal-load' && uiState.modalContextId) {
+        setTimeout(() => {
+          if (typeof openLoadModal === 'function') openLoadModal(uiState.modalContextId);
+        }, 200);
+      }
     }
 
     // role/currentUser/currentDispatcherId are session-only (persist() never saves them —
@@ -487,10 +513,14 @@
     // the login screen (see restoreSession()), so signing out has to clear that too or
     // reloading would just log the same person straight back in.
     function signOut() {
-      try {
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem('haulbox_active_view');
-      } catch (e) { }
+      if (typeof SessionManager !== 'undefined') {
+        SessionManager.clearSession();
+      } else {
+        try {
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem('haulbox_active_view');
+        } catch (e) { }
+      }
       window.location.reload();
     }
     function toggleUserMenu() { toast('Signed in', STATE.currentUser ? STATE.currentUser.email : ''); }
@@ -605,8 +635,14 @@
       document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
       if (VIEW_TITLES[view]) document.getElementById('pagetitle').textContent = VIEW_TITLES[view];
 
-      try { localStorage.setItem('haulbox_active_view', view); } catch (e) { }
+      try {
+        localStorage.setItem('haulbox_active_view', view);
+        if (typeof SessionManager !== 'undefined') {
+          SessionManager.saveUiState({ activeView: view });
+        }
+      } catch (e) { }
       if (typeof rotateActiveDiceToView === 'function') rotateActiveDiceToView(view);
+
 
       if (view === 'dashboard') renderDashboard();
       if (view === 'loadboard') renderLoadBoard();
@@ -2816,11 +2852,64 @@
       document.getElementById('f-systemdate').value = document.getElementById('f-systemdate').value || new Date().toISOString().slice(0, 10);
       showLoadStep(2);
     }
+    function saveAddLoadDraft() {
+      if (typeof SessionManager === 'undefined') return;
+      const getVal = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+      const draft = {
+        broker: getVal('f-broker'),
+        brokermc: getVal('f-brokermc'),
+        loadnumber: getVal('f-loadnumber'),
+        pickup: getVal('f-pickup'),
+        dropoff: getVal('f-dropoff'),
+        pickupdate: getVal('f-pickupdate'),
+        deliverydate: getVal('f-deliverydate'),
+        rate: getVal('f-rate'),
+        miles: getVal('f-miles'),
+        notes: getVal('f-notes'),
+        driverId: getVal('f-driver'),
+        dispatcherId: getVal('f-dispatcher'),
+      };
+      SessionManager.saveFormDraft('add_load', draft);
+    }
+
+    function restoreAddLoadDraft() {
+      if (typeof SessionManager === 'undefined') return;
+      const draft = SessionManager.loadFormDraft('add_load');
+      if (!draft) return;
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== '') el.value = v; };
+      setVal('f-broker', draft.broker);
+      setVal('f-brokermc', draft.brokermc);
+      setVal('f-loadnumber', draft.loadnumber);
+      setVal('f-pickup', draft.pickup);
+      setVal('f-dropoff', draft.dropoff);
+      setVal('f-pickupdate', draft.pickupdate);
+      setVal('f-deliverydate', draft.deliverydate);
+      setVal('f-rate', draft.rate);
+      setVal('f-miles', draft.miles);
+      setVal('f-notes', draft.notes);
+      setVal('f-driver', draft.driverId);
+      setVal('f-dispatcher', draft.dispatcherId);
+    }
+
     function backToLoadStep1() { showLoadStep(1); }
     function showLoadStep(n) {
       document.getElementById('load-step1').style.display = n === 1 ? 'block' : 'none';
       document.getElementById('load-step2').style.display = n === 2 ? 'block' : 'none';
+      if (n === 1) restoreAddLoadDraft();
     }
+
+    document.addEventListener('input', e => {
+      if (e.target && e.target.id && e.target.id.startsWith('f-')) {
+        saveAddLoadDraft();
+      }
+    });
+    document.addEventListener('change', e => {
+      if (e.target && e.target.id && e.target.id.startsWith('f-')) {
+        saveAddLoadDraft();
+      }
+    });
+
+
     async function submitLoadForm(e) {
       e.preventDefault();
       if (STATE.role === 'viewonly') { toast('View only', 'You cannot create loads.'); return false; }
@@ -2894,11 +2983,15 @@
       if (load.docs.RC && load.docs.RC.data) {
         autoDriveUploadDoc(load, 'RC', load.docs.RC).catch(() => { });
       }
+      if (typeof SessionManager !== 'undefined') {
+        SessionManager.clearFormDraft('add_load');
+      }
       toast('Load booked', load.loadNumber + ' — RC on file, status Booked', true);
       resetLoadForm();
       switchView('loadboard');
       return false;
     }
+
 
     /* ================= LOAD BOARD ================= */
     const LB_TABS = ['All Loads', 'Pending RC', 'Booked', 'Loaded', 'Drop-off'];
@@ -2909,11 +3002,23 @@
     function renderLoadBoardTabs() {
       const el = document.getElementById('loadboard-tabs');
       if (!el) return;
+      if (typeof SessionManager !== 'undefined' && !STATE.loadFilter) {
+        const saved = SessionManager.loadUiState();
+        if (saved && saved.loadFilter) STATE.loadFilter = saved.loadFilter;
+      }
       el.innerHTML = loadBoardTabs().map(t =>
         '<button class="tab-btn' + (STATE.loadFilter === t ? ' active' : '') + '" onclick="setLoadFilter(\'' + t + '\')">' + t + '</button>'
       ).join('');
     }
-    function setLoadFilter(t) { STATE.loadFilter = t; renderLoadBoardTabs(); renderLoadBoard(); }
+    function setLoadFilter(t) {
+      STATE.loadFilter = t;
+      if (typeof SessionManager !== 'undefined') {
+        SessionManager.saveUiState({ loadFilter: t });
+      }
+      renderLoadBoardTabs();
+      renderLoadBoard();
+    }
+
     function matchesFilter(load, filter) {
       if (filter === 'All Loads') return true;
       if (PAYMENT_STAGES.includes(filter)) return paymentOf(load) === filter;
@@ -3107,7 +3212,11 @@
       const l = STATE.loads.find(x => x.id === id);
       if (!l) return;
       if (!canAccessLoad(l)) return toast('Not your load', 'You can only view loads assigned to you.');
+      if (typeof SessionManager !== 'undefined') {
+        SessionManager.saveUiState({ activeModalId: 'modal-load', modalContextId: id });
+      }
       document.getElementById('load-modal-title').textContent = l.loadNumber + ' — ' + l.pickup + ' → ' + l.dropoff;
+
       const nextHint = l.status === 'Pending RC' ? 'Not booked yet — upload the Rate Confirmation to book this load.'
         : l.status === 'Booked' ? 'Upload the BOL to move this to Loaded.'
           : l.status === 'Loaded' ? 'Upload the POD to mark this Drop-off.'

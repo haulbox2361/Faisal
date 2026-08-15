@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/widgets/haulbox_bottom_navigation.dart';
 import 'chat/chat_screen.dart';
 import 'current_load/current_load_screen.dart';
@@ -14,7 +15,7 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  // Index 2 is the Center 'Current Load' primary action
+  // Index 2 is the Center 'Current Load' primary action (default)
   int _currentIndex = 2;
 
   late final List<Widget> _screens;
@@ -22,13 +23,38 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
+    _restoreLastTab();
     _screens = [
       const LoadsScreen(),
       const PaymentsScreen(),
-      CurrentLoadScreen(onNavigateTab: (idx) => setState(() => _currentIndex = idx)),
+      CurrentLoadScreen(onNavigateTab: (idx) => _switchTab(idx)),
       const ChatScreen(),
       const ProfileScreen(),
     ];
+  }
+
+  Future<void> _restoreLastTab() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedIdx = prefs.getInt('last_selected_tab_idx');
+      if (savedIdx != null && savedIdx >= 0 && savedIdx < 5) {
+        if (mounted) {
+          setState(() {
+            _currentIndex = savedIdx;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _switchTab(int index) async {
+    setState(() {
+      _currentIndex = index;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('last_selected_tab_idx', index);
+    } catch (_) {}
   }
 
   @override
@@ -40,12 +66,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       bottomNavigationBar: HaulBoxBottomNavigation(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: _switchTab,
       ),
     );
   }
 }
+

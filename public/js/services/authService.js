@@ -1,10 +1,16 @@
 /* =========================================================================
-   HaulBoX Authentication & Role Management Service
+   HaulBoX Authentication, Role Management & Session Persistence Service
    ========================================================================= */
+
+const SESSION_KEY = 'haulline-session-email';
+const SESSION_USER_KEY = 'haulbox_session_user';
+const SESSION_UI_KEY = 'haulbox_ui_state';
+const SESSION_DRAFTS_KEY = 'haulbox_form_drafts';
 
 let IS_SETTINGS_PIN_UNLOCKED = false;
 let PENDING_SETTINGS_SWITCH = false;
 
+// 1. PIN VERIFICATION FOR ADMIN SETTINGS
 function openSettingsWithPin() {
   if (IS_SETTINGS_PIN_UNLOCKED) {
     doSwitchView('settings');
@@ -63,3 +69,92 @@ function cancelSettingsPin() {
   PENDING_SETTINGS_SWITCH = false;
   closeModal('modal-settings-pin');
 }
+
+// 2. PERSISTENT SESSION RESTORATION MANAGER
+const SessionManager = {
+  saveSession(email, role, currentUser, currentDispatcherId = null, isSuperAdmin = false) {
+    try {
+      localStorage.setItem(SESSION_KEY, email);
+      localStorage.setItem(SESSION_USER_KEY, JSON.stringify({
+        email,
+        role,
+        currentUser,
+        currentDispatcherId,
+        isSuperAdmin,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch (_) {}
+  },
+
+  loadSession() {
+    try {
+      const email = localStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(SESSION_USER_KEY);
+      if (!email) return null;
+      if (!raw) return { email };
+      return JSON.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  },
+
+  clearSession() {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_USER_KEY);
+      localStorage.removeItem(SESSION_UI_KEY);
+      localStorage.removeItem('haulbox_active_view');
+    } catch (_) {}
+  },
+
+  saveUiState(stateUpdates = {}) {
+    try {
+      const existing = this.loadUiState() || {};
+      const merged = { ...existing, ...stateUpdates, updatedAt: new Date().toISOString() };
+      localStorage.setItem(SESSION_UI_KEY, JSON.stringify(merged));
+    } catch (_) {}
+  },
+
+  loadUiState() {
+    try {
+      const raw = localStorage.getItem(SESSION_UI_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      return {};
+    }
+  },
+
+  saveFormDraft(formId, data) {
+    try {
+      const allDrafts = this.loadAllDrafts();
+      allDrafts[formId] = { data, updatedAt: new Date().toISOString() };
+      localStorage.setItem(SESSION_DRAFTS_KEY, JSON.stringify(allDrafts));
+    } catch (_) {}
+  },
+
+  loadFormDraft(formId) {
+    try {
+      const allDrafts = this.loadAllDrafts();
+      return (allDrafts[formId] && allDrafts[formId].data) || null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  loadAllDrafts() {
+    try {
+      const raw = localStorage.getItem(SESSION_DRAFTS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      return {};
+    }
+  },
+
+  clearFormDraft(formId) {
+    try {
+      const allDrafts = this.loadAllDrafts();
+      delete allDrafts[formId];
+      localStorage.setItem(SESSION_DRAFTS_KEY, JSON.stringify(allDrafts));
+    } catch (_) {}
+  }
+};

@@ -15,6 +15,46 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  AuthProvider() {
+    _restorePersistedSession();
+  }
+
+  Future<void> _restorePersistedSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedToken = prefs.getString('token');
+      final savedDriverId = prefs.getString('driverId');
+      final savedDriverName = prefs.getString('driverName');
+      final savedTruck = prefs.getString('driverTruck');
+      final savedPhone = prefs.getString('driverPhone');
+      final savedEmail = prefs.getString('driverEmail');
+      final savedCdl = prefs.getString('driverCdl');
+
+      if (savedDriverId != null && savedDriverId.isNotEmpty) {
+        _token = savedToken;
+        _driver = DriverModel(
+          id: savedDriverId,
+          name: savedDriverName ?? 'John D. Smith',
+          truck: savedTruck ?? 'Truck # HBX-1042',
+          phone: savedPhone ?? '(214) 555-0123',
+          email: savedEmail ?? 'john.smith@email.com',
+          cdlNumber: savedCdl ?? 'CDL12345678',
+          cdlExpiration: 'Dec 15, 2026',
+          address: '123 Driver St, Dallas, TX 75201',
+          status: 'ACTIVE',
+        );
+        if (_token != null) {
+          refreshLoads();
+        } else {
+          _seedDefaultData();
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Session restore error: $e');
+    }
+  }
+
   DriverModel? get driver => _driver ?? DriverModel(
     id: 'D-101',
     name: 'John D. Smith',
@@ -34,6 +74,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => true;
+
 
   LoadModel? get currentLoad {
     if (_loads.isEmpty) {
@@ -312,6 +353,10 @@ class AuthProvider extends ChangeNotifier {
       if (_driver != null) {
         await prefs.setString('driverId', _driver!.id);
         await prefs.setString('driverName', _driver!.name);
+        if (_driver!.truck != null) await prefs.setString('driverTruck', _driver!.truck!);
+        if (_driver!.phone != null) await prefs.setString('driverPhone', _driver!.phone!);
+        if (_driver!.email != null) await prefs.setString('driverEmail', _driver!.email!);
+        if (_driver!.cdlNumber != null) await prefs.setString('driverCdl', _driver!.cdlNumber!);
       }
 
       notifyListeners();
@@ -329,9 +374,19 @@ class AuthProvider extends ChangeNotifier {
         status: 'ACTIVE',
       );
       _seedDefaultData();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('driverId', _driver!.id);
+      await prefs.setString('driverName', _driver!.name);
+      if (_driver!.truck != null) await prefs.setString('driverTruck', _driver!.truck!);
+      if (_driver!.phone != null) await prefs.setString('driverPhone', _driver!.phone!);
+      if (_driver!.email != null) await prefs.setString('driverEmail', _driver!.email!);
+      if (_driver!.cdlNumber != null) await prefs.setString('driverCdl', _driver!.cdlNumber!);
+
       notifyListeners();
       return true;
     }
+
   }
 
   Future<void> refreshLoads() async {
@@ -388,9 +443,21 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     _token = null;
     _driver = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      await prefs.remove('driverId');
+      await prefs.remove('driverName');
+      await prefs.remove('driverTruck');
+      await prefs.remove('driverPhone');
+      await prefs.remove('driverEmail');
+      await prefs.remove('driverCdl');
+      await prefs.remove('last_selected_tab_idx');
+    } catch (_) {}
     notifyListeners();
   }
 }
+
