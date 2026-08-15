@@ -2,32 +2,9 @@
    HaulBoX Centralized Reactive State & Persistence Store
    ========================================================================= */
 
-(function () {
-  if (window.storage) return;
-  window.storage = {
-    async get(key) {
-      const res = await fetch('/api/storage/' + encodeURIComponent(key));
-      if (res.status === 404) throw new Error('Key not found: ' + key);
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage read failed');
-      return res.json();
-    },
-    async set(key, value) {
-      const res = await fetch('/api/storage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }) });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage write failed');
-      return res.json();
-    },
-    async delete(key) {
-      const res = await fetch('/api/storage/' + encodeURIComponent(key), { method: 'DELETE' });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage delete failed');
-      return res.json();
-    },
-    async list(prefix) {
-      const res = await fetch('/api/storage' + (prefix ? ('?prefix=' + encodeURIComponent(prefix)) : ''));
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage list failed');
-      return res.json();
-    }
-  };
-})();
+// NOTE: window.storage polyfill, CHARTS, and pendingSelectTarget are declared
+// in app.js which loads after this file. STATE is declared here as the single
+// source of truth and referenced by app.js.
 
 let STATE = {
   loads: [],
@@ -46,8 +23,6 @@ let STATE = {
   loadFilter: 'all'
 };
 
-let CHARTS = {};
-let pendingSelectTarget = null;
 
 function computeStatus(l) {
   if (l.docs && l.docs.POD) return 'Drop-off';

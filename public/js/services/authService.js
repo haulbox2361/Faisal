@@ -2,7 +2,7 @@
    HaulBoX Authentication, Role Management & Session Persistence Service
    ========================================================================= */
 
-const SESSION_KEY = 'haulline-session-email';
+// SESSION_KEY is declared in js/constants/statusCodes.js (loaded before this file)
 const SESSION_USER_KEY = 'haulbox_session_user';
 const SESSION_UI_KEY = 'haulbox_ui_state';
 const SESSION_DRAFTS_KEY = 'haulbox_form_drafts';

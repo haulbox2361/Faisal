@@ -41,9 +41,9 @@
       };
     })();
 
-    let STATE = { loads: [], drivers: [], brokers: [], dispatchers: [], settings: {}, chat: {}, emailLogs: [], driveFiles: [], notifications: [], currentUser: null, role: 'admin', currentDispatcherId: null, viewAs: null, loadFilter: 'all' };
-    let CHARTS = {};
-    let pendingSelectTarget = null; // 'broker' | 'driver' — set when quick-adding from the Add Load form
+    // STATE and CHARTS are declared in js/state/store.js (loaded before this file)
+    // pendingSelectTarget: tracks which field triggered quick-add from the Add Load form
+    let pendingSelectTarget = null; // 'broker' | 'driver'
 
     // Statuses are computed automatically from which documents are on file — see computeStatus().
     // NO RC  = Pending RC (the load is NOT booked until the Rate Confirmation is shared)
@@ -314,7 +314,7 @@
     }
 
     // Which signed-in Google account this browser last got into HaulBoX with
-    const SESSION_KEY = 'haulbox_session_email';
+    // SESSION_KEY is declared in js/constants/statusCodes.js (loaded before this file)
     async function restoreSession() {
       const session = (typeof SessionManager !== 'undefined') ? SessionManager.loadSession() : null;
       let savedEmail = session ? session.email : '';
