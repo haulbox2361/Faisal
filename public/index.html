@@ -170,8 +170,7 @@
         <div class="drv-section-title">Your Details</div>
         <div class="drv-info-list" id="drv-info-list"></div>
 
-        <div class="drv-section-title">Documents</div>
-        <div id="drv-doc-cards"></div>
+
 
         <div class="drv-section-title">&nbsp;</div>
         <button class="btn btn-ghost" style="width:100%;color:var(--red);" onclick="driverSignOut()">Sign Out</button>
@@ -367,13 +366,7 @@
           </svg>
           Brokers
         </div>
-        <div class="nav-item" data-view="documents">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <path d="M14 2v6h6" />
-          </svg>
-          Documents
-        </div>
+
         <div class="nav-item" data-view="chat" id="nav-chat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -609,151 +602,6 @@
             </div>
           </div>
 
-          <!-- MAIN MIDDLE SECTION (LIVE TRACKING + RECENT ACTIVITY) -->
-          <div style="display:grid;grid-template-columns:2.1fr 1fr;gap:24px;margin-bottom:24px;">
-
-            <!-- LIVE DRIVER TRACKING SECTION -->
-            <div
-              style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);display:flex;flex-direction:column;gap:18px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;">
-                <h2 style="font-size:16px;font-weight:700;margin:0;color:#0f172a;">Live Driver Tracking</h2>
-                <div style="display:flex;align-items:center;gap:10px;">
-                  <label style="font-size:12px;font-weight:600;color:#64748b;">Select Driver:</label>
-                  <select id="tracking-driver-select" onchange="onTrackingDriverChanged(this.value)"
-                    style="padding:8px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;font-size:13px;font-weight:600;color:#0f172a;outline:none;cursor:pointer;">
-                    <option value="driver-1" selected>John Smith (Load #12345)</option>
-                    <option value="driver-2">Mike Johnson (Load #12346)</option>
-                    <option value="driver-3">Alex Williams (Load #12347)</option>
-                    <option value="driver-4">Tom Brown (Load #12348)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style="display:grid;grid-template-columns:260px 1fr;gap:20px;align-items:stretch;">
-                <!-- Driver Selected Info Card -->
-                <div id="tracking-driver-info-card"
-                  style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px;display:flex;flex-direction:column;justify-content:space-between;">
-                  <div>
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                      <div id="trk-card-driver" style="font-size:16px;font-weight:800;color:#0f172a;">John Smith</div>
-                      <span id="trk-card-stage-badge"
-                        style="background:#dbeafe;color:#1e40af;font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:6px;text-transform:uppercase;">IN
-                        TRANSIT</span>
-                    </div>
-                    <div id="trk-card-loadnum" style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;">
-                      Load #12345</div>
-                    <div id="trk-card-lane" style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:14px;">
-                      Dallas, TX → Indianapolis, IN</div>
-
-                    <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;">
-                      <div
-                        style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
-                        <span style="color:#64748b;">Miles Remaining</span>
-                        <span id="trk-card-miles" style="font-weight:700;color:#0f172a;">245 mi</span>
-                      </div>
-                      <div
-                        style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
-                        <span style="color:#64748b;">ETA Delivery</span>
-                        <span id="trk-card-eta" style="font-weight:700;color:#0f172a;">Today 4:35 PM</span>
-                      </div>
-                      <div
-                        style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
-                        <span style="color:#64748b;">Last Update</span>
-                        <span id="trk-card-lastupdate" style="font-weight:700;color:#0f172a;">2 mins ago</span>
-                      </div>
-                      <div
-                        style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
-                        <span style="color:#64748b;">Speed</span>
-                        <span id="trk-card-speed" style="font-weight:700;color:#0f172a;">62 mph</span>
-                      </div>
-                      <div style="display:flex;justify-content:space-between;padding-top:2px;">
-                        <span style="color:#64748b;">Status</span>
-                        <span id="trk-card-status" style="font-weight:700;color:#16a34a;">🟢 On Time</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button class="btn btn-accent"
-                    style="width:100%;margin-top:16px;border-radius:10px;font-weight:600;padding:10px;justify-content:center;background:#2563eb;"
-                    onclick="openSelectedDriverLoadDetails()">View Load Details</button>
-                </div>
-
-                <!-- Interactive Live Map -->
-                <div
-                  style="position:relative;border-radius:14px;overflow:hidden;border:1px solid #cbd5e1;background:#e2e8f0;min-height:300px;">
-                  <div id="tracking-map-container" style="width:100%;height:100%;min-height:300px;"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- RIGHT PANEL: RECENT ACTIVITY FEED -->
-            <div
-              style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);display:flex;flex-direction:column;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-                <h2 style="font-size:16px;font-weight:700;margin:0;color:#0f172a;">Recent Activity</h2>
-                <a href="#" onclick="toggleNotifPanel();return false;"
-                  style="font-size:12px;font-weight:600;color:#2563eb;text-decoration:none;">View All Notifications</a>
-              </div>
-
-              <div style="display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto;">
-                <!-- Item 1 -->
-                <div onclick="openLoadModal('12345')" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:6px;border-radius:10px;transition:background 0.15s ease;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                  <div
-                    style="width:32px;height:32px;border-radius:50%;background:#dbeafe;color:#2563eb;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;">
-                    🚚</div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:#0f172a;">John Smith (Load #12345) is at pickup</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">10 minutes ago · <span style="color:#2563eb;font-weight:600;">Open Load →</span></div>
-                  </div>
-                </div>
-
-                <!-- Item 2 -->
-                <div onclick="switchView('documents')" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:6px;border-radius:10px;transition:background 0.15s ease;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                  <div
-                    style="width:32px;height:32px;border-radius:50%;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;">
-                    ✓</div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:#0f172a;">POD uploaded for Load #12298</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">25 minutes ago · <span style="color:#2563eb;font-weight:600;">View Docs →</span></div>
-                  </div>
-                </div>
-
-                <!-- Item 3 -->
-                <div onclick="switchView('driverpay')" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:6px;border-radius:10px;transition:background 0.15s ease;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                  <div
-                    style="width:32px;height:32px;border-radius:50%;background:#ffedd5;color:#ea580c;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;">
-                    $</div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:#0f172a;">Payment confirmed by Mike Johnson (Load #12275)</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">1 hour ago · <span style="color:#2563eb;font-weight:600;">View Pay →</span></div>
-                  </div>
-                </div>
-
-                <!-- Item 4 -->
-                <div onclick="switchView('chat')" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:6px;border-radius:10px;transition:background 0.15s ease;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                  <div
-                    style="width:32px;height:32px;border-radius:50%;background:#f3e8ff;color:#9333ea;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;">
-                    💬</div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:#0f172a;">New message from Driver - Alex Williams</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">1 hour ago · <span style="color:#2563eb;font-weight:600;">Open Chat →</span></div>
-                  </div>
-                </div>
-
-                <!-- Item 5 -->
-                <div onclick="switchView('drivers')" style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:6px;border-radius:10px;transition:background 0.15s ease;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background='transparent'">
-                  <div
-                    style="width:32px;height:32px;border-radius:50%;background:#fee2e2;color:#ef4444;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;">
-                    ⚠️</div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:#0f172a;">Document expiring soon for Driver - Tom Brown</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">2 hours ago · <span style="color:#2563eb;font-weight:600;">Open Driver →</span></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- BOTTOM TABLE: ACTIVE LOADS (9 COLUMNS) -->
           <div
             style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);">
@@ -778,99 +626,7 @@
                     <th style="padding:12px;text-align:right;">Actions</th>
                   </tr>
                 </thead>
-                <tbody id="dash-active-loads-tbody">
-                  <!-- Row 1 -->
-                  <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:14px 12px;font-weight:700;color:#2563eb;">12345</td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">John Smith</td>
-                    <td style="padding:14px 12px;color:#475569;">Dallas, TX → Indianapolis, IN</td>
-                    <td style="padding:14px 12px;"><span
-                        style="background:#dbeafe;color:#1e40af;font-size:11px;font-weight:800;padding:4px 8px;border-radius:6px;">IN
-                        TRANSIT</span></td>
-                    <td style="padding:14px 12px;color:#475569;">May 23, 8:00 AM<br><span
-                        style="font-size:11px;color:#94a3b8;">Dallas, TX</span></td>
-                    <td style="padding:14px 12px;color:#475569;">May 25, 5:00 PM<br><span
-                        style="font-size:11px;color:#94a3b8;">Indianapolis, IN</span></td>
-                    <td style="padding:14px 12px;color:#0f172a;font-weight:600;">Today 4:35 PM<br><span
-                        style="font-size:11px;color:#16a34a;font-weight:700;">ON TIME</span></td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">245 mi</td>
-                    <td style="padding:14px 12px;text-align:right;">
-                      <button class="btn btn-ghost btn-sm" onclick="openLoadModal('12345')"
-                        style="color:#2563eb;padding:4px 8px;">👁</button>
-                      <button class="btn btn-ghost btn-sm" onclick="switchView('chat')"
-                        style="color:#2563eb;padding:4px 8px;">💬</button>
-                    </td>
-                  </tr>
-
-                  <!-- Row 2 -->
-                  <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:14px 12px;font-weight:700;color:#2563eb;">12346</td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">Mike Johnson</td>
-                    <td style="padding:14px 12px;color:#475569;">Atlanta, GA → Chicago, IL</td>
-                    <td style="padding:14px 12px;"><span
-                        style="background:#ffedd5;color:#c2410c;font-size:11px;font-weight:800;padding:4px 8px;border-radius:6px;">AT
-                        PICKUP</span></td>
-                    <td style="padding:14px 12px;color:#475569;">May 23, 9:00 AM<br><span
-                        style="font-size:11px;color:#94a3b8;">Atlanta, GA</span></td>
-                    <td style="padding:14px 12px;color:#475569;">May 24, 6:00 PM<br><span
-                        style="font-size:11px;color:#94a3b8;">Chicago, IL</span></td>
-                    <td style="padding:14px 12px;color:#0f172a;font-weight:600;">Tomorrow 9:15 AM<br><span
-                        style="font-size:11px;color:#d97706;font-weight:700;">RUNNING LATE</span></td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">115 mi</td>
-                    <td style="padding:14px 12px;text-align:right;">
-                      <button class="btn btn-ghost btn-sm" onclick="openLoadModal('12346')"
-                        style="color:#2563eb;padding:4px 8px;">👁</button>
-                      <button class="btn btn-ghost btn-sm" onclick="switchView('chat')"
-                        style="color:#2563eb;padding:4px 8px;">💬</button>
-                    </td>
-                  </tr>
-
-                  <!-- Row 3 -->
-                  <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="padding:14px 12px;font-weight:700;color:#2563eb;">12347</td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">Alex Williams</td>
-                    <td style="padding:14px 12px;color:#475569;">Houston, TX → Memphis, TN</td>
-                    <td style="padding:14px 12px;"><span
-                        style="background:#f3e8ff;color:#7e22ce;font-size:11px;font-weight:800;padding:4px 8px;border-radius:6px;">LOADED</span>
-                    </td>
-                    <td style="padding:14px 12px;color:#475569;">May 22, 7:00 PM<br><span
-                        style="font-size:11px;color:#94a3b8;">Houston, TX</span></td>
-                    <td style="padding:14px 12px;color:#475569;">May 23, 1:00 PM<br><span
-                        style="font-size:11px;color:#94a3b8;">Memphis, TN</span></td>
-                    <td style="padding:14px 12px;color:#0f172a;font-weight:600;">Today 12:40 PM<br><span
-                        style="font-size:11px;color:#16a34a;font-weight:700;">ON TIME</span></td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">363 mi</td>
-                    <td style="padding:14px 12px;text-align:right;">
-                      <button class="btn btn-ghost btn-sm" onclick="openLoadModal('12347')"
-                        style="color:#2563eb;padding:4px 8px;">👁</button>
-                      <button class="btn btn-ghost btn-sm" onclick="switchView('chat')"
-                        style="color:#2563eb;padding:4px 8px;">💬</button>
-                    </td>
-                  </tr>
-
-                  <!-- Row 4 -->
-                  <tr>
-                    <td style="padding:14px 12px;font-weight:700;color:#2563eb;">12348</td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">Tom Brown</td>
-                    <td style="padding:14px 12px;color:#475569;">Phoenix, AZ → Los Angeles, CA</td>
-                    <td style="padding:14px 12px;"><span
-                        style="background:#dbeafe;color:#1e40af;font-size:11px;font-weight:800;padding:4px 8px;border-radius:6px;">IN
-                        TRANSIT</span></td>
-                    <td style="padding:14px 12px;color:#475569;">May 22, 6:00 AM<br><span
-                        style="font-size:11px;color:#94a3b8;">Phoenix, AZ</span></td>
-                    <td style="padding:14px 12px;color:#475569;">May 23, 2:00 PM<br><span
-                        style="font-size:11px;color:#94a3b8;">Los Angeles, CA</span></td>
-                    <td style="padding:14px 12px;color:#0f172a;font-weight:600;">Today 2:00 PM<br><span
-                        style="font-size:11px;color:#d97706;font-weight:700;">RUNNING LATE</span></td>
-                    <td style="padding:14px 12px;font-weight:600;color:#0f172a;">372 mi</td>
-                    <td style="padding:14px 12px;text-align:right;">
-                      <button class="btn btn-ghost btn-sm" onclick="openLoadModal('12348')"
-                        style="color:#2563eb;padding:4px 8px;">👁</button>
-                      <button class="btn btn-ghost btn-sm" onclick="switchView('chat')"
-                        style="color:#2563eb;padding:4px 8px;">💬</button>
-                    </td>
-                  </tr>
-                </tbody>
+                <tbody id="dash-active-loads-tbody"></tbody>
               </table>
             </div>
           </div>
@@ -1459,40 +1215,7 @@
           </div>
         </section>
 
-        <!-- ============ DOCUMENTS ============ -->
-        <section class="view" id="view-documents">
-          <div class="toolbar">
-            <div class="search-box" style="width:280px;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.3-4.3" />
-              </svg>
-              <input id="docs-search" placeholder="Find a load to manage documents" oninput="renderDocsList()">
-            </div>
-          </div>
-          <div class="panel">
-            <div class="table-wrap">
-              <table class="data">
-                <thead>
-                  <tr>
-                    <th>Load #</th>
-                    <th>Driver</th>
-                    <th>Route</th>
-                    <th>RC</th>
-                    <th>PU Pics</th>
-                    <th>DO Pics</th>
-                    <th>BOL</th>
-                    <th>POD</th>
-                    <th>Extra</th>
-                    <th>Package</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="docs-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+
 
         <!-- ============ EMAIL LOGS ============ -->
         <section class="view" id="view-emaillogs">
@@ -2656,15 +2379,7 @@
 
   <div id="toast-wrap"></div>
 
-  <!-- HaulBoX Core Application Scripts -->
-  <!-- HaulBoX Modular JavaScript Architecture -->
-  <!-- HaulBoX Modular JavaScript Architecture -->
-  <!-- HaulBoX Modular JavaScript Architecture -->
-  <script src="js/constants/statusCodes.js"></script>
-  <script src="js/utils/dom.js"></script>
-  <script src="js/state/store.js"></script>
-  <script src="js/services/api.js"></script>
-  <script src="js/services/authService.js"></script>
+  <!-- HaulBoX Core Application Script -->
   <script src="js/app.js"></script>
 </body>
 </html>

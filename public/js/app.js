@@ -41,9 +41,9 @@
       };
     })();
 
-    // STATE and CHARTS are declared in js/state/store.js (loaded before this file)
-    // pendingSelectTarget: tracks which field triggered quick-add from the Add Load form
-    let pendingSelectTarget = null; // 'broker' | 'driver'
+    let STATE = { loads: [], drivers: [], brokers: [], dispatchers: [], settings: {}, chat: {}, emailLogs: [], driveFiles: [], notifications: [], currentUser: null, role: 'admin', currentDispatcherId: null, viewAs: null, loadFilter: 'all' };
+    let CHARTS = {};
+    let pendingSelectTarget = null; // 'broker' | 'driver' — set when quick-adding from the Add Load form
 
     // Statuses are computed automatically from which documents are on file — see computeStatus().
     // NO RC  = Pending RC (the load is NOT booked until the Rate Confirmation is shared)
@@ -314,9 +314,101 @@
     }
 
     // Which signed-in Google account this browser last got into HaulBoX with
-    // SESSION_KEY is declared in js/constants/statusCodes.js (loaded before this file)
+    const SESSION_KEY = 'haulline-session-email';
+    const SESSION_USER_KEY = 'haulbox_session_user';
+    const SESSION_UI_KEY = 'haulbox_ui_state';
+    const SESSION_DRAFTS_KEY = 'haulbox_form_drafts';
+
+    const SessionManager = {
+      saveSession(email, role, currentUser, currentDispatcherId = null, isSuperAdmin = false) {
+        try {
+          localStorage.setItem(SESSION_KEY, email);
+          localStorage.setItem(SESSION_USER_KEY, JSON.stringify({
+            email,
+            role,
+            currentUser,
+            currentDispatcherId,
+            isSuperAdmin,
+            savedAt: new Date().toISOString(),
+          }));
+        } catch (_) {}
+      },
+
+      loadSession() {
+        try {
+          const email = localStorage.getItem(SESSION_KEY);
+          const raw = localStorage.getItem(SESSION_USER_KEY);
+          if (!email) return null;
+          if (!raw) return { email };
+          return JSON.parse(raw);
+        } catch (_) {
+          return null;
+        }
+      },
+
+      clearSession() {
+        try {
+          localStorage.removeItem(SESSION_KEY);
+          localStorage.removeItem(SESSION_USER_KEY);
+          localStorage.removeItem(SESSION_UI_KEY);
+          localStorage.removeItem('haulbox_active_view');
+        } catch (_) {}
+      },
+
+      saveUiState(stateUpdates = {}) {
+        try {
+          const existing = this.loadUiState() || {};
+          const merged = { ...existing, ...stateUpdates, updatedAt: new Date().toISOString() };
+          localStorage.setItem(SESSION_UI_KEY, JSON.stringify(merged));
+        } catch (_) {}
+      },
+
+      loadUiState() {
+        try {
+          const raw = localStorage.getItem(SESSION_UI_KEY);
+          return raw ? JSON.parse(raw) : {};
+        } catch (_) {
+          return {};
+        }
+      },
+
+      saveFormDraft(formId, data) {
+        try {
+          const allDrafts = this.loadAllDrafts();
+          allDrafts[formId] = { data, updatedAt: new Date().toISOString() };
+          localStorage.setItem(SESSION_DRAFTS_KEY, JSON.stringify(allDrafts));
+        } catch (_) {}
+      },
+
+      loadFormDraft(formId) {
+        try {
+          const allDrafts = this.loadAllDrafts();
+          return (allDrafts[formId] && allDrafts[formId].data) || null;
+        } catch (_) {
+          return null;
+        }
+      },
+
+      loadAllDrafts() {
+        try {
+          const raw = localStorage.getItem(SESSION_DRAFTS_KEY);
+          return raw ? JSON.parse(raw) : {};
+        } catch (_) {
+          return {};
+        }
+      },
+
+      clearFormDraft(formId) {
+        try {
+          const allDrafts = this.loadAllDrafts();
+          delete allDrafts[formId];
+          localStorage.setItem(SESSION_DRAFTS_KEY, JSON.stringify(allDrafts));
+        } catch (_) {}
+      }
+    };
+
     async function restoreSession() {
-      const session = (typeof SessionManager !== 'undefined') ? SessionManager.loadSession() : null;
+      const session = SessionManager.loadSession();
       let savedEmail = session ? session.email : '';
       if (!savedEmail) {
         try { savedEmail = localStorage.getItem(SESSION_KEY) || ''; } catch (e) { }
