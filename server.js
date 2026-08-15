@@ -26,11 +26,32 @@ if (SUPER_ADMIN_EMAIL && !ADMIN_EMAILS_RAW.includes(SUPER_ADMIN_EMAIL)) {
 // 6-digit security PIN required to open the Settings page (Configured in Render / environment)
 const SETTINGS_ADMIN_PIN = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
 
+const compression = require('compression');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// High-performance gzip/deflate response compression (reduces payload by ~85%)
+app.use(compression({
+  threshold: 1024,
+  level: 6,
+}));
+
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  etag: true,
+}));
 app.use(authRoutes);
 app.use(apiRoutes);
 app.use(storageRoutes);
@@ -39,8 +60,52 @@ app.use(chatRoutes);
 app.use(notificationRoutes);
 app.use(mistralRoutes);
 
+// Health check & monitoring endpoint for load balancers and uptime monitors
+app.get('/api/health', async (req, res) => {
+  const startTime = Date.now();
+  let dbStatus = 'healthy';
+  let dbLatencyMs = 0;
+  let dbError = null;
+
+  try {
+    const { getPool, ensureSchema } = require('./lib/db');
+    await ensureSchema();
+    const dbStart = Date.now();
+    await getPool().query('SELECT 1');
+    dbLatencyMs = Date.now() - dbStart;
+  } catch (err) {
+    dbStatus = 'degraded';
+    dbError = err.message;
+  }
+
+  const memory = process.memoryUsage();
+  const isHealthy = dbStatus === 'healthy';
+
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'OK' : 'DEGRADED',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    environment: process.env.NODE_ENV || 'development',
+    server: {
+      port: PORT,
+      responseLatencyMs: Date.now() - startTime,
+      memory: {
+        rssMb: Math.round(memory.rss / (1024 * 1024)),
+        heapUsedMb: Math.round(memory.heapUsed / (1024 * 1024)),
+        heapTotalMb: Math.round(memory.heapTotal / (1024 * 1024)),
+      },
+    },
+    database: {
+      status: dbStatus,
+      latencyMs: dbLatencyMs,
+      error: dbError,
+    },
+  });
+});
+
 // Frontend fetches this on load to know which Google accounts are allowed as Admin / Super Admin
 app.get('/api/config', (req, res) => {
+
   res.json({
     adminEmail: ADMIN_EMAILS_RAW[0] || 'haulbox2361@gmail.com',
     adminEmails: ADMIN_EMAILS_RAW,
@@ -62,45 +127,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/driver', async (req, res) => {
-  try {
-    const kv = require('./lib/kvstore');
-    const raw = await kv.get('haulline:state').catch(() => null);
-    const state = raw ? JSON.parse(raw) : null;
-    if (state && state.settings && state.settings.driver_portal_enabled === false) {
-      return res.status(403).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Driver Portal Disabled — HaulBoX</title>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-          <style>
-            body { font-family: 'Inter', sans-serif; background: #0B0D10; color: #F8FAFC; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
-            .card { max-width: 440px; background: #0F172A; border: 1px solid #1E293B; border-radius: 16px; padding: 36px 28px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
-            .icon { font-size: 44px; margin-bottom: 16px; }
-            h1 { font-size: 22px; font-weight: 800; margin: 0 0 10px; color: #fff; }
-            p { font-size: 14px; color: #94A3B8; line-height: 1.5; margin: 0 0 24px; }
-            a { display: inline-block; background: #0284c7; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 13px; }
-            a:hover { background: #0369a1; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="icon">🚫</div>
-            <h1>Driver Portal Inactive</h1>
-            <p>The Driver Mobile Portal has been disabled by the system administrator. Please contact your dispatch team or management for assistance.</p>
-            <a href="/">← Return to Staff Sign-In</a>
-          </div>
-        </body>
-        </html>
-      `);
-    }
-  } catch (err) {
-    console.error('Error checking driver_portal_enabled on /driver:', err);
-  }
-  res.sendFile(path.join(__dirname, 'public', 'driver-portal.html'));
+// Drivers use the HaulBoX Native Android APK App
+app.get('/driver', (req, res) => {
+  res.redirect('/');
 });
 
 app.listen(PORT, () => {

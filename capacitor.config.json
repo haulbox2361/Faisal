@@ -1,0 +1,15 @@
+{
+  "appId": "com.haulbox.driver",
+  "appName": "HaulBoX Driver",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

@@ -7,8 +7,13 @@ const chat = require('../lib/chatStore');
 const audit = require('../lib/auditStore');
 const store = require('../lib/store');
 const { clientForAccount } = require('../lib/googleClient');
-const { recordDriverLocation, getLatestDriverLocation } = require('../lib/db');
+const { recordDriverLocation, getLatestDriverLocation, saveDocumentValidation, getDocumentValidations } = require('../lib/db');
 const { calculateLoadTracking } = require('../lib/etaEngine');
+const { validateBolDocument, validatePodDocument } = require('../lib/docValidator');
+const notificationService = require('../lib/notificationService');
+const security = require('../lib/security');
+const fcm = require('../lib/fcmService');
+
 
 const router = express.Router();
 router.use(express.json({ limit: '10mb' }));
@@ -1424,4 +1429,373 @@ router.post('/api/driver/chats/:id/messages', async (req, res) => {
   }
 });
 
+// POST /api/driver/device-token  { token, platform }
+// Registers native Android FCM push notification token for the authenticated driver
+router.post('/api/driver/device-token', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { token, platform } = req.body || {};
+  if (!token) return res.status(400).json({ error: 'Missing device token' });
+
+  try {
+    const ok = await fcm.registerDeviceToken(ctx.driver.id, token, platform || 'android');
+    res.json({ ok, message: 'Device token registered successfully' });
+  } catch (e) {
+    console.error('driver device token register failed:', e);
+    res.status(500).json({ error: 'Failed to register device token' });
+  }
+});
+
+// POST /api/driver/device-token/remove  { token }
+// Removes device token on driver logout
+router.post('/api/driver/device-token/remove', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { token } = req.body || {};
+
+  try {
+    const ok = await fcm.removeDeviceToken(ctx.driver.id, token);
+    res.json({ ok, message: 'Device token removed successfully' });
+  } catch (e) {
+    console.error('driver device token remove failed:', e);
+    res.status(500).json({ error: 'Failed to remove device token' });
+  }
+});
+
+// POST /api/driver/verify-document  { documentType, base64, mimeType, loadData }
+// Performs automated AI quality check, OCR, signature detection, and RC validation for BOL / POD
+router.post('/api/driver/verify-document', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { documentType, base64, mimeType, loadData } = req.body || {};
+  if (!documentType || (!['BOL', 'POD'].includes(documentType.toUpperCase()))) {
+    return res.status(400).json({ error: 'Invalid document type. Must be BOL or POD.' });
+  }
+
+  try {
+    const verifier = require('../lib/aiDocumentVerifier');
+    const result = await verifier.verifyDocument({
+      documentType: documentType.toUpperCase(),
+      base64Data: base64,
+      mimeType: mimeType || 'image/jpeg',
+      loadData: loadData || {},
+      driverId: ctx.driver.id,
+    });
+    res.json({ ok: true, result });
+  } catch (err) {
+    console.error('driver document verification failed:', err);
+    res.status(500).json({ error: 'Verification temporarily unavailable. Please retry.' });
+  }
+});
+
+// GET /api/driver/loads/:id/documents
+// Returns all load documents, lock statuses, version history, and role-based permissions
+router.get('/api/driver/loads/:id/documents', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const loadId = req.params.id;
+  const userRole = req.query.role || 'driver';
+
+  try {
+    const lockService = require('../lib/documentLockService');
+    const result = await lockService.getLoadDocuments(loadId, userRole);
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    console.error('failed to get load documents:', err);
+    res.status(500).json({ error: 'Failed to retrieve load documents' });
+  }
+});
+
+// POST /api/driver/loads/:id/documents/replace  { docType, filename, fileUrl, reason, base64 }
+// Enforces document locking rules and maintains multi-version audit history
+router.post('/api/driver/loads/:id/documents/replace', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const loadId = req.params.id;
+  const { docType, filename, fileUrl, reason, userRole } = req.body || {};
+
+  if (!docType) {
+    return res.status(400).json({ error: 'Missing docType parameter' });
+  }
+
+  try {
+    const lockService = require('../lib/documentLockService');
+    const result = await lockService.replaceLoadDocument({
+      loadId,
+      docType,
+      filename,
+      fileUrl,
+      uploadedBy: ctx.driver.name || `Driver (${ctx.driver.id})`,
+      userRole: userRole || 'driver',
+      reason: reason || 'Document uploaded/replaced',
+    });
+    res.json({ ok: true, data: result });
+  } catch (err) {
+    console.error('failed to replace document:', err);
+    const isLockedError = err.message && err.message.includes('locked');
+    res.status(isLockedError ? 403 : 500).json({ error: err.message || 'Failed to replace document' });
+  }
+});
+
+// POST /api/driver/loads/:id/status/skip  { currentStatus, nextStatus }
+// Records skipped status in load history while strictly enforcing required document checks
+router.post('/api/driver/loads/:id/status/skip', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const loadId = req.params.id;
+  const { currentStatus, nextStatus } = req.body || {};
+
+  if (!currentStatus || !nextStatus) {
+    return res.status(400).json({ error: 'Missing currentStatus or nextStatus' });
+  }
+
+  // Strictly enforce required documents: Cannot skip past LOADED without BOL, or COMPLETED without POD
+  if (String(nextStatus).toUpperCase() === 'GOING_TO_DELIVERY' || String(nextStatus).toUpperCase() === 'ARRIVED_DELIVERY') {
+    const lockService = require('../lib/documentLockService');
+    const docs = await lockService.getLoadDocuments(loadId, 'driver');
+    const bol = docs.documents?.BOL;
+    if (!bol || bol.status === 'NOT_UPLOADED') {
+      return res.status(400).json({
+        error: 'BOL Required: You cannot advance past Loaded without a verified Bill of Lading (BOL).',
+        documentRequired: 'BOL',
+      });
+    }
+  }
+
+  if (String(nextStatus).toUpperCase() === 'COMPLETED' || String(nextStatus).toUpperCase() === 'DELIVERED') {
+    const lockService = require('../lib/documentLockService');
+    const docs = await lockService.getLoadDocuments(loadId, 'driver');
+    const pod = docs.documents?.POD;
+    if (!pod || pod.status === 'NOT_UPLOADED') {
+      return res.status(400).json({
+        error: 'POD Required: You cannot complete the load without a signed Proof of Delivery (POD).',
+        documentRequired: 'POD',
+      });
+    }
+  }
+
+  try {
+    const historyKey = `load_status_history:${loadId}`;
+    const raw = await kv.get(historyKey).catch(() => null);
+    const history = raw ? JSON.parse(raw) : [];
+
+    const skipRecord = {
+      loadId,
+      status: currentStatus,
+      result: 'SKIPPED',
+      by: ctx.driver.name || `Driver (${ctx.driver.id})`,
+      timestamp: new Date().toISOString(),
+      advancedTo: nextStatus,
+    };
+
+    history.push(skipRecord);
+    await kv.set(historyKey, JSON.stringify(history));
+
+    console.log(`[STATUS SKIP] Load ${loadId}: ${currentStatus} skipped by ${skipRecord.by} ↷ Advanced to ${nextStatus}`);
+    res.json({ ok: true, data: skipRecord });
+  } catch (err) {
+    console.error('failed to record status skip:', err);
+    res.status(500).json({ error: 'Failed to record skipped status' });
+  }
+});
+
+// =========================================================================
+// GPS TRACKING, ETA & GEOFENCE ARRIVAL DETECTION
+// =========================================================================
+
+// POST /api/driver/location { latitude, longitude, speed, heading, loadId, sharingMode }
+router.post('/api/driver/location', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { latitude, longitude, speed, heading, loadId, sharingMode } = req.body || {};
+  if (latitude == null || longitude == null) {
+    return res.status(400).json({ error: 'Missing latitude/longitude coordinates.' });
+  }
+
+  try {
+    const locRecord = await recordDriverLocation({
+      driverId: ctx.driver.id,
+      loadId: loadId || null,
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      speed: speed != null ? Number(speed) : null,
+      heading: heading != null ? Number(heading) : null,
+      sharingMode: sharingMode || 'ACTIVE_LOAD',
+    });
+
+    let trackingData = null;
+    let arrivalEvent = null;
+
+    if (loadId) {
+      const state = ctx.state;
+      const load = (state.loads || []).find((l) => l.id === loadId);
+      if (load) {
+        trackingData = calculateLoadTracking(load, locRecord);
+
+        // Geofence Arrival Detection (within 0.25 miles / ~400m)
+        if (trackingData.milesToPickup <= 0.3 && (load.driverProgress === 'EN_ROUTE_TO_PICKUP' || load.status === 'EN_ROUTE_TO_PICKUP')) {
+          arrivalEvent = { type: 'AT_PICKUP', message: `Driver ${ctx.driver.name} arrived at pickup location: ${load.pickup}` };
+          await notificationService.notifyDispatcherDriverArrivedPickup(load.dispatcherId || 'admin', load, ctx.driver);
+        } else if (trackingData.milesToDelivery <= 0.3 && (load.driverProgress === 'IN_TRANSIT' || load.status === 'IN_TRANSIT')) {
+          arrivalEvent = { type: 'AT_DELIVERY', message: `Driver ${ctx.driver.name} arrived at delivery location: ${load.dropoff}` };
+          await notificationService.notifyDispatcherDriverArrivedDelivery(load.dispatcherId || 'admin', load, ctx.driver);
+        }
+
+        // Automated Delay Detection Alert
+        if (trackingData.risk && (trackingData.risk.riskCode === 'RUNNING_LATE' || trackingData.risk.riskCode === 'DELAYED')) {
+          await notificationService.notifyAdminCriticalDelay(load, ctx.driver, trackingData.risk.diffMinutes || 35);
+        }
+      }
+    }
+
+
+    res.json({
+      ok: true,
+      location: locRecord,
+      tracking: trackingData,
+      arrivalEvent,
+    });
+  } catch (err) {
+    console.error('Failed to record driver location:', err);
+    res.status(500).json({ error: 'Failed to record location.' });
+  }
+});
+
+// GET /api/driver/location/history?limit=50
+router.get('/api/driver/location/history', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+  try {
+    const { getPool, ensureSchema } = require('../lib/db');
+    await ensureSchema();
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT * FROM driver_locations WHERE driver_id = $1 ORDER BY recorded_at DESC LIMIT $2`,
+      [ctx.driver.id, limit]
+    );
+    res.json({ history: result.rows });
+  } catch (err) {
+    console.error('Failed to fetch location history:', err);
+    res.status(500).json({ error: 'Failed to fetch location history.' });
+  }
+});
+
+// GET /api/driver/loads/:id/tracking
+router.get('/api/driver/loads/:id/tracking', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const load = (ctx.state.loads || []).find((l) => l.id === req.params.id && l.driverId === ctx.driver.id);
+  if (!load) return res.status(404).json({ error: 'Load not found' });
+
+  try {
+    const latestLoc = await getLatestDriverLocation(ctx.driver.id);
+    const tracking = calculateLoadTracking(load, latestLoc);
+    res.json({ ok: true, tracking });
+  } catch (err) {
+    console.error('Failed to calculate load tracking:', err);
+    res.status(500).json({ error: 'Failed to calculate tracking.' });
+  }
+});
+
+// POST /api/driver/verify-document
+// AI Document Validation for BOL and POD uploads
+router.post('/api/driver/verify-document', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+
+  const { documentType = 'BOL', loadId, loadData = {}, imageMeta = {}, base64 = '', fileUrl = '' } = req.body;
+  const docTypeUpper = String(documentType).toUpperCase();
+
+  if (base64) {
+    const valCheck = security.validateBase64Payload(base64, 15 * 1024 * 1024);
+    if (!valCheck.ok) {
+      return res.status(400).json({ error: valCheck.error });
+    }
+  }
+
+  try {
+    let validationResult;
+    if (docTypeUpper === 'BOL') {
+      validationResult = validateBolDocument({ loadData, imageMeta, base64 });
+    } else if (docTypeUpper === 'POD') {
+      validationResult = validatePodDocument({ loadData, imageMeta, base64 });
+    } else {
+      return res.status(400).json({ error: `Unsupported documentType: ${documentType}` });
+    }
+
+    // Persist validation audit log in PostgreSQL
+    const savedRecord = await saveDocumentValidation({
+
+      loadId: loadId || loadData.loadNumber || 'UNKNOWN',
+      driverId: ctx.driver.id,
+      documentType: docTypeUpper,
+      fileUrl,
+      overallStatus: validationResult.overallStatus,
+      confidence: validationResult.confidence,
+      clarityPass: validationResult.clarityPass,
+      blurDetected: validationResult.blurDetected,
+      shadowDetected: validationResult.shadowDetected,
+      cornersVisible: validationResult.cornersVisible,
+      addressMatch: validationResult.addressMatch,
+      weightMatch: validationResult.weightMatch,
+      signaturePresent: validationResult.signaturePresent,
+      dateVisible: validationResult.dateVisible,
+      rejectionReason: validationResult.rejectionReason,
+      issues: validationResult.issues,
+      extractedData: validationResult.extractedData,
+    });
+
+    // Dispatch notifications based on document outcome
+    if (validationResult.overallStatus === 'RETAKE_REQUIRED') {
+      await notificationService.notifyDriverDocCorrectionRequired(
+        ctx.driver.id,
+        { loadNumber: loadData.loadNumber || loadId, id: loadId },
+        docTypeUpper,
+        validationResult.rejectionReason
+      );
+    } else if (validationResult.overallStatus === 'APPROVED') {
+      if (docTypeUpper === 'BOL') {
+        await notificationService.notifyDispatcherBolUploaded(ctx.driver.dispatcherId || 'admin', { loadNumber: loadData.loadNumber || loadId, id: loadId }, ctx.driver);
+      } else if (docTypeUpper === 'POD') {
+        await notificationService.notifyDispatcherPodUploaded(ctx.driver.dispatcherId || 'admin', { loadNumber: loadData.loadNumber || loadId, id: loadId }, ctx.driver);
+      }
+    } else if (validationResult.overallStatus === 'DISPATCHER_REVIEW') {
+      await notificationService.notifyAdminFailedUpload(
+        { loadNumber: loadData.loadNumber || loadId, id: loadId },
+        ctx.driver,
+        docTypeUpper,
+        validationResult.rejectionReason
+      );
+    }
+
+    res.json({
+      ok: true,
+      result: validationResult,
+      validationId: savedRecord.id,
+    });
+  } catch (err) {
+    console.error('Failed to verify document:', err);
+    res.status(500).json({ error: err.message || 'Failed to verify document.' });
+  }
+});
+
+
+// GET /api/driver/loads/:id/documents/validations
+router.get('/api/driver/loads/:id/documents/validations', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+
+  try {
+    const validations = await getDocumentValidations(req.params.id);
+    res.json({ ok: true, validations });
+  } catch (err) {
+    console.error('Failed to fetch document validations:', err);
+    res.status(500).json({ error: 'Failed to fetch validations.' });
+  }
+});
+
 module.exports = router;
+
+

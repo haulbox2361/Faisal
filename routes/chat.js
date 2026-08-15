@@ -197,4 +197,62 @@ router.post('/api/chat/read/:id', async (req, res) => {
   }
 });
 
+// GET /api/chat/search?q=...&conversationId=...
+router.get('/api/chat/search', async (req, res) => {
+  const me = requireParty(req, res);
+  if (!me) return;
+  const { q, conversationId } = req.query || {};
+  try {
+    const messages = await chat.searchMessages(q, me, conversationId ? Number(conversationId) : null);
+    res.json({ ok: true, count: messages.length, messages });
+  } catch (e) {
+    console.error('chat search failed:', e);
+    res.status(500).json({ error: 'Failed to search messages' });
+  }
+});
+
+// POST /api/chat/typing { accountId, role, conversationId, isTyping }
+router.post('/api/chat/typing', async (req, res) => {
+  const me = requireParty(req, res);
+  if (!me) return;
+  const { conversationId, isTyping } = req.body || {};
+  if (!conversationId) return res.status(400).json({ error: 'Missing conversationId' });
+  try {
+    chat.setTypingStatus(Number(conversationId), me, !!isTyping);
+    res.json({ ok: true });
+  } catch (e) {
+    res.json({ ok: true });
+  }
+});
+
+// GET /api/chat/typing/:id?accountId=...&role=...
+router.get('/api/chat/typing/:id', async (req, res) => {
+  const me = requireParty(req, res);
+  if (!me) return;
+  const conversationId = Number(req.params.id);
+  try {
+    const typingUsers = chat.getTypingUsers(conversationId, me);
+    res.json({ ok: true, typing: typingUsers.length > 0, users: typingUsers });
+  } catch (e) {
+    res.json({ ok: true, typing: false, users: [] });
+  }
+});
+
+// POST /api/chat/presence { accountId, role, isOnline }
+router.post('/api/chat/presence', async (req, res) => {
+  const me = requireParty(req, res);
+  if (!me) return;
+  const { isOnline } = req.body || {};
+  chat.setUserPresence(me, isOnline !== false);
+  res.json({ ok: true });
+});
+
+// GET /api/chat/presence?type=...&id=...
+router.get('/api/chat/presence', async (req, res) => {
+  const { type = 'driver', id = '' } = req.query || {};
+  const presence = chat.getUserPresence(type, id);
+  res.json({ ok: true, presence });
+});
+
 module.exports = router;
+

@@ -6,6 +6,7 @@
 
 const express = require('express');
 const notifications = require('../lib/notificationStore');
+const fcm = require('../lib/fcmService');
 
 const router = express.Router();
 router.use(express.json({ limit: '1mb' }));
@@ -64,6 +65,17 @@ router.post('/api/notifications', async (req, res) => {
       body,
       data,
     });
+
+    // Send native Android FCM Push Notification if recipient is a Driver
+    if (toType === 'driver') {
+      fcm.sendToDriver(String(toId), {
+        title,
+        body,
+        type: type || 'announcement',
+        data: data || {},
+      }).catch(err => console.error('[FCM] Push send error:', err));
+    }
+
     res.json({ ok: true, id: created.id, createdAt: created.createdAt });
   } catch (e) {
     console.error('notification send failed:', e);
