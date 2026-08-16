@@ -808,6 +808,9 @@ router.post('/api/documents/review', async (req, res) => {
     }
 
     await kv.set('haulline:state', JSON.stringify(state));
+    if (global.broadcastState) {
+      global.broadcastState(state).catch(() => {});
+    }
     res.json({ ok: true, load });
 
   } catch (e) {

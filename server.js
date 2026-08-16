@@ -132,7 +132,32 @@ app.get('/driver', (req, res) => {
   res.redirect('/');
 });
 
-app.listen(PORT, () => {
+const http = require('http');
+const { Server } = require('socket.io');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+app.set('io', io); // Make it accessible in routes if needed
+
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// Broadcast wrapper for easy state updates
+global.broadcastState = async (state) => {
+  io.emit('state_update', state);
+};
+
+server.listen(PORT, () => {
   const missingEnv = !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET;
   console.log(`HaulBoX backend running at http://localhost:${PORT}`);
   console.log(`Admin accounts active: ${ADMIN_EMAILS_RAW.join(', ')}`);

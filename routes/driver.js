@@ -59,6 +59,9 @@ async function loadFullState() {
 
 async function saveFullState(state) {
   await kv.set(STATE_KEY, JSON.stringify(state));
+  if (global.broadcastState) {
+    global.broadcastState(state).catch(() => {});
+  }
 }
 
 // Looks a driver up by Driver ID / Code / Name / Phone + PIN.
