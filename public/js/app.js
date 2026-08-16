@@ -3089,12 +3089,14 @@
     const LB_TABS = [
       'All Loads',
       'Booked',
+      'Accepted',
+      'At Pickup',
       'Loaded',
       'In Transit',
-      'ETA',
-      'Drop Off',
+      'At Delivery',
       'Delivered',
-      'Completed',
+      'POD Uploaded',
+      'Paid',
       'Cancelled'
     ];
     function loadBoardTabs() {
@@ -3155,41 +3157,67 @@
 
     function matchesFilter(load, filter) {
       if (!filter || filter === 'All Loads') return true;
-      const st = String(load.status || '').toLowerCase().trim();
-      const fl = String(filter).toLowerCase().trim();
+      const st  = String(load.status         || '').toLowerCase().trim();
+      const fl  = String(filter              || '').toLowerCase().trim();
       const prog = String(load.driverProgress || '').toLowerCase().trim();
 
       if (fl === 'all loads') return true;
+
       if (fl === 'booked') {
-        return st === 'booked' || st === 'pending rc' || st === 'accepted' || prog === 'assigned' || prog === 'accepted';
-      }
-      if (fl === 'loaded') {
-        return st === 'loaded' || st === 'at pickup' || st === 'at_pickup' || prog === 'loaded' || prog === 'at_pickup';
-      }
-      if (fl === 'in transit') {
-        return st === 'in transit' || st === 'in_transit' || prog === 'in_transit' || prog === 'in transit';
-      }
-      if (fl === 'eta') {
-        return prog === 'in_transit' || prog === 'at_pickup' || prog === 'at_delivery' ||
-               st === 'in transit' || st === 'at pickup' || st === 'at delivery' ||
-               st === 'booked' || (!!load.eta || !!load.deliveryDate || !!load.pickupDate);
-      }
-      if (fl === 'drop off' || fl === 'drop-off') {
-        return st === 'drop-off' || st === 'drop off' || st === 'at delivery' || st === 'at_delivery' ||
-               prog === 'at_delivery' || prog === 'drop_off' || prog === 'drop-off';
-      }
-      if (fl === 'delivered') {
-        return st === 'delivered' || st === 'pod uploaded' || prog === 'delivered' || prog === 'pod_uploaded' || (load.docs && !!load.docs.POD);
-      }
-      if (fl === 'completed') {
-        return st === 'completed' || prog === 'completed' || prog === 'paid' || prog === 'paid_confirmed' ||
-               load.payment === 'Payment Received' || load.driverPaid === true ||
-               (st === 'drop-off' && load.docs && !!load.docs.POD);
-      }
-      if (fl === 'cancelled' || fl === 'canceled') {
-        return st === 'cancelled' || st === 'canceled' || prog === 'cancelled' || prog === 'canceled';
+        return st === 'booked' || st === 'pending rc' ||
+               prog === 'assigned' || prog === 'booked';
       }
 
+      if (fl === 'accepted') {
+        return st === 'accepted' || st === 'pending rc' ||
+               prog === 'accepted';
+      }
+
+      if (fl === 'at pickup') {
+        return st === 'at pickup' || st === 'at_pickup' ||
+               prog === 'at_pickup' || prog === 'at pickup';
+      }
+
+      if (fl === 'loaded') {
+        return st === 'loaded' ||
+               prog === 'loaded';
+      }
+
+      if (fl === 'in transit') {
+        return st === 'in transit' || st === 'in_transit' ||
+               prog === 'in_transit' || prog === 'in transit';
+      }
+
+      if (fl === 'at delivery') {
+        return st === 'at delivery' || st === 'at_delivery' ||
+               st === 'drop-off'    || st === 'drop off'    ||
+               prog === 'at_delivery' || prog === 'at delivery' ||
+               prog === 'drop_off'    || prog === 'drop-off';
+      }
+
+      if (fl === 'delivered') {
+        return st === 'delivered' ||
+               prog === 'delivered';
+      }
+
+      if (fl === 'pod uploaded') {
+        return st === 'pod uploaded' || st === 'pod_uploaded' ||
+               prog === 'pod_uploaded' || prog === 'pod uploaded' ||
+               (load.docs && !!load.docs.POD);
+      }
+
+      if (fl === 'paid') {
+        return st === 'paid' || st === 'paid_confirmed' || st === 'completed' ||
+               prog === 'paid' || prog === 'paid_confirmed' || prog === 'completed' ||
+               load.payment === 'Payment Received' || load.driverPaid === true;
+      }
+
+      if (fl === 'cancelled' || fl === 'canceled') {
+        return st === 'cancelled' || st === 'canceled' ||
+               prog === 'cancelled' || prog === 'canceled';
+      }
+
+      /* Fallback: direct string match */
       return st === fl || prog === fl;
     }
 

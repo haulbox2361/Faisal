@@ -4890,11 +4890,11 @@
     .lb-filter-tabs {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
+      gap: 6px;
+      margin-bottom: 18px;
       overflow-x: auto;
       white-space: nowrap;
-      padding-bottom: 4px;
+      padding: 4px 2px 8px;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
     }
@@ -4905,30 +4905,34 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 7px 14px;
+      padding: 7px 13px;
       border-radius: 8px;
       font-size: 12.5px;
       font-weight: 600;
       color: #475569;
       background: #ffffff;
-      border: 1px solid #e2e8f0;
+      border: 1.5px solid #e2e8f0;
       cursor: pointer;
       transition: all 0.15s ease;
       white-space: nowrap;
       user-select: none;
       flex-shrink: 0;
       font-family: inherit;
+      letter-spacing: 0.01em;
     }
     .lb-filter-tab:hover {
       border-color: #94a3b8;
       color: #0f172a;
       background: #f8fafc;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(15,23,42,0.06);
     }
     .lb-filter-tab.active {
-      background: #2563eb;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
       border-color: #2563eb;
       color: #ffffff;
-      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+      transform: translateY(-1px);
     }
     .lb-filter-tab-badge {
       display: inline-flex;
@@ -4938,7 +4942,7 @@
       height: 18px;
       padding: 0 5px;
       border-radius: 10px;
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
       line-height: 1;
       background: #f1f5f9;
@@ -4946,6 +4950,23 @@
       transition: all 0.15s ease;
     }
     .lb-filter-tab.active .lb-filter-tab-badge {
-      background: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.22);
       color: #ffffff;
+    }
+    @media (max-width: 768px) {
+      .lb-filter-tabs {
+        gap: 5px;
+        padding-bottom: 10px;
+        margin-bottom: 14px;
+      }
+      .lb-filter-tab {
+        padding: 6px 11px;
+        font-size: 12px;
+      }
+    }
+    @media (max-width: 480px) {
+      .lb-filter-tab {
+        padding: 5px 10px;
+        font-size: 11.5px;
+      }
     }
