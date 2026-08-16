@@ -29,6 +29,34 @@ class ConversationModel {
     this.memberNames = const [],
   });
 
+  ConversationModel copyWith({
+    String? id,
+    ConversationType? type,
+    String? title,
+    String? subtitle,
+    String? participantRole,
+    String? participantPhoto,
+    String? lastMessage,
+    String? lastMessageTime,
+    int? unreadCount,
+    bool? isOnline,
+    List<String>? memberNames,
+  }) {
+    return ConversationModel(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      participantRole: participantRole ?? this.participantRole,
+      participantPhoto: participantPhoto ?? this.participantPhoto,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isOnline: isOnline ?? this.isOnline,
+      memberNames: memberNames ?? this.memberNames,
+    );
+  }
+
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
     ConversationType cType = ConversationType.adminDriver;
     if (json['type'] == 'DRIVER_DISPATCHER') {

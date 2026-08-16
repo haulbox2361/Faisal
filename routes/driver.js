@@ -227,11 +227,20 @@ function shapeLoadForDriver(l) {
 }
 
 function driverLoads(state, driverId) {
-  return (state.loads || []).filter((l) => l.driverId === driverId);
+  if (!driverId) return [];
+  const targetId = String(driverId).trim().toLowerCase();
+  return (state.loads || []).filter((l) => {
+    if (!l) return false;
+    const lDrvId = String(l.driverId || '').trim().toLowerCase();
+    const lDrvCode = String(l.driverCode || '').trim().toLowerCase();
+    const nestedId = l.driver && String(l.driver.id || l.driver.driverId || '').trim().toLowerCase();
+    return lDrvId === targetId || lDrvCode === targetId || nestedId === targetId;
+  });
 }
 
 function isCompleted(l) {
-  return l.status === 'Drop-off' || l.status === 'Completed' || l.status === 'Delivered';
+  const st = String(l.status || '').trim().toLowerCase();
+  return st === 'drop-off' || st === 'completed' || st === 'delivered' || st === 'paid';
 }
 
 // ---------------------------------------------------------------------------
@@ -339,8 +348,79 @@ router.get('/api/driver/me', async (req, res) => {
   if (!ctx) return;
   const { driver, state } = ctx;
   res.json({
-    driver: { id: driver.id, name: driver.name, truck: driver.truck, phone: driver.phone, email: driver.email || null, company: driver.company, status: isDisabled(driver) ? 'Inactive' : 'Active' },
+    driver: {
+      id: driver.id,
+      name: driver.name,
+      truck: driver.truck,
+      phone: driver.phone,
+      email: driver.email || null,
+      cdlNumber: driver.cdl || driver.cdlNumber || null,
+      cdlExpiration: driver.cdlExpiration || null,
+      address: driver.address || null,
+      company: driver.company || (state.settings && state.settings.companyName) || 'HaulBoX',
+      status: isDisabled(driver) ? 'Inactive' : 'Active',
+    },
     permissions: permissionsFor(driver),
+    settings: {
+      driver_portal_enabled: state.settings?.driver_portal_enabled !== false,
+      driver_chat_enabled: state.settings?.driver_chat_enabled !== false,
+      driver_upload_enabled: state.settings?.driver_upload_enabled !== false,
+      driver_tracking_enabled: state.settings?.driver_tracking_enabled !== false,
+      driver_earnings_enabled: state.settings?.driver_earnings_enabled !== false,
+      driver_payments_enabled: state.settings?.driver_payments_enabled !== false,
+      driver_notifications_enabled: state.settings?.driver_notifications_enabled !== false,
+    },
+  });
+});
+
+// GET /api/driver/sync — Full live state synchronization for Flutter Driver App
+router.get('/api/driver/sync', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { driver, state } = ctx;
+
+  const rawLoads = driverLoads(state, driver.id);
+  const loads = rawLoads
+    .sort((a, b) => String(b.pickupDate || b.deliveryDate || '').localeCompare(String(a.pickupDate || a.deliveryDate || '')))
+    .map(shapeLoadForDriver);
+
+  const payments = rawLoads
+    .sort((a, b) => String(b.deliveryDate || b.pickupDate || '').localeCompare(String(a.deliveryDate || a.pickupDate || '')))
+    .map(toTransaction);
+
+  let unreadChats = 0;
+  try {
+    const chats = await chat.listConversationsFor({ type: 'driver', id: driver.id });
+    unreadChats = chats.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+  } catch (_) {}
+
+  let unreadNotifs = 0;
+  try {
+    const notifs = await notifications.listForDriver(driver.id);
+    unreadNotifs = notifs.filter((n) => !n.read).length;
+  } catch (_) {}
+
+  res.json({
+    ok: true,
+    serverTime: new Date().toISOString(),
+    driver: {
+      id: driver.id,
+      name: driver.name,
+      truck: driver.truck,
+      phone: driver.phone,
+      email: driver.email || null,
+      cdlNumber: driver.cdl || driver.cdlNumber || null,
+      cdlExpiration: driver.cdlExpiration || null,
+      address: driver.address || null,
+      company: driver.company || (state.settings && state.settings.companyName) || 'HaulBoX',
+      status: isDisabled(driver) ? 'Inactive' : 'Active',
+    },
+    companyName: (state.settings && state.settings.companyName) || 'HaulBoX',
+    permissions: permissionsFor(driver),
+    loads,
+    payments,
+    unreadChats,
+    unreadNotifications: unreadNotifs,
     settings: {
       driver_portal_enabled: state.settings?.driver_portal_enabled !== false,
       driver_chat_enabled: state.settings?.driver_chat_enabled !== false,

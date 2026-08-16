@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../shared/models/driver_model.dart';
 import '../../shared/models/load_model.dart';
+import '../../shared/models/payment_model.dart';
 
 class ApiClient {
   static String baseUrl = kIsWeb ? 'http://localhost:3000' : 'http://10.0.2.2:3000';
@@ -15,19 +16,19 @@ class ApiClient {
     }
   }
 
-  // Driver Sign-In
+  // 1. Driver Sign-In
   static Future<Map<String, dynamic>> login(String driverId, String pin) async {
     final uri = Uri.parse('$baseUrl/api/driver/login');
     try {
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'driverId': driverId, 'pin': pin}),
-      ).timeout(const Duration(seconds: 10));
+        body: jsonEncode({'driverId': driverId.trim(), 'pin': pin.trim()}),
+      ).timeout(const Duration(seconds: 12));
 
       final data = jsonDecode(response.body);
       if (response.statusCode == 200 && data['ok'] == true) {
-        final driver = DriverModel.fromJson(data['driver']);
+        final driver = DriverModel.fromJson(data['driver'] ?? {});
         final loadsList = (data['loads'] as List<dynamic>?)
                 ?.map((l) => LoadModel.fromJson(l))
                 .toList() ??
@@ -47,11 +48,75 @@ class ApiClient {
         };
       }
     } catch (e) {
-      return {'success': false, 'error': 'Network connection issue ($baseUrl): $e'};
+      return {'success': false, 'error': 'Connection error ($baseUrl): $e'};
     }
   }
 
-  // Fetch Loads
+  // 2. High-Performance Full Sync
+  static Future<Map<String, dynamic>?> fetchSync(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/sync');
+    try {
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['ok'] == true) {
+          final driver = DriverModel.fromJson(data['driver'] ?? {});
+          final loads = (data['loads'] as List<dynamic>?)
+                  ?.map((item) => LoadModel.fromJson(item))
+                  .toList() ??
+              [];
+          final payments = (data['payments'] as List<dynamic>?)
+                  ?.map((item) => PaymentModel.fromJson(item))
+                  .toList() ??
+              [];
+
+          return {
+            'driver': driver,
+            'loads': loads,
+            'payments': payments,
+            'unreadChats': data['unreadChats'] ?? 0,
+            'unreadNotifications': data['unreadNotifications'] ?? 0,
+            'settings': data['settings'] ?? {},
+            'companyName': data['companyName'] ?? 'HaulBoX',
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Sync API error: $e');
+    }
+    return null;
+  }
+
+  // 3. Fetch Driver Profile
+  static Future<DriverModel?> fetchDriverProfile(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/me');
+    try {
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['driver'] != null) {
+          return DriverModel.fromJson(data['driver']);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // 4. Fetch Loads
   static Future<List<LoadModel>> fetchLoads(String token) async {
     final uri = Uri.parse('$baseUrl/api/driver/loads');
     try {
@@ -68,21 +133,43 @@ class ApiClient {
         final list = data['loads'] as List<dynamic>? ?? [];
         return list.map((item) => LoadModel.fromJson(item)).toList();
       }
-    } catch (e) {
-      // Return empty list on network error
-    }
+    } catch (_) {}
     return [];
   }
 
-  // Update Load Checkpoint
-  static Future<bool> updateLoadProgress(
-      String token, String loadId, String progress, {String? manualEta}) async {
-    final uri = Uri.parse('$baseUrl/api/driver/loads/$loadId/progress');
+  // 5. Fetch Payments / Transactions
+  static Future<List<PaymentModel>> fetchPayments(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/transactions');
     try {
-      final payload = <String, dynamic>{'progress': progress};
-      if (manualEta != null) {
-        payload['manualEta'] = manualEta;
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = data['transactions'] as List<dynamic>? ?? [];
+        return list.map((item) => PaymentModel.fromJson(item)).toList();
       }
+    } catch (_) {}
+    return [];
+  }
+
+  // 6. Update Load Progress Checkpoint
+  static Future<bool> updateLoadProgress(
+      String token, String loadId, String progress,
+      {String? manualEta, String? note}) async {
+    final uri = Uri.parse('$baseUrl/api/driver/loads/$loadId/status');
+    try {
+      final payload = <String, dynamic>{
+        'status': progress,
+        'checkpoint': progress,
+      };
+      if (manualEta != null) payload['eta'] = manualEta;
+      if (note != null) payload['note'] = note;
 
       final response = await http.post(
         uri,
@@ -91,32 +178,142 @@ class ApiClient {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(payload),
-      );
+      ).timeout(const Duration(seconds: 10));
+
       return response.statusCode == 200;
     } catch (e) {
       return false;
     }
   }
 
-  // Send Chat Message
-  static Future<bool> sendChatMessage(String token, String message, {String? loadId}) async {
-    final uri = Uri.parse('$baseUrl/api/driver/chat');
+  // 7. Upload Load Document (BOL, POD, Photos)
+  static Future<bool> uploadLoadDocument(String token, String loadId,
+      String key, String fileName, String base64Data) async {
+    final uri = Uri.parse('$baseUrl/api/driver/upload-doc');
     try {
-      final payload = <String, dynamic>{'text': message};
-      if (loadId != null) {
-        payload['loadId'] = loadId;
-      }
-
       final response = await http.post(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode(payload),
-      );
+        body: jsonEncode({
+          'loadId': loadId,
+          'key': key,
+          'fileName': fileName,
+          'data': base64Data,
+        }),
+      ).timeout(const Duration(seconds: 25));
+
       return response.statusCode == 200;
     } catch (e) {
+      return false;
+    }
+  }
+
+  // 8. Accept Payment
+  static Future<bool> acceptPayment(String token, String loadId) async {
+    final uri = Uri.parse('$baseUrl/api/driver/transactions/$loadId/accept');
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 9. Fetch Chat Conversations
+  static Future<List<dynamic>> fetchChats(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/chats');
+    try {
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['chats'] as List<dynamic>? ?? [];
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  // 10. Fetch Chat Messages for a Conversation
+  static Future<List<dynamic>> fetchChatMessages(
+      String token, dynamic conversationId) async {
+    final uri = Uri.parse('$baseUrl/api/driver/chats/$conversationId/messages');
+    try {
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['messages'] as List<dynamic>? ?? [];
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  // 11. Send Chat Message
+  static Future<Map<String, dynamic>?> sendChatMessage(
+      String token, dynamic conversationId, String message) async {
+    final uri = Uri.parse('$baseUrl/api/driver/chats/$conversationId/messages');
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'body': message}),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['message'] as Map<String, dynamic>?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // 12. Send GPS Location
+  static Future<bool> sendLocation(String token, double latitude,
+      double longitude, double? speed, double? heading, String? loadId) async {
+    final uri = Uri.parse('$baseUrl/api/driver/location');
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'latitude': latitude,
+          'longitude': longitude,
+          'speed': speed,
+          'heading': heading,
+          'loadId': loadId,
+        }),
+      ).timeout(const Duration(seconds: 6));
+
+      return response.statusCode == 200;
+    } catch (_) {
       return false;
     }
   }

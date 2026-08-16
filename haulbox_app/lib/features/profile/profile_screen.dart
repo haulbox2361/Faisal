@@ -425,12 +425,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: Stack(
         children: [
-          ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            children: [
-              // 1. PROFILE HEADER (Photo + Camera/Edit Button)
-              _buildProfileHeader(driver, authProvider),
-              const SizedBox(height: 14),
+          RefreshIndicator(
+            onRefresh: () => authProvider.syncAllData(),
+            color: AppColors.emeraldPrimary,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              children: [
+                // 1. PROFILE HEADER (Photo + Camera/Edit Button)
+                _buildProfileHeader(driver, authProvider),
+                const SizedBox(height: 14),
 
               // 2. COMBINED DRIVER & TRUCK DETAILS CARD (ONE SINGLE CARD)
               _buildCombinedDriverAndTruckCard(driver),
@@ -495,6 +499,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: () => _confirmLogout(context, authProvider),
               ),
             ],
+          ),
           ),
 
           // Uploading Profile Photo Overlay

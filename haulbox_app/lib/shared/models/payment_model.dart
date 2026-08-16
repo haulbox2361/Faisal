@@ -54,18 +54,30 @@ class PaymentModel {
     DateTime? dt;
     if (json['paymentDateTime'] != null) {
       dt = DateTime.tryParse(json['paymentDateTime'].toString());
+    } else if (json['paidDate'] != null) {
+      dt = DateTime.tryParse(json['paidDate'].toString());
+    } else if (json['date'] != null) {
+      dt = DateTime.tryParse(json['date'].toString());
     }
 
+    final amt = (json['amount'] is num)
+        ? (json['amount'] as num).toDouble()
+        : ((json['driverPay'] is num)
+            ? (json['driverPay'] as num).toDouble()
+            : (double.tryParse(json['amount']?.toString() ?? json['driverPay']?.toString() ?? '0') ?? 0.0));
+
+    final st = (json['status']?.toString() ?? (json['driverPaid'] == true ? 'PAID' : 'PENDING')).toUpperCase();
+
     return PaymentModel(
-      id: json['id']?.toString() ?? '',
-      loadNumber: json['loadNumber']?.toString() ?? 'HBX-2024-1042',
-      loadId: json['loadId']?.toString() ?? '',
-      date: json['date']?.toString() ?? 'May 16, 2026',
-      amount: (json['amount'] is num) ? (json['amount'] as num).toDouble() : 1850.0,
+      id: json['id']?.toString() ?? json['loadId']?.toString() ?? '',
+      loadNumber: json['loadNumber']?.toString() ?? json['load_number']?.toString() ?? 'Load',
+      loadId: json['loadId']?.toString() ?? json['id']?.toString() ?? '',
+      date: json['date']?.toString() ?? json['paidDate']?.toString() ?? json['deliveryDate']?.toString() ?? 'Recent',
+      amount: amt,
       paymentMethod: json['paymentMethod']?.toString() ?? 'Direct Deposit (ACH)',
-      status: json['status']?.toString() ?? 'PAID',
-      broker: json['broker']?.toString() ?? 'Rapid Freight Inc.',
-      rate: (json['rate'] is num) ? (json['rate'] as num).toDouble() : null,
+      status: st,
+      broker: json['broker']?.toString() ?? json['brokerName']?.toString() ?? 'Broker Settlement',
+      rate: (json['rate'] is num) ? (json['rate'] as num).toDouble() : amt,
       adjustments: (json['adjustments'] is num) ? (json['adjustments'] as num).toDouble() : 0.0,
       deductions: (json['deductions'] is num) ? (json['deductions'] as num).toDouble() : 0.0,
       settlementDocUrl: json['settlementDocUrl']?.toString(),

@@ -1316,7 +1316,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> with SingleTicker
               // 2. SCROLLABLE DASHBOARD BODY
               Expanded(
                 child: RefreshIndicator(
-                  onRefresh: () => authProvider.refreshLoads(),
+                  onRefresh: () => authProvider.syncAllData(),
                   backgroundColor: Colors.white,
                   color: AppColors.emeraldPrimary,
                   child: ListView(

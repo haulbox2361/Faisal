@@ -100,58 +100,63 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.4),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        children: [
-          // 1. DYNAMIC EARNINGS HERO SUMMARY CARD (Navy #0F172A)
-          _buildEarningsSummaryCard(periodTotalEarnings, periodCompletedLoads, periodPendingAmount),
-          const SizedBox(height: 14),
+      body: RefreshIndicator(
+        onRefresh: () => auth.syncAllData(),
+        color: AppColors.emeraldPrimary,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            // 1. DYNAMIC EARNINGS HERO SUMMARY CARD (Navy #0F172A)
+            _buildEarningsSummaryCard(periodTotalEarnings, periodCompletedLoads, periodPendingAmount),
+            const SizedBox(height: 14),
 
-          // 2. UNIFIED RANGE SELECTOR DROPDOWN (Same control across Loads & Payments)
-          RangeSelector(
-            selectedType: _selectedDateRange,
-            customRange: _customDateRange,
-            onRangeChanged: (type, custom) {
-              setState(() {
-                _selectedDateRange = type;
-                _customDateRange = custom;
-              });
-            },
-          ),
-          const SizedBox(height: 12),
+            // 2. UNIFIED RANGE SELECTOR DROPDOWN (Same control across Loads & Payments)
+            RangeSelector(
+              selectedType: _selectedDateRange,
+              customRange: _customDateRange,
+              onRangeChanged: (type, custom) {
+                setState(() {
+                  _selectedDateRange = type;
+                  _customDateRange = custom;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
 
-          // 3. SEARCH & STATUS FILTER CHIPS
-          _buildSearchBar(),
-          const SizedBox(height: 10),
-          _buildStatusFilterChips(),
-          const SizedBox(height: 14),
+            // 3. SEARCH & STATUS FILTER CHIPS
+            _buildSearchBar(),
+            const SizedBox(height: 10),
+            _buildStatusFilterChips(),
+            const SizedBox(height: 14),
 
-          // 4. PAYMENT TRANSACTIONS LIST
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'PAYMENT TRANSACTIONS (${filteredList.length})',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textSubtle,
-                  letterSpacing: 0.6,
+            // 4. PAYMENT TRANSACTIONS LIST
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'PAYMENT TRANSACTIONS (${filteredList.length})',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textSubtle,
+                    letterSpacing: 0.6,
+                  ),
                 ),
-              ),
-              Text(
-                DateRangeHelper.getDisplayText(_selectedDateRange, customRange: _customDateRange).toUpperCase(),
-                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.emeraldDark),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+                Text(
+                  DateRangeHelper.getDisplayText(_selectedDateRange, customRange: _customDateRange).toUpperCase(),
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.emeraldDark),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
 
-          if (filteredList.isEmpty)
-            _buildEmptyState()
-          else
-            ...filteredList.map((payment) => _buildPaymentRowCard(context, payment)),
-        ],
+            if (filteredList.isEmpty)
+              _buildEmptyState()
+            else
+              ...filteredList.map((payment) => _buildPaymentRowCard(context, payment)),
+          ],
+        ),
       ),
     );
   }

@@ -146,41 +146,55 @@ class LoadModel {
   }
 
   factory LoadModel.fromJson(Map<String, dynamic> json) {
+    final docs = json['documents'] as Map<String, dynamic>? ?? json['docs'] as Map<String, dynamic>?;
+    
+    // Determine BOL and POD status from documents map if present
+    String bolSt = 'PENDING';
+    String podSt = 'PENDING';
+    if (docs != null) {
+      if (docs['BOL'] != null && (docs['BOL']['hasFile'] == true || docs['BOL']['name'] != null)) {
+        bolSt = 'VERIFIED';
+      }
+      if (docs['POD'] != null && (docs['POD']['hasFile'] == true || docs['POD']['name'] != null)) {
+        podSt = 'VERIFIED';
+      }
+    }
+
     return LoadModel(
       id: json['id']?.toString() ?? '',
-      loadNumber: json['loadNumber']?.toString() ?? json['load_number']?.toString() ?? 'HBX-2024-1042',
-      brokerName: json['brokerName']?.toString() ?? json['broker_name']?.toString() ?? 'Rapid Freight Inc.',
-      driverPay: json['driverPay'] ?? json['driver_pay'] ?? json['rate'] ?? 1850.0,
+      loadNumber: json['loadNumber']?.toString() ?? json['load_number']?.toString() ?? 'Load',
+      brokerName: json['brokerName']?.toString() ?? json['broker_name']?.toString() ?? 'Broker',
+      driverPay: json['driverPay'] ?? json['driver_pay'] ?? json['brokerRate'] ?? json['rate'] ?? 0,
       status: (json['status']?.toString() ?? 'ASSIGNED').toUpperCase(),
-      driverProgress: (json['driverProgress']?.toString() ?? json['driver_progress']?.toString() ?? 'ASSIGNED').toUpperCase(),
-      pickup: json['pickup']?.toString() ?? 'Dallas, TX',
-      dropoff: json['dropoff']?.toString() ?? 'Houston, TX',
-      pickupDate: json['pickupDate']?.toString() ?? json['pickup_date']?.toString() ?? 'May 15, 2026',
-      pickupTime: json['pickupTime']?.toString() ?? json['pickup_time']?.toString() ?? '08:00 AM',
-      deliveryDate: json['deliveryDate']?.toString() ?? json['delivery_date']?.toString() ?? 'May 16, 2026',
-      deliveryTime: json['deliveryTime']?.toString() ?? json['delivery_time']?.toString() ?? '02:00 PM',
-      miles: json['miles'] ?? 245,
-      milesRemaining: json['milesRemaining'] ?? json['miles_remaining'] ?? 245,
-      eta: json['eta']?.toString() ?? '04h 32m',
-      pickupAddress: json['pickupAddress']?.toString() ?? json['pickup_address']?.toString() ?? '123 Logistics Blvd, Dallas, TX 75201',
+      driverProgress: (json['driverProgress']?.toString() ?? json['driver_progress']?.toString() ?? json['status']?.toString() ?? 'ASSIGNED').toUpperCase(),
+      pickup: json['pickup']?.toString() ?? '',
+      dropoff: json['dropoff']?.toString() ?? '',
+      pickupDate: json['pickupDate']?.toString() ?? json['pickup_date']?.toString() ?? '',
+      pickupTime: json['pickupTime']?.toString() ?? json['pickup_time']?.toString() ?? '',
+      deliveryDate: json['deliveryDate']?.toString() ?? json['delivery_date']?.toString() ?? '',
+      deliveryTime: json['deliveryTime']?.toString() ?? json['delivery_time']?.toString() ?? '',
+      miles: json['miles'] ?? 0,
+      milesRemaining: json['milesRemaining'] ?? json['miles_remaining'] ?? json['miles'] ?? 0,
+      eta: json['eta']?.toString() ?? '',
+      pickupAddress: json['pickupAddress']?.toString() ?? json['pickup_address']?.toString(),
       pickupContact: json['pickupContact']?.toString() ?? json['pickup_contact']?.toString(),
       pickupPhone: json['pickupPhone']?.toString() ?? json['pickup_phone']?.toString(),
-      dropoffAddress: json['dropoffAddress']?.toString() ?? json['dropoff_address']?.toString() ?? '700 Warehouse St, Houston, TX 77001',
+      dropoffAddress: json['dropoffAddress']?.toString() ?? json['dropoff_address']?.toString(),
       dropoffContact: json['dropoffContact']?.toString() ?? json['dropoff_contact']?.toString(),
       dropoffPhone: json['dropoffPhone']?.toString() ?? json['dropoff_phone']?.toString(),
-      notes: json['notes']?.toString() ?? 'Receiver requested delivery at dock 4.',
-      weight: json['weight'] ?? '42,500 lbs',
-      commodity: json['commodity']?.toString() ?? 'General Merchandise',
-      trailerType: json['trailerType']?.toString() ?? json['trailer_type']?.toString() ?? '53ft Dry Van',
-      bolStatus: json['bolStatus']?.toString() ?? 'VERIFIED',
-      podStatus: json['podStatus']?.toString() ?? 'PENDING',
+      notes: json['notes']?.toString(),
+      weight: json['weight'],
+      commodity: json['commodity']?.toString(),
+      trailerType: json['trailerType']?.toString() ?? json['trailer_type']?.toString(),
+      bolStatus: json['bolStatus']?.toString() ?? bolSt,
+      podStatus: json['podStatus']?.toString() ?? podSt,
       bolRejectionReason: json['bolRejectionReason']?.toString(),
       podRejectionReason: json['podRejectionReason']?.toString(),
-      paymentStatus: json['paymentStatus']?.toString() ?? 'PENDING',
-      paymentDate: json['paymentDate']?.toString(),
+      paymentStatus: (json['paymentStatus']?.toString() ?? (json['driverPaid'] == true ? 'PAID' : 'PENDING')).toUpperCase(),
+      paymentDate: json['paymentDate']?.toString() ?? json['driverPaidDate']?.toString(),
       loadingPhotos: (json['loadingPhotos'] as List?)?.map((e) => e.toString()).toList() ?? [],
       unloadingPhotos: (json['unloadingPhotos'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      documents: json['documents'] as Map<String, dynamic>?,
+      documents: docs,
     );
   }
 

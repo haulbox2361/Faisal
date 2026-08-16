@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
 import '../../shared/models/driver_model.dart';
@@ -14,11 +14,22 @@ class AuthProvider extends ChangeNotifier {
   List<PaymentModel> _payments = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int _unreadNotifications = 0;
+  int _unreadChats = 0;
+
+  Timer? _autoSyncTimer;
 
   AuthProvider() {
     _restorePersistedSession();
   }
 
+  @override
+  void dispose() {
+    _autoSyncTimer?.cancel();
+    super.dispose();
+  }
+
+  // 1. Session Restoration on App Launch
   Future<void> _restorePersistedSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -29,423 +40,307 @@ class AuthProvider extends ChangeNotifier {
       final savedPhone = prefs.getString('driverPhone');
       final savedEmail = prefs.getString('driverEmail');
       final savedCdl = prefs.getString('driverCdl');
+      final savedCdlExp = prefs.getString('driverCdlExp');
+      final savedAddress = prefs.getString('driverAddress');
+      final savedServerUrl = prefs.getString('serverUrl');
 
-      if (savedDriverId != null && savedDriverId.isNotEmpty) {
+      if (savedServerUrl != null && savedServerUrl.isNotEmpty) {
+        ApiClient.setBaseUrl(savedServerUrl);
+      }
+
+      if (savedToken != null && savedToken.isNotEmpty && savedDriverId != null) {
         _token = savedToken;
         _driver = DriverModel(
           id: savedDriverId,
-          name: savedDriverName ?? 'John D. Smith',
-          truck: savedTruck ?? 'Truck # HBX-1042',
-          phone: savedPhone ?? '(214) 555-0123',
-          email: savedEmail ?? 'john.smith@email.com',
-          cdlNumber: savedCdl ?? 'CDL12345678',
-          cdlExpiration: 'Dec 15, 2026',
-          address: '123 Driver St, Dallas, TX 75201',
+          name: savedDriverName ?? 'Driver',
+          truck: savedTruck,
+          phone: savedPhone,
+          email: savedEmail,
+          cdlNumber: savedCdl,
+          cdlExpiration: savedCdlExp,
+          address: savedAddress,
           status: 'ACTIVE',
         );
-        if (_token != null) {
-          refreshLoads();
-        } else {
-          _seedDefaultData();
-        }
+
         notifyListeners();
+
+        // Immediately perform full live sync from database
+        await syncAllData();
+        _startAutoSync();
       }
     } catch (e) {
       debugPrint('Session restore error: $e');
     }
   }
 
-  DriverModel? get driver => _driver ?? DriverModel(
-    id: 'D-101',
-    name: 'John D. Smith',
-    truck: 'Truck # HBX-1042',
-    phone: '(214) 555-0123',
-    email: 'john.smith@email.com',
-    cdlNumber: 'CDL12345678',
-    cdlExpiration: 'Dec 15, 2026',
-    address: '123 Driver St, Dallas, TX 75201',
-    status: 'ACTIVE',
-  );
+  // 2. Start Automatic Background Polling (Every 12 seconds)
+  void _startAutoSync() {
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (isAuthenticated) {
+        syncAllData(silent: true);
+      }
+    });
+  }
 
+  // Getters
+  DriverModel? get driver => _driver;
   String? get token => _token;
   String get companyName => _companyName;
   List<LoadModel> get loads => _loads;
   List<PaymentModel> get payments => _payments;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  bool get isAuthenticated => true;
+  bool get isAuthenticated => _token != null && _driver != null;
+  int get unreadNotifications => _unreadNotifications;
+  int get unreadChats => _unreadChats;
 
-
+  // Active / Current Run: First load that is not delivered or completed
   LoadModel? get currentLoad {
-    if (_loads.isEmpty) {
-      _seedDefaultData();
-    }
-    final active = _loads.where((l) => !['DELIVERED', 'COMPLETED', 'CANCELLED'].contains(l.status.toUpperCase())).toList();
+    if (_loads.isEmpty) return null;
+    final active = _loads.where((l) {
+      final st = l.status.toUpperCase();
+      final prog = l.driverProgress.toUpperCase();
+      return st != 'DELIVERED' &&
+          st != 'COMPLETED' &&
+          st != 'CANCELLED' &&
+          prog != 'COMPLETED' &&
+          prog != 'DELIVERED';
+    }).toList();
+
     if (active.isNotEmpty) return active.first;
-    return _loads.isNotEmpty ? _loads.first : null;
+    return _loads.first;
   }
 
-  void _seedDefaultData() {
-    final now = DateTime.now();
-    final thisMonday = now.subtract(Duration(days: now.weekday - DateTime.monday));
-    final lastMonday = thisMonday.subtract(const Duration(days: 7));
-    final lastWednesday = lastMonday.add(const Duration(days: 2));
-    final lastMonthMid = DateTime(now.year, now.month - 1, 15);
-
-    final df = DateFormat('MMM d, yyyy');
-
-    _loads = [
-      // 1. Current Active Run
-      LoadModel(
-        id: 'ld-1042',
-        loadNumber: 'HBX-2024-1042',
-        brokerName: 'Rapid Freight Inc.',
-        driverPay: 1850.0,
-        status: 'IN TRANSIT',
-        driverProgress: 'GOING_TO_DELIVERY',
-        pickup: 'Dallas, TX',
-        dropoff: 'Houston, TX',
-        pickupDate: df.format(now),
-        pickupTime: '08:00 AM',
-        deliveryDate: df.format(now.add(const Duration(days: 1))),
-        deliveryTime: '02:00 PM',
-        miles: 245,
-        milesRemaining: 245,
-        eta: '04h 32m',
-        pickupAddress: '123 Logistics Blvd, Dallas, TX 75201',
-        dropoffAddress: '700 Warehouse St, Houston, TX 77001',
-        weight: '42,500 lbs',
-        commodity: 'General Merchandise',
-        trailerType: '53ft Dry Van',
-        bolStatus: 'VERIFIED',
-        podStatus: 'PENDING',
-        paymentStatus: 'PENDING',
-        notes: 'Receiver requested delivery at dock 4.',
-      ),
-
-      // 2. Completed Load 1 (This Week)
-      LoadModel(
-        id: 'ld-1041',
-        loadNumber: 'HBX-2024-1041',
-        brokerName: 'Rapid Freight Inc.',
-        driverPay: 2400.0,
-        status: 'COMPLETED',
-        driverProgress: 'COMPLETED',
-        pickup: 'Atlanta, GA',
-        dropoff: 'Miami, FL',
-        pickupDate: df.format(thisMonday),
-        pickupTime: '07:00 AM',
-        deliveryDate: df.format(thisMonday.add(const Duration(days: 1))),
-        deliveryTime: '03:00 PM',
-        miles: 660,
-        milesRemaining: 0,
-        eta: 'Delivered',
-        pickupAddress: '400 Industrial Pkwy, Atlanta, GA 30301',
-        dropoffAddress: '880 Ocean Port Way, Miami, FL 33101',
-        weight: '38,000 lbs',
-        commodity: 'Packaged Food Goods',
-        trailerType: '53ft Reefer',
-        bolStatus: 'VERIFIED',
-        podStatus: 'VERIFIED',
-        paymentStatus: 'PAID',
-        paymentDate: df.format(thisMonday.add(const Duration(days: 1))),
-        notes: 'Smooth delivery. Gate code #4921.',
-      ),
-
-      // 3. Completed Load 2 (Last Week)
-      LoadModel(
-        id: 'ld-1040',
-        loadNumber: 'HBX-2024-1040',
-        brokerName: 'Apex Global Logistics',
-        driverPay: 1650.0,
-        status: 'COMPLETED',
-        driverProgress: 'COMPLETED',
-        pickup: 'Chicago, IL',
-        dropoff: 'Detroit, MI',
-        pickupDate: df.format(lastMonday),
-        pickupTime: '09:00 AM',
-        deliveryDate: df.format(lastWednesday),
-        deliveryTime: '11:00 AM',
-        miles: 280,
-        milesRemaining: 0,
-        eta: 'Delivered',
-        pickupAddress: '100 Windy City Blvd, Chicago, IL 60601',
-        dropoffAddress: '220 Motor City Way, Detroit, MI 48201',
-        weight: '44,000 lbs',
-        commodity: 'Automotive Parts',
-        trailerType: '53ft Dry Van',
-        bolStatus: 'VERIFIED',
-        podStatus: 'VERIFIED',
-        paymentStatus: 'PAID',
-        paymentDate: df.format(lastWednesday),
-        notes: 'Signed POD on file.',
-      ),
-
-      // 4. Completed Load 3 (Last Month)
-      LoadModel(
-        id: 'ld-1039',
-        loadNumber: 'HBX-2024-1039',
-        brokerName: 'Prime Freight Systems',
-        driverPay: 3100.0,
-        status: 'COMPLETED',
-        driverProgress: 'COMPLETED',
-        pickup: 'Dallas, TX',
-        dropoff: 'Phoenix, AZ',
-        pickupDate: df.format(lastMonthMid),
-        pickupTime: '06:00 AM',
-        deliveryDate: df.format(lastMonthMid.add(const Duration(days: 2))),
-        deliveryTime: '04:00 PM',
-        miles: 1060,
-        milesRemaining: 0,
-        eta: 'Delivered',
-        pickupAddress: '550 Lonestar Way, Dallas, TX 75201',
-        dropoffAddress: '900 Desert Sun Rd, Phoenix, AZ 85001',
-        weight: '41,200 lbs',
-        commodity: 'Electronics & Hardware',
-        trailerType: '53ft Dry Van',
-        bolStatus: 'VERIFIED',
-        podStatus: 'VERIFIED',
-        paymentStatus: 'PAID',
-        paymentDate: df.format(lastMonthMid.add(const Duration(days: 2))),
-        notes: 'Long haul run verified.',
-      ),
-
-      // 5. Cancelled Load
-      LoadModel(
-        id: 'ld-1038',
-        loadNumber: 'HBX-2024-1038',
-        brokerName: 'Swiftway Cargo',
-        driverPay: 1200.0,
-        status: 'CANCELLED',
-        driverProgress: 'CANCELLED',
-        pickup: 'Austin, TX',
-        dropoff: 'San Antonio, TX',
-        pickupDate: df.format(lastMonthMid.subtract(const Duration(days: 5))),
-        pickupTime: '10:00 AM',
-        deliveryDate: df.format(lastMonthMid.subtract(const Duration(days: 5))),
-        deliveryTime: '02:00 PM',
-        miles: 80,
-        milesRemaining: 80,
-        eta: 'Cancelled',
-        pickupAddress: '300 Capitol Way, Austin, TX 78701',
-        dropoffAddress: '150 Riverwalk Dr, San Antonio, TX 78201',
-        weight: '20,000 lbs',
-        commodity: 'Retail Goods',
-        trailerType: '53ft Dry Van',
-        bolStatus: 'PENDING',
-        podStatus: 'PENDING',
-        paymentStatus: 'CANCELLED',
-        notes: 'Shipper cancelled booking before dispatch.',
-      ),
-    ];
-
-    _payments = [
-      // Payment 1: This Week
-      PaymentModel(
-        id: 'pay-1041',
-        loadNumber: 'HBX-2024-1041',
-        loadId: 'ld-1041',
-        date: df.format(thisMonday.add(const Duration(days: 1))),
-        paymentDateTime: thisMonday.add(const Duration(days: 1)),
-        amount: 2400.00,
-        rate: 2400.00,
-        adjustments: 0.00,
-        deductions: 0.00,
-        paymentMethod: 'Direct Deposit (ACH)',
-        status: 'PAID',
-        broker: 'Rapid Freight Inc.',
-      ),
-      // Payment 2: Last Week
-      PaymentModel(
-        id: 'pay-1040',
-        loadNumber: 'HBX-2024-1040',
-        loadId: 'ld-1040',
-        date: df.format(lastWednesday),
-        paymentDateTime: lastWednesday,
-        amount: 1650.00,
-        rate: 1650.00,
-        adjustments: 0.00,
-        deductions: 0.00,
-        paymentMethod: 'Direct Deposit (ACH)',
-        status: 'PAID',
-        broker: 'Apex Global Logistics',
-      ),
-      // Payment 3: Last Month
-      PaymentModel(
-        id: 'pay-1039',
-        loadNumber: 'HBX-2024-1039',
-        loadId: 'ld-1039',
-        date: df.format(lastMonthMid.add(const Duration(days: 2))),
-        paymentDateTime: lastMonthMid.add(const Duration(days: 2)),
-        amount: 3100.00,
-        rate: 3100.00,
-        adjustments: 0.00,
-        deductions: 0.00,
-        paymentMethod: 'Direct Deposit (ACH)',
-        status: 'PAID',
-        broker: 'Prime Freight Systems',
-      ),
-      // Payment 4: Processing
-      PaymentModel(
-        id: 'pay-1037',
-        loadNumber: 'HBX-2024-1037',
-        loadId: 'ld-1042',
-        date: df.format(thisMonday),
-        paymentDateTime: thisMonday,
-        amount: 2150.00,
-        rate: 2150.00,
-        adjustments: 0.00,
-        deductions: 0.00,
-        paymentMethod: 'Direct Deposit (ACH)',
-        status: 'PROCESSING',
-        broker: 'Rapid Freight Inc.',
-      ),
-    ];
-  }
-
-  void updateProfilePhoto(String photoUrl) {
-    if (_driver != null) {
-      _driver = _driver!.copyWith(profilePhotoUrl: photoUrl);
-    } else {
-      _driver = DriverModel(
-        id: 'D-101',
-        name: 'John D. Smith',
-        truck: 'Truck # HBX-1042',
-        phone: '(214) 555-0123',
-        email: 'john.smith@email.com',
-        cdlNumber: 'CDL12345678',
-        cdlExpiration: 'Dec 15, 2026',
-        address: '123 Driver St, Dallas, TX 75201',
-        status: 'ACTIVE',
-        profilePhotoUrl: photoUrl,
-      );
+  // 3. Full Live Synchronization (Master Source of Truth)
+  Future<void> syncAllData({bool silent = false}) async {
+    if (_token == null) return;
+    if (!silent) {
+      _isLoading = true;
+      notifyListeners();
     }
-    notifyListeners();
+
+    try {
+      final syncData = await ApiClient.fetchSync(_token!);
+      if (syncData != null) {
+        if (syncData['driver'] is DriverModel) {
+          _driver = syncData['driver'] as DriverModel;
+          _persistDriverLocally(_driver!);
+        }
+        if (syncData['loads'] is List<LoadModel>) {
+          _loads = syncData['loads'] as List<LoadModel>;
+        }
+        if (syncData['payments'] is List<PaymentModel>) {
+          _payments = syncData['payments'] as List<PaymentModel>;
+        }
+        _unreadChats = syncData['unreadChats'] ?? 0;
+        _unreadNotifications = syncData['unreadNotifications'] ?? 0;
+        if (syncData['companyName'] != null) {
+          _companyName = syncData['companyName'].toString();
+        }
+        _errorMessage = null;
+      } else {
+        // Fallback individual refreshes if sync endpoint is unavailable
+        await refreshLoads(silent: true);
+        await refreshPayments(silent: true);
+        await refreshProfile(silent: true);
+      }
+    } catch (e) {
+      debugPrint('Sync error: $e');
+    } finally {
+      if (!silent) {
+        _isLoading = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  // 4. Refresh Loads
+  Future<void> refreshLoads({bool silent = false}) async {
+    if (_token == null) return;
+    if (!silent) {
+      _isLoading = true;
+      notifyListeners();
+    }
+    try {
+      final freshLoads = await ApiClient.fetchLoads(_token!);
+      _loads = freshLoads;
+    } catch (e) {
+      debugPrint('Error fetching loads: $e');
+    } finally {
+      if (!silent) {
+        _isLoading = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  // 5. Refresh Payments
+  Future<void> refreshPayments({bool silent = false}) async {
+    if (_token == null) return;
+    try {
+      final freshPayments = await ApiClient.fetchPayments(_token!);
+      _payments = freshPayments;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error fetching payments: $e');
+    }
+  }
+
+  // 6. Refresh Driver Profile
+  Future<void> refreshProfile({bool silent = false}) async {
+    if (_token == null) return;
+    try {
+      final profile = await ApiClient.fetchDriverProfile(_token!);
+      if (profile != null) {
+        _driver = profile;
+        _persistDriverLocally(profile);
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  void updateProfilePhoto(String photoPath) {
+    if (_driver != null) {
+      _driver = _driver!.copyWith(profilePhotoUrl: photoPath);
+      _persistDriverLocally(_driver!);
+      notifyListeners();
+    }
   }
 
   void removeProfilePhoto() {
     if (_driver != null) {
       _driver = _driver!.copyWith(clearPhoto: true);
+      _persistDriverLocally(_driver!);
       notifyListeners();
     }
   }
 
+  // 7. Login
   Future<bool> login(String driverId, String pin) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    final result = await ApiClient.login(driverId, pin);
-    _isLoading = false;
+    try {
+      final result = await ApiClient.login(driverId, pin);
+      if (result['success'] == true) {
+        _token = result['token'];
+        _driver = result['driver'];
+        _loads = result['loads'] ?? [];
+        _companyName = result['companyName'] ?? 'HaulBoX';
 
-    if (result['success'] == true) {
-      _token = result['token'];
-      _driver = result['driver'];
-      _companyName = result['companyName'] ?? 'HaulBoX';
-      _loads = (result['loads'] as List<LoadModel>?) ?? [];
+        final prefs = await SharedPreferences.getInstance();
+        if (_token != null) await prefs.setString('token', _token!);
+        if (_driver != null) {
+          await _persistDriverLocally(_driver!);
+        }
 
-      if (_loads.isEmpty) {
-        _seedDefaultData();
-      }
+        _startAutoSync();
+        // Trigger immediate background sync for payments and docs
+        syncAllData(silent: true);
 
-      final prefs = await SharedPreferences.getInstance();
-      if (_token != null) await prefs.setString('token', _token!);
-      if (_driver != null) {
-        await prefs.setString('driverId', _driver!.id);
-        await prefs.setString('driverName', _driver!.name);
-        if (_driver!.truck != null) await prefs.setString('driverTruck', _driver!.truck!);
-        if (_driver!.phone != null) await prefs.setString('driverPhone', _driver!.phone!);
-        if (_driver!.email != null) await prefs.setString('driverEmail', _driver!.email!);
-        if (_driver!.cdlNumber != null) await prefs.setString('driverCdl', _driver!.cdlNumber!);
-      }
-
-      notifyListeners();
-      return true;
-    } else {
-      _driver = DriverModel(
-        id: driverId,
-        name: 'John D. Smith',
-        truck: 'Truck # HBX-1042',
-        phone: '(214) 555-0123',
-        email: 'john.smith@email.com',
-        cdlNumber: 'CDL12345678',
-        cdlExpiration: 'Dec 15, 2026',
-        address: '123 Driver St, Dallas, TX 75201',
-        status: 'ACTIVE',
-      );
-      _seedDefaultData();
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('driverId', _driver!.id);
-      await prefs.setString('driverName', _driver!.name);
-      if (_driver!.truck != null) await prefs.setString('driverTruck', _driver!.truck!);
-      if (_driver!.phone != null) await prefs.setString('driverPhone', _driver!.phone!);
-      if (_driver!.email != null) await prefs.setString('driverEmail', _driver!.email!);
-      if (_driver!.cdlNumber != null) await prefs.setString('driverCdl', _driver!.cdlNumber!);
-
-      notifyListeners();
-      return true;
-    }
-
-  }
-
-  Future<void> refreshLoads() async {
-    if (_token != null) {
-      final freshLoads = await ApiClient.fetchLoads(_token!);
-      if (freshLoads.isNotEmpty) {
-        _loads = freshLoads;
+        _isLoading = false;
         notifyListeners();
-        return;
+        return true;
+      } else {
+        _errorMessage = result['error'] ?? 'Login failed. Please check Driver ID and PIN.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
       }
-    }
-    if (_loads.isEmpty) {
-      _seedDefaultData();
+    } catch (e) {
+      _errorMessage = 'Connection error: $e';
+      _isLoading = false;
       notifyListeners();
+      return false;
     }
   }
 
-  Future<void> updateLoadProgress(String loadId, String checkpoint) async {
+  Future<void> _persistDriverLocally(DriverModel d) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('driverId', d.id);
+      await prefs.setString('driverName', d.name);
+      if (d.truck != null) await prefs.setString('driverTruck', d.truck!);
+      if (d.phone != null) await prefs.setString('driverPhone', d.phone!);
+      if (d.email != null) await prefs.setString('driverEmail', d.email!);
+      if (d.cdlNumber != null) await prefs.setString('driverCdl', d.cdlNumber!);
+      if (d.cdlExpiration != null) await prefs.setString('driverCdlExp', d.cdlExpiration!);
+      if (d.address != null) await prefs.setString('driverAddress', d.address!);
+    } catch (_) {}
+  }
+
+  // 8. Update Load Workflow Checkpoint
+  Future<bool> updateLoadProgress(String loadId, String checkpoint,
+      {String? manualEta, String? note}) async {
     if (_token != null) {
-      await ApiClient.updateLoadProgress(_token!, loadId, checkpoint);
+      final ok = await ApiClient.updateLoadProgress(_token!, loadId, checkpoint,
+          manualEta: manualEta, note: note);
+      if (ok) {
+        // Optimistically update local state & sync
+        final idx = _loads.indexWhere((l) => l.id == loadId);
+        if (idx != -1) {
+          _loads[idx] = _loads[idx].copyWith(
+            driverProgress: checkpoint,
+            status: checkpoint == 'COMPLETED' ? 'COMPLETED' : 'IN TRANSIT',
+          );
+          notifyListeners();
+        }
+        syncAllData(silent: true);
+        return true;
+      }
     }
-    final idx = _loads.indexWhere((l) => l.id == loadId);
-    if (idx != -1) {
-      _loads[idx] = _loads[idx].copyWith(
-        driverProgress: checkpoint,
-        status: checkpoint == 'COMPLETED' ? 'COMPLETED' : 'IN TRANSIT',
-      );
-      notifyListeners();
+    return false;
+  }
+
+  // 9. Document Upload
+  Future<bool> uploadDocument(String loadId, String docType, String fileName,
+      String base64Data) async {
+    if (_token == null) return false;
+    final ok = await ApiClient.uploadLoadDocument(
+        _token!, loadId, docType, fileName, base64Data);
+    if (ok) {
+      await syncAllData(silent: true);
+      return true;
     }
+    return false;
+  }
+
+  // 10. Accept / Confirm Payment
+  Future<bool> acceptPayment(String loadId) async {
+    if (_token == null) return false;
+    final ok = await ApiClient.acceptPayment(_token!, loadId);
+    if (ok) {
+      await syncAllData(silent: true);
+      return true;
+    }
+    return false;
   }
 
   void completeCurrentLoad(String loadId) {
-    final idx = _loads.indexWhere((l) => l.id == loadId);
-    if (idx != -1) {
-      _loads[idx] = _loads[idx].copyWith(
-        status: 'COMPLETED',
-        driverProgress: 'COMPLETED',
-        milesRemaining: 0,
-        eta: 'Delivered',
-        podStatus: 'VERIFIED',
-        paymentStatus: 'PROCESSING',
-      );
-      notifyListeners();
-    }
+    updateLoadProgress(loadId, 'COMPLETED');
   }
 
   void addNoteToLoad(String loadId, String note) {
     final idx = _loads.indexWhere((l) => l.id == loadId);
     if (idx != -1) {
       final currentNotes = _loads[idx].notes;
-      final updated = currentNotes != null && currentNotes.isNotEmpty ? '$currentNotes\n• $note' : note;
+      final updated = currentNotes != null && currentNotes.isNotEmpty
+          ? '$currentNotes\n• $note'
+          : note;
       _loads[idx] = _loads[idx].copyWith(notes: updated);
       notifyListeners();
     }
   }
 
+  // 11. Logout (Only on explicit driver action)
   Future<void> logout() async {
+    _autoSyncTimer?.cancel();
     _token = null;
     _driver = null;
+    _loads = [];
+    _payments = [];
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('token');
@@ -455,9 +350,10 @@ class AuthProvider extends ChangeNotifier {
       await prefs.remove('driverPhone');
       await prefs.remove('driverEmail');
       await prefs.remove('driverCdl');
+      await prefs.remove('driverCdlExp');
+      await prefs.remove('driverAddress');
       await prefs.remove('last_selected_tab_idx');
     } catch (_) {}
     notifyListeners();
   }
 }
-

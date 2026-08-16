@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
 import '../../core/network/api_client.dart';
@@ -14,8 +15,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _driverIdController = TextEditingController(text: 'D101');
-  final _pinController = TextEditingController(text: '1234');
+  final _driverIdController = TextEditingController();
+  final _pinController = TextEditingController();
   final _serverUrlController = TextEditingController(text: ApiClient.baseUrl);
   bool _showServerConfig = false;
   bool _obscurePin = true;
@@ -29,8 +30,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() async {
-    if (_showServerConfig && _serverUrlController.text.trim().isNotEmpty) {
-      ApiClient.setBaseUrl(_serverUrlController.text.trim());
+    final newUrl = _serverUrlController.text.trim();
+    if (_showServerConfig && newUrl.isNotEmpty) {
+      ApiClient.setBaseUrl(newUrl);
+      // Persist server URL so restored sessions use same server
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('serverUrl', newUrl);
+      } catch (_) {}
     }
 
     final driverId = _driverIdController.text.trim();

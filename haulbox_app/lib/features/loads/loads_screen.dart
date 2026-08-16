@@ -184,17 +184,22 @@ class _LoadsScreenState extends State<LoadsScreen> {
           // Scrollable Load Cards List
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => authProvider.refreshLoads(),
+              onRefresh: () => authProvider.syncAllData(),
               color: AppColors.emeraldPrimary,
               child: filteredLoads.isEmpty
-                  ? const Center(
-                      child: EmptyState(
-                        icon: Icons.inventory_2_outlined,
-                        title: 'No Loads Found',
-                        description: 'No loads match your current date range, filter, or search criteria.',
-                      ),
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 80),
+                        EmptyState(
+                          icon: Icons.inventory_2_outlined,
+                          title: 'No Loads Found',
+                          description: 'No loads match your current date range, filter, or search criteria.',
+                        ),
+                      ],
                     )
                   : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
                       itemCount: filteredLoads.length,
                       itemBuilder: (context, index) {
