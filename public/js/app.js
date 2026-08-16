@@ -3086,10 +3086,19 @@
 
 
     /* ================= LOAD BOARD ================= */
-    const LB_TABS = ['All Loads', 'Pending RC', 'Booked', 'Loaded', 'Drop-off'];
+    const LB_TABS = [
+      'All Loads',
+      'Booked',
+      'Loaded',
+      'In Transit',
+      'ETA',
+      'Drop Off',
+      'Delivered',
+      'Completed',
+      'Cancelled'
+    ];
     function loadBoardTabs() {
-      // Payment stages are an Admin concern — dispatchers just see the load pipeline.
-      return STATE.role === 'admin' ? LB_TABS.concat(PAYMENT_STAGES) : LB_TABS;
+      return LB_TABS;
     }
     function populateLoadBoardFilters() {
       const dispSelect = document.getElementById('loadboard-dispatcher-filter');
@@ -3129,14 +3138,9 @@
       el.innerHTML = loadBoardTabs().map(t => {
         const count = filteredByDropdowns.filter(l => matchesFilter(l, t)).length;
         const isActive = (STATE.loadFilter === t);
-        const activeBg = isActive ? 'background:#2563eb;color:#ffffff;border-color:#2563eb;' : 'background:#ffffff;color:#334155;border-color:#cbd5e1;';
-        const badgeBg = isActive ? 'rgba(255,255,255,0.25)' : '#f1f5f9';
-        const badgeColor = isActive ? '#ffffff' : '#64748b';
-
-        return `<button class="tab-btn${isActive ? ' active' : ''}" onclick="setLoadFilter('${escapeAttr(t)}')"
-          style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid;transition:all 0.15s ease;${activeBg}">
+        return `<button type="button" class="lb-filter-tab${isActive ? ' active' : ''}" onclick="setLoadFilter('${escapeAttr(t)}')" title="Filter by ${escapeAttr(t)}">
           <span>${escapeHtml(t)}</span>
-          <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:12px;background:${badgeBg};color:${badgeColor};">${count}</span>
+          <span class="lb-filter-tab-badge">${count}</span>
         </button>`;
       }).join('');
     }
@@ -3151,15 +3155,42 @@
 
     function matchesFilter(load, filter) {
       if (!filter || filter === 'All Loads') return true;
-      if (PAYMENT_STAGES.includes(filter)) return paymentOf(load) === filter;
       const st = String(load.status || '').toLowerCase().trim();
       const fl = String(filter).toLowerCase().trim();
       const prog = String(load.driverProgress || '').toLowerCase().trim();
-      if (fl === 'pending rc') return st === 'pending rc';
-      if (fl === 'booked') return st === 'booked' || st === 'accepted' || prog === 'accepted';
-      if (fl === 'loaded') return st === 'loaded' || st === 'in transit' || prog === 'loaded' || prog === 'in_transit' || prog === 'at_pickup';
-      if (fl === 'drop-off' || fl === 'delivered') return st === 'drop-off' || st === 'delivered' || st === 'pod uploaded' || prog === 'at_delivery' || prog === 'delivered' || prog === 'completed' || prog === 'pod_uploaded';
-      return st === fl;
+
+      if (fl === 'all loads') return true;
+      if (fl === 'booked') {
+        return st === 'booked' || st === 'pending rc' || st === 'accepted' || prog === 'assigned' || prog === 'accepted';
+      }
+      if (fl === 'loaded') {
+        return st === 'loaded' || st === 'at pickup' || st === 'at_pickup' || prog === 'loaded' || prog === 'at_pickup';
+      }
+      if (fl === 'in transit') {
+        return st === 'in transit' || st === 'in_transit' || prog === 'in_transit' || prog === 'in transit';
+      }
+      if (fl === 'eta') {
+        return prog === 'in_transit' || prog === 'at_pickup' || prog === 'at_delivery' ||
+               st === 'in transit' || st === 'at pickup' || st === 'at delivery' ||
+               st === 'booked' || (!!load.eta || !!load.deliveryDate || !!load.pickupDate);
+      }
+      if (fl === 'drop off' || fl === 'drop-off') {
+        return st === 'drop-off' || st === 'drop off' || st === 'at delivery' || st === 'at_delivery' ||
+               prog === 'at_delivery' || prog === 'drop_off' || prog === 'drop-off';
+      }
+      if (fl === 'delivered') {
+        return st === 'delivered' || st === 'pod uploaded' || prog === 'delivered' || prog === 'pod_uploaded' || (load.docs && !!load.docs.POD);
+      }
+      if (fl === 'completed') {
+        return st === 'completed' || prog === 'completed' || prog === 'paid' || prog === 'paid_confirmed' ||
+               load.payment === 'Payment Received' || load.driverPaid === true ||
+               (st === 'drop-off' && load.docs && !!load.docs.POD);
+      }
+      if (fl === 'cancelled' || fl === 'canceled') {
+        return st === 'cancelled' || st === 'canceled' || prog === 'cancelled' || prog === 'canceled';
+      }
+
+      return st === fl || prog === fl;
     }
 
     function clearLoadBoardDateRange() {
