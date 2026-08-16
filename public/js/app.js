@@ -1836,6 +1836,213 @@
       return `${yr}-${mo}-${da}`;
     }
 
+    /* ================= NEW DASHBOARD EXTENSIONS ================= */
+    let dashboardMap = null;
+    let driverMarkers = {};
+
+    function initDashboardMap() {
+      if (dashboardMap) return;
+      const container = document.getElementById('live-driver-map');
+      if (!container) return;
+      if (typeof L === 'undefined') return; // Leaflet not loaded
+      
+      dashboardMap = L.map('live-driver-map').setView([39.8283, -98.5795], 4); // Center of US
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      }).addTo(dashboardMap);
+    }
+
+    function renderLiveDashboardMap() {
+      initDashboardMap();
+      if (!dashboardMap) return;
+
+      const panel = document.getElementById('driver-tracking-panel');
+      if (!panel) return;
+
+      const drivers = visibleDrivers();
+      let bounds = [];
+      let activeDriversList = '';
+
+      drivers.forEach(d => {
+        // If driver has location data
+        if (d.location && d.location.lat && d.location.lng) {
+          if (!driverMarkers[d.id]) {
+            const marker = L.marker([d.location.lat, d.location.lng]).addTo(dashboardMap);
+            marker.on('click', () => showDriverDetails(d.id));
+            driverMarkers[d.id] = marker;
+          } else {
+            driverMarkers[d.id].setLatLng([d.location.lat, d.location.lng]);
+          }
+          bounds.push([d.location.lat, d.location.lng]);
+        } else {
+          // Remove marker if driver no longer has location
+          if (driverMarkers[d.id]) {
+            dashboardMap.removeLayer(driverMarkers[d.id]);
+            delete driverMarkers[d.id];
+          }
+        }
+      });
+
+      if (bounds.length > 0) {
+        dashboardMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 8 });
+      }
+
+      // Default state if no driver selected
+      panel.innerHTML = '<div style="text-align:center;color:#64748b;font-size:13px;padding-top:40px;">Select a driver on the map or from the roster to view live details.</div>';
+    }
+
+    window.showDriverDetails = function(driverId) {
+      const panel = document.getElementById('driver-tracking-panel');
+      if (!panel) return;
+
+      const driver = (STATE.drivers || []).find(d => d.id === driverId);
+      if (!driver) return;
+
+      const activeLoad = (STATE.loads || []).find(l => l.driverId === driver.id && l.status !== 'Drop-off' && l.status !== 'Cancelled');
+      const hasLocation = driver.location && driver.location.lat && driver.location.lng;
+
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <div style="width:42px;height:42px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;">
+            ${escapeAttr((driver.name || 'D').split(' ').map(p => p[0]).join('').slice(0, 2))}
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:15px;color:#0f172a;">${escapeHtml(driver.name)}</div>
+            <div style="font-size:12px;color:#64748b;">Truck: ${escapeHtml(driver.truck || '—')}</div>
+          </div>
+        </div>
+        <div style="border-top:1px solid #e2e8f0;padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:13px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:#64748b;">Location:</span>
+            <span style="font-weight:600;color:#0f172a;">${hasLocation ? (driver.location.city || 'Updating...') : '<span style="color:#ef4444">Location Unavailable</span>'}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:#64748b;">Speed:</span>
+            <span style="font-weight:600;color:#0f172a;">${hasLocation && driver.location.speed ? driver.location.speed + ' mph' : '0 mph'}</span>
+          </div>
+          ${activeLoad ? `
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#64748b;">Active Load:</span>
+              <span style="font-weight:600;color:#2563eb;cursor:pointer;" onclick="openLoadModal('${activeLoad.id}')">#${escapeHtml(activeLoad.loadNumber)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#64748b;">Status:</span>
+              <span style="font-weight:600;color:#16a34a;">${escapeHtml(activeLoad.status || 'In Transit')}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#64748b;">Destination:</span>
+              <span style="font-weight:600;color:#0f172a;">${escapeHtml(formatCityState(activeLoad.dropoff))}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#64748b;">ETA:</span>
+              <span style="font-weight:600;color:#0f172a;">${activeLoad.eta || 'Calculating...'}</span>
+            </div>
+          ` : `
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:#64748b;">Status:</span>
+              <span style="font-weight:600;color:#f59e0b;">Idle (No Active Load)</span>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderDashboardNotifications() {
+      const feed = document.getElementById('dashboard-notifications-feed');
+      if (!feed) return;
+
+      // Ensure we have some base state
+      let events = [];
+
+      // Synthesize events from real database data if actual events don't exist
+      if (!STATE.notifications || STATE.notifications.length === 0) {
+        // Collect latest 5 loads
+        const sortedLoads = (STATE.loads || []).slice().sort((a,b) => new Date(b.systemDate) - new Date(a.systemDate)).slice(0, 5);
+        sortedLoads.forEach(l => {
+          if (l.status === 'Delivered' || l.status === 'Completed') {
+            events.push({ icon: '🏁', text: `${l.driverName || 'Driver'} completed Load #${l.loadNumber}`, color: '#16a34a', bg: '#dcfce7', loadId: l.id, time: l.systemDate });
+          } else if (l.status === 'POD Uploaded') {
+            events.push({ icon: '📄', text: `${l.driverName || 'Driver'} uploaded POD for Load #${l.loadNumber}`, color: '#2563eb', bg: '#dbeafe', loadId: l.id, time: l.systemDate });
+          } else if (l.status === 'In Transit' || l.status === 'At Pickup') {
+            events.push({ icon: '🚚', text: `${l.driverName || 'Driver'} is ${l.status} on Load #${l.loadNumber}`, color: '#ea580c', bg: '#ffedd5', loadId: l.id, time: l.systemDate });
+          } else if (l.status === 'Booked') {
+            events.push({ icon: '📝', text: `New Load #${l.loadNumber} assigned to ${l.driverName || 'Driver'}`, color: '#64748b', bg: '#f1f5f9', loadId: l.id, time: l.systemDate });
+          }
+        });
+        
+        // Find recent chats
+        Object.keys(STATE.chat || {}).forEach(k => {
+          const conv = STATE.chat[k];
+          if (conv.messages && conv.messages.length > 0) {
+            const lastMsg = conv.messages[conv.messages.length - 1];
+            events.push({ icon: '💬', text: `${lastMsg.senderName || 'Admin'} sent a message`, color: '#9333ea', bg: '#f3e8ff', action: `switchView('chat'); loadConversation('${k}')`, time: lastMsg.timestamp });
+          }
+        });
+      } else {
+        events = STATE.notifications;
+      }
+
+      // Sort by time descending
+      events.sort((a, b) => new Date(b.time || new Date()) - new Date(a.time || new Date()));
+
+      if (events.length === 0) {
+        feed.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">No recent activity</div>';
+        return;
+      }
+
+      feed.innerHTML = events.slice(0, 10).map(e => `
+        <div style="display:flex;gap:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;align-items:center;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='#f8fafc'" onclick="${e.action ? e.action : (e.loadId ? `openLoadModal('${e.loadId}')` : '')}">
+          <div style="width:36px;height:36px;border-radius:10px;background:${e.bg || '#f1f5f9'};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">
+            ${e.icon || '🔔'}
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.4;">${escapeHtml(e.text)}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">${e.time ? timeAgo(e.time) : 'Just now'}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderRecentLoadsCenter() {
+      const tbody = document.getElementById('dash-recent-loads-tbody');
+      if (!tbody) return;
+
+      const recentLoads = visibleLoads().slice().sort((a,b) => new Date(b.systemDate) - new Date(a.systemDate)).slice(0, 10);
+      
+      if (recentLoads.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:#64748b;font-size:13px;">No recent loads found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = recentLoads.map(load => {
+        const route = formatCityStateLane(load.pickup, load.dropoff);
+        const st = String(load.status || 'Pending RC').toLowerCase();
+        
+        let stClass = 'status-badge-gray';
+        if (st.includes('booked') || st.includes('rc')) stClass = 'status-badge-blue';
+        else if (st.includes('transit') || st.includes('pickup') || st.includes('loaded')) stClass = 'status-badge-orange';
+        else if (st.includes('drop') || st.includes('deliver') || st.includes('completed')) stClass = 'status-badge-green';
+
+        return `
+          <tr style="border-bottom:1px solid #e2e8f0;transition:background 0.1s;cursor:pointer;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background=''" onclick="openLoadModal('${escapeAttr(load.id)}')">
+            <td style="padding:12px;color:#0f172a;font-weight:600;">${escapeHtml(load.loadNumber)}</td>
+            <td style="padding:12px;color:#475569;font-weight:500;">${escapeHtml(load.driverName || '—')}</td>
+            <td style="padding:12px;color:#475569;font-weight:500;">${escapeHtml(load.brokerName || '—')}</td>
+            <td style="padding:12px;color:#475569;font-size:12px;">${escapeHtml(load.dispatcherName || '—')}</td>
+            <td style="padding:12px;color:#475569;">${escapeHtml(formatCityState(load.pickup))}</td>
+            <td style="padding:12px;color:#475569;">${escapeHtml(formatCityState(load.dropoff))}</td>
+            <td style="padding:12px;color:#0f172a;font-weight:600;">${load.brokerRate ? '$'+Number(load.brokerRate).toLocaleString() : '—'}</td>
+            <td style="padding:12px;"><span class="${stClass}" style="padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;">${escapeHtml(load.status || 'Pending')}</span></td>
+            <td style="padding:12px;color:#475569;">${escapeHtml(load.eta || '—')}</td>
+            <td style="padding:12px;color:#64748b;font-size:12px;">${load.systemDate ? timeAgo(load.systemDate) : '—'}</td>
+            <td style="padding:12px;text-align:right;">
+              <button class="btn btn-primary" style="padding:6px 12px;font-size:12px;" onclick="event.stopPropagation();openLoadModal('${escapeAttr(load.id)}')">View</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     function renderDashboard() {
       // 1. Calculate Real Dynamic KPIs
       const allDrivers = visibleDrivers();
@@ -1906,6 +2113,11 @@
         const curVal = select ? select.value : 'driver-1';
         onTrackingDriverChanged(curVal);
       }, 200);
+
+      // Render new Dashboard Extensions
+      renderLiveDashboardMap();
+      renderDashboardNotifications();
+      renderRecentLoadsCenter();
     }
 
     /* ---- KPI SHORTCUT DIALOGS & ACTION HANDLERS ---- */
@@ -2032,6 +2244,48 @@
             </div>
             <div style="text-align:right;">
               <span style="background:#ffedd5;color:#ea580c;font-weight:700;font-size:11px;padding:3px 9px;border-radius:10px;">Delivering Today</span>
+              <div style="font-size:11px;color:var(--brand);margin-top:6px;font-weight:600;">Open Load →</div>
+            </div>
+          </div>`;
+        });
+      }
+      html += `</div>`;
+      document.getElementById('kpi-modal-body').innerHTML = html;
+      openModal('modal-kpi-detail');
+    }
+
+    function openKpiWeeklyGross() {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      
+      const loads = visibleLoads().filter(l => {
+        if (!l.systemDate) return false;
+        const d = new Date(l.systemDate + 'T00:00:00');
+        return d >= weekStart;
+      });
+      
+      const totalRev = loads.reduce((sum, l) => sum + (Number(l.brokerRate) || 0), 0);
+      
+      document.getElementById('kpi-modal-title').innerHTML = `💰 Weekly Gross Revenue (${loads.length} Loads)`;
+      
+      let html = `<div style="display:flex;flex-direction:column;gap:10px;">`;
+      html += `<div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;margin-bottom:12px;border:1px solid #e2e8f0;">
+                 <div style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:1px;">7-Day Gross</div>
+                 <div style="font-size:28px;font-weight:800;color:#0f172a;margin-top:4px;">${money(totalRev)}</div>
+               </div>`;
+               
+      if (!loads.length) {
+        html += `<div style="text-align:center;padding:24px;color:var(--text-dim);">No revenue recorded in the last 7 days.</div>`;
+      } else {
+        loads.forEach(l => {
+          html += `
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color 0.15s ease;" onmouseenter="this.style.borderColor='var(--brand)'" onmouseleave="this.style.borderColor='var(--border)'" onclick="closeModal('modal-kpi-detail');openLoadModal('${l.id}')">
+            <div>
+              <div style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:3px;">Load #${escapeAttr(l.loadNumber)}</div>
+              <div style="font-size:12px;color:var(--text-dim);">Driver: <b>${escapeAttr(l.driverName || '—')}</b> · Completed: ${escapeAttr(l.systemDate || '—')}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-weight:800;font-size:15px;color:#16a34a;">${money(l.brokerRate)}</div>
               <div style="font-size:11px;color:var(--brand);margin-top:6px;font-weight:600;">Open Load →</div>
             </div>
           </div>`;
