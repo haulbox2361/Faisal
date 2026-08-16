@@ -1,9 +1,11 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:battery_plus/battery_plus.dart';
+import '../network/api_client.dart';
 
 enum LocationPermissionState { granted, denied, restricted, undetermined }
-
 enum EtaRiskLevel { onTime, runningLate, delayed, stale }
 
 class DriverLocationUpdate {
@@ -42,8 +44,8 @@ class LocationService {
   LocationService._internal();
 
   bool _isTracking = false;
-  Timer? _trackingTimer;
-  LocationPermissionState _permissionState = LocationPermissionState.granted;
+  StreamSubscription<Position>? _positionStream;
+  LocationPermissionState _permissionState = LocationPermissionState.undetermined;
 
   final StreamController<DriverLocationUpdate> _locationController =
       StreamController<DriverLocationUpdate>.broadcast();
@@ -52,116 +54,157 @@ class LocationService {
   bool get isTracking => _isTracking;
   LocationPermissionState get permissionState => _permissionState;
 
+  final Battery _battery = Battery();
+  String? _currentLoadId;
+  String? _currentToken;
+
   Future<bool> requestLocationPermission() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _permissionState = LocationPermissionState.denied;
+      return false;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _permissionState = LocationPermissionState.denied;
+        return false;
+      }
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      _permissionState = LocationPermissionState.denied;
+      return false;
+    }
+
     _permissionState = LocationPermissionState.granted;
     return true;
   }
 
-  /// Starts GPS tracking session with automated battery & network optimization:
-  /// - High frequency (4s - 8s) when in active motion (> 25 mph)
-  /// - Low power / eco mode (20s - 30s) when stationary or idling
-  /// - Automated ETA and delay detection
-  /// - Geofence arrival detection for pickup and delivery
-  void startTripTracking({
+  Future<void> startTripTracking({
     required String loadId,
-    required int initialMiles,
-    DateTime? appointmentDeliveryTime,
-    VoidCallback? onGeofenceReached,
-    VoidCallback? onPickupArrived,
-    VoidCallback? onDeliveryArrived,
-  }) {
+    required String token,
+  }) async {
     if (_isTracking) return;
+
+    final hasPermission = await requestLocationPermission();
+    if (!hasPermission) return;
+
     _isTracking = true;
+    _currentLoadId = loadId;
+    _currentToken = token;
 
-    int remaining = initialMiles > 0 ? initialMiles : 450;
-    _trackingTimer?.cancel();
+    try {
+      final initialPos = await Geolocator.getCurrentPosition();
+      _handleNewPosition(initialPos);
+    } catch (_) {}
 
-    // Baseline coordinates (e.g. starting around Dallas / Midwest freight corridor)
-    double currentLat = 32.7767;
-    double currentLng = -96.7970;
-    double currentSpeed = 62.5;
+    final locationSettings = const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 50, // Update every 50 meters
+    );
 
-    _trackingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+    _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings)
+        .listen((Position position) {
+      _handleNewPosition(position);
+    });
+    
+    Timer.periodic(const Duration(minutes: 5), (timer) async {
       if (!_isTracking) {
         timer.cancel();
         return;
       }
-
-      // Step-down simulation (moves towards destination)
-      if (remaining > 5) {
-        remaining -= 4;
-        currentLat += 0.004;
-        currentLng -= 0.003;
-        currentSpeed = 62.5;
-        if (remaining < 5) remaining = 0;
-      } else {
-        remaining = 0;
-        currentSpeed = 0.0;
-      }
-
-      // Calculate ETA (assuming 55 mph average speed + mandatory breaks)
-      final drivingHours = remaining / 55.0;
-      final breakHours = (drivingHours / 8.0).floor();
-      final totalHours = drivingHours + breakHours;
-      final etaDateTime = DateTime.now().add(Duration(minutes: (totalHours * 60).round()));
-
-      // Format ETA display string
-      final now = DateTime.now();
-      String etaStr;
-      if (etaDateTime.day == now.day && etaDateTime.month == now.month) {
-        etaStr = 'Today ${DateFormat('h:mm a').format(etaDateTime)}';
-      } else if (etaDateTime.day == now.day + 1 && etaDateTime.month == now.month) {
-        etaStr = 'Tomorrow ${DateFormat('h:mm a').format(etaDateTime)}';
-      } else {
-        etaStr = DateFormat('MMM d, h:mm a').format(etaDateTime);
-      }
-
-      // Detect Delays vs Scheduled Appointment
-      EtaRiskLevel risk = EtaRiskLevel.onTime;
-      String badge = '🟢 On Time';
-
-      if (appointmentDeliveryTime != null) {
-        final diffMinutes = etaDateTime.difference(appointmentDeliveryTime).inMinutes;
-        if (diffMinutes > 30) {
-          risk = EtaRiskLevel.delayed;
-          badge = '🔴 Delayed (+${diffMinutes}m)';
-        } else if (diffMinutes > 0) {
-          risk = EtaRiskLevel.runningLate;
-          badge = '🟡 Running Late (+${diffMinutes}m)';
-        }
-      }
-
-      final isAtDelivery = remaining <= 0;
-      final isAtPickup = remaining >= (initialMiles - 2);
-
-      final update = DriverLocationUpdate(
-        latitude: currentLat,
-        longitude: currentLng,
-        speedMph: currentSpeed,
-        heading: 45.0,
-        timestamp: DateTime.now(),
-        milesRemaining: remaining,
-        etaText: etaStr,
-        etaDateTime: etaDateTime,
-        riskLevel: risk,
-        riskBadge: badge,
-        isNearPickup: isAtPickup,
-        isNearDelivery: isAtDelivery,
-      );
-
-      _locationController.add(update);
-
-      if (isAtDelivery) {
-        onGeofenceReached?.call();
-        onDeliveryArrived?.call();
-      }
+      try {
+        final pos = await Geolocator.getCurrentPosition();
+        _handleNewPosition(pos);
+      } catch (_) {}
     });
+  }
+
+  EtaRiskLevel _parseRiskLevel(String? riskCode) {
+    if (riskCode == 'DELAYED') return EtaRiskLevel.delayed;
+    if (riskCode == 'RUNNING_LATE') return EtaRiskLevel.runningLate;
+    if (riskCode == 'STALE') return EtaRiskLevel.stale;
+    return EtaRiskLevel.onTime;
+  }
+
+  Future<void> _handleNewPosition(Position position) async {
+    if (_currentToken == null || !_isTracking) return;
+
+    int? batteryLevel;
+    try {
+      batteryLevel = await _battery.batteryLevel;
+    } catch (_) {}
+
+    final speedMph = position.speed * 2.23694;
+
+    final data = {
+      'latitude': position.latitude,
+      'longitude': position.longitude,
+      'speed': speedMph,
+      'heading': position.heading,
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+      'batteryLevel': batteryLevel,
+      'loadId': _currentLoadId,
+    };
+
+    final response = await ApiClient.updateLocation(_currentToken!, data);
+    
+    if (response == null) {
+      await _cacheLocationOffline(data);
+    } else {
+      await _syncOfflineLocations();
+
+      final tracking = response['tracking'];
+      if (tracking != null) {
+        final update = DriverLocationUpdate(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          speedMph: speedMph,
+          heading: position.heading,
+          timestamp: DateTime.now(),
+          milesRemaining: tracking['milesRemaining']?.toInt() ?? 0,
+          etaText: (tracking['milesToPickup'] != null && tracking['milesToPickup'] > 0) 
+            ? tracking['etaPickupText'] ?? '' 
+            : tracking['etaDeliveryText'] ?? '',
+          etaDateTime: DateTime.tryParse(tracking['etaDeliveryIso'] ?? '') ?? DateTime.now(),
+          riskLevel: _parseRiskLevel(tracking['risk']?['riskCode']),
+          riskBadge: tracking['risk']?['badge'] ?? '🟢 On Time',
+          isNearPickup: (tracking['milesToPickup'] != null && tracking['milesToPickup'] <= 0.3),
+          isNearDelivery: (tracking['milesToDelivery'] != null && tracking['milesToDelivery'] <= 0.3),
+        );
+        _locationController.add(update);
+      }
+    }
+  }
+
+  Future<void> _cacheLocationOffline(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getStringList('offline_locations') ?? [];
+    cached.add(jsonEncode(data));
+    await prefs.setStringList('offline_locations', cached);
+  }
+
+  Future<void> _syncOfflineLocations() async {
+    if (_currentToken == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getStringList('offline_locations') ?? [];
+    if (cached.isEmpty) return;
+
+    List<Map<String, dynamic>> toSync = cached.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+    final success = await ApiClient.syncOfflineLocations(_currentToken!, toSync);
+    if (success) {
+      await prefs.remove('offline_locations');
+    }
   }
 
   void stopTripTracking() {
     _isTracking = false;
-    _trackingTimer?.cancel();
-    _trackingTimer = null;
+    _positionStream?.cancel();
+    _positionStream = null;
+    _currentLoadId = null;
   }
 
   void dispose() {

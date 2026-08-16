@@ -383,6 +383,16 @@
           </svg>
           Payments
         </div>
+        <div class="nav-item" data-view="docreview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+          Doc Review <span class="badge" id="doc-review-badge" style="display:none;margin-left:auto;background:#f59e0b;color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;">0</span>
+        </div>
         <div class="nav-item" data-view="statistics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 19V9M12 19V5M20 19v-7" />
@@ -400,7 +410,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3" />
             <path
-              d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z" />
+              d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z" />
           </svg>
           Settings
         </div>
@@ -938,6 +948,43 @@
               </svg>
               <h4 style="font-size:15px;font-weight:700;color:#334155;margin:0 0 6px;">No loads match this filter</h4>
               <p style="color:#94a3b8;font-size:13px;margin:0;">Try selecting a different status or clearing the search.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ DOCUMENT REVIEW CENTER ============ -->
+        <section class="view" id="view-docreview">
+          <div class="toolbar" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="font-size:18px;font-weight:700;color:#0f172a;">Document Review Center</div>
+            <div style="font-size:13px;color:#64748b;">Review and approve driver-uploaded documents. Only approved documents are uploaded to Google Drive.</div>
+          </div>
+
+          <!-- Status Tabs -->
+          <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid #e2e8f0;padding-bottom:12px;">
+            <button id="docreview-tab-pending" onclick="setDocReviewTab('pending')" class="btn" style="background:#f59e0b;color:#fff;font-weight:700;border:none;">⏳ Pending</button>
+            <button id="docreview-tab-approved" onclick="setDocReviewTab('approved')" class="btn btn-ghost" style="font-weight:700;">✅ Approved</button>
+            <button id="docreview-tab-rejected" onclick="setDocReviewTab('rejected')" class="btn btn-ghost" style="font-weight:700;">❌ Rejected</button>
+          </div>
+
+          <div class="panel" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);">
+            <div class="table-wrap">
+              <table class="data" id="docreview-table" style="width:100%;">
+                <thead>
+                  <tr>
+                    <th style="padding:12px;">Document Type</th>
+                    <th style="padding:12px;">Driver Name</th>
+                    <th style="padding:12px;">Load Number</th>
+                    <th style="padding:12px;">Upload Date</th>
+                    <th style="padding:12px;">Status</th>
+                    <th style="padding:12px;text-align:center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="docreview-body"></tbody>
+              </table>
+            </div>
+            <div id="docreview-empty" style="display:none;padding:48px 32px;text-align:center;">
+              <h4 style="font-size:15px;font-weight:700;color:#334155;margin:0 0 6px;">No documents in this category</h4>
+              <p style="color:#94a3b8;font-size:13px;margin:0;">Documents uploaded by drivers will appear here for review.</p>
             </div>
           </div>
         </section>

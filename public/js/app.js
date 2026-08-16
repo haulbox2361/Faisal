@@ -749,6 +749,7 @@
       if (view === 'settings') renderSettings();
       if (view === 'chat') { if (typeof initWaChat === 'function') initWaChat(); else loadMainChat(); }
       if (view === 'addload') showLoadStep(1);
+      if (view === 'docreview') { setDocReviewTab(_docReviewTab || 'pending'); }
     }
     document.getElementById('mainnav').addEventListener('click', e => {
       const item = e.target.closest('.nav-item');
@@ -3342,7 +3343,145 @@
     }
 
 
+    /* ================= DOCUMENT REVIEW CENTER ================= */
+    let _docReviewTab = 'pending';
+
+    function setDocReviewTab(tab) {
+      _docReviewTab = tab;
+      ['pending', 'approved', 'rejected'].forEach(t => {
+        const btn = document.getElementById(`docreview-tab-${t}`);
+        if (!btn) return;
+        if (t === tab) {
+          btn.style.background = t === 'pending' ? '#f59e0b' : t === 'approved' ? '#16a34a' : '#dc2626';
+          btn.style.color = '#fff';
+        } else {
+          btn.style.background = '';
+          btn.style.color = '';
+        }
+      });
+      renderDocReview();
+    }
+
+    function renderDocReview() {
+      const body = document.getElementById('docreview-body');
+      const empty = document.getElementById('docreview-empty');
+      if (!body) return;
+
+      const loads = STATE.loads || [];
+      const docTypes = ['BOL', 'POD', 'RC'];
+      const rows = [];
+
+      loads.forEach(load => {
+        const docs = load.docs || load.documents || {};
+        docTypes.forEach(docType => {
+          const doc = docs[docType];
+          if (!doc || (!doc.name && !doc.fileName)) return;
+
+          const docStatus = doc.status || 'Pending Verification';
+          const statusNorm = docStatus.toLowerCase();
+          let matchesTab = false;
+          if (_docReviewTab === 'pending') matchesTab = statusNorm.includes('pending');
+          else if (_docReviewTab === 'approved') matchesTab = statusNorm === 'approved';
+          else if (_docReviewTab === 'rejected') matchesTab = statusNorm === 'rejected';
+          if (!matchesTab) return;
+
+          const uploadedAt = doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString() : '—';
+          const statusColor = statusNorm.includes('pending') ? '#f59e0b' : statusNorm === 'approved' ? '#16a34a' : '#dc2626';
+          const statusLabel = doc.status || 'Pending Verification';
+
+          let actionHtml = '';
+          if (_docReviewTab === 'pending') {
+            actionHtml = `
+              <div style="display:flex;gap:8px;justify-content:center;">
+                <button class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="reviewDocument('${escapeAttr(load.id)}','${docType}','approve','')">Approve</button>
+                <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="openDocRejectModal('${escapeAttr(load.id)}','${docType}')">Reject</button>
+              </div>`;
+          } else if (_docReviewTab === 'rejected') {
+            actionHtml = `
+              <div style="font-size:11px;color:#dc2626;font-style:italic;max-width:200px;">${escapeAttr(doc.rejectionReason || 'No reason provided')}</div>`;
+          } else {
+            actionHtml = `<span style="color:#16a34a;font-size:13px;">✓ Approved</span>`;
+          }
+
+          rows.push(`
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:12px;font-weight:700;color:#0f172a;">${escapeAttr(docType)}</td>
+              <td style="padding:12px;color:#475569;">${escapeAttr(load.driverName || '—')}</td>
+              <td style="padding:12px;color:#475569;font-weight:600;">#${escapeAttr(load.loadNumber || load.id)}</td>
+              <td style="padding:12px;color:#64748b;font-size:12px;">${uploadedAt}</td>
+              <td style="padding:12px;"><span style="background:${statusColor}20;color:${statusColor};padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700;">${escapeAttr(statusLabel)}</span></td>
+              <td style="padding:12px;">${actionHtml}</td>
+            </tr>`);
+        });
+      });
+
+      // Update pending badge count
+      let pendingCount = 0;
+      loads.forEach(load => {
+        const docs = load.docs || load.documents || {};
+        ['BOL','POD','RC'].forEach(dt => {
+          const d = docs[dt];
+          if (d && (d.name || d.fileName)) {
+            const st = (d.status || 'Pending').toLowerCase();
+            if (st.includes('pending')) pendingCount++;
+          }
+        });
+      });
+      const badge = document.getElementById('doc-review-badge');
+      if (badge) {
+        badge.textContent = pendingCount;
+        badge.style.display = pendingCount > 0 ? 'inline' : 'none';
+      }
+
+      if (rows.length === 0) {
+        body.innerHTML = '';
+        if (empty) empty.style.display = '';
+      } else {
+        body.innerHTML = rows.join('');
+        if (empty) empty.style.display = 'none';
+      }
+    }
+
+    async function reviewDocument(loadId, docKey, action, rejectionReason) {
+      try {
+        const resp = await fetch('/api/documents/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ loadId, docKey, action, rejectionReason }),
+        });
+        const data = resp.ok ? await resp.json() : null;
+        if (data && data.ok) {
+          // Optimistically update the local STATE
+          const load = (STATE.loads || []).find(l => l.id === loadId);
+          if (load) {
+            const docs = load.docs || load.documents || {};
+            if (docs[docKey]) {
+              docs[docKey].status = action === 'approve' ? 'Approved' : 'Rejected';
+              docs[docKey].rejectionReason = rejectionReason || null;
+            }
+          }
+          renderDocReview();
+          toast(
+            action === 'approve' ? `${docKey} Approved` : `${docKey} Rejected`,
+            action === 'approve' ? 'Document sent to Google Drive.' : 'Driver has been notified.',
+            action === 'approve'
+          );
+        } else {
+          toast('Review Failed', 'Could not update document status. Please try again.', false);
+        }
+      } catch (e) {
+        toast('Network Error', 'Failed to reach server. Please try again.', false);
+      }
+    }
+
+    function openDocRejectModal(loadId, docKey) {
+      const reason = prompt(`Enter rejection reason for ${docKey}:`);
+      if (reason === null) return;
+      reviewDocument(loadId, docKey, 'reject', reason || 'No reason provided');
+    }
+
     /* ================= LOAD BOARD ================= */
+
     const LB_TABS = [
       'All Loads',
       'Booked',

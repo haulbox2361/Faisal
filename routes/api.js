@@ -654,7 +654,7 @@ router.post('/api/webhook-sync', async (req, res) => {
 router.get('/api/tracking/live', async (req, res) => {
   try {
     const stateBlob = await kv.get('haulline:state');
-    const state = stateBlob || {};
+    const state = typeof stateBlob === 'string' ? JSON.parse(stateBlob) : (stateBlob || {});
     const loads = state.loads || [];
     const role = String(req.query.role || 'admin').toLowerCase();
     const userId = String(req.query.userId || '').trim();
@@ -689,6 +689,130 @@ router.get('/api/tracking/live', async (req, res) => {
   } catch (e) {
     console.error('tracking/live failed:', e);
     res.status(500).json({ error: e.message || 'Failed to fetch live tracking' });
+  }
+});
+
+// POST /api/documents/review
+// Enforces document approval workflow: Pending Verification -> Approved or Rejected.
+// Approved documents are pushed to Google Drive and transition load status.
+router.post('/api/documents/review', async (req, res) => {
+  const { loadId, docKey, action, rejectionReason } = req.body || {};
+  if (!loadId || !docKey || !action) {
+    return res.status(400).json({ error: 'Missing loadId, docKey, or action' });
+  }
+
+  try {
+    const raw = await kv.get('haulline:state');
+    const state = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+    const loads = state.loads || [];
+    const load = loads.find(l => String(l.id) === String(loadId));
+    if (!load) return res.status(404).json({ error: 'Load not found' });
+
+    load.docs = load.docs || {};
+    const doc = load.docs[docKey];
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    const nowIso = new Date().toISOString();
+    const notifications = require('../lib/notificationStore');
+
+    if (action === 'approve') {
+      doc.status = 'Approved';
+      doc.rejectionReason = null;
+
+      // Push to Google Drive
+      if (['BOL', 'POD', 'RC'].includes(docKey)) {
+        try {
+          const folderId = driveStore.folderIdFor(docKey);
+          const fileName = driveStore.buildFileName(docKey, {
+            loadNumber: load.loadNumber,
+            driverName: load.driverName || 'Driver',
+            pickup: load.pickup,
+            dropoff: load.dropoff,
+            pickupDate: load.pickupDate,
+            originalName: doc.name || doc.fileName || `${docKey}.pdf`,
+          });
+
+          // Check for duplicate uploads
+          const adminRecord = await store.get('admin');
+          if (adminRecord) {
+            const auth = clientForAccount(adminRecord, store, 'admin');
+            const duplicate = await driveStore.findExistingInFolder(auth, folderId, fileName);
+            
+            if (!duplicate) {
+              const rawBase64 = doc.data ? doc.data.split(',').slice(1).join(',') : '';
+              if (rawBase64) {
+                const result = await driveStore.uploadToFolder(auth, {
+                  folderId,
+                  fileName,
+                  mimeType: 'application/octet-stream',
+                  base64Data: rawBase64,
+                });
+
+                await driveStore.recordUpload({
+                  loadId: load.id,
+                  driverId: load.driverId,
+                  docType: docKey,
+                  driveFileId: result.fileId,
+                  fileName,
+                  folderId,
+                  webViewLink: result.webViewLink,
+                  uploadedBy: 'admin',
+                });
+              }
+            }
+          }
+        } catch (driveErr) {
+          console.error(`Google Drive upload for ${docKey} failed:`, driveErr.message);
+        }
+      }
+
+      // Automated Workflow Transition on Approval
+      if (docKey === 'BOL') {
+        load.driverProgress = 'LOADED';
+        load.timestamps = load.timestamps || {};
+        load.timestamps.loadedAt = nowIso;
+        load.status = 'Loaded';
+      } else if (docKey === 'POD') {
+        load.driverProgress = 'DELIVERED';
+        load.timestamps = load.timestamps || {};
+        load.timestamps.deliveredAt = nowIso;
+        load.status = 'Delivered';
+      }
+
+      // Dispatcher Notification
+      const notifPayload = {
+        type: 'document_approved',
+        title: `Document Approved`,
+        body: `${docKey} for Load #${load.loadNumber || load.id} has been approved.`,
+        data: { loadId: load.id, key: docKey },
+      };
+      if (load.driverId) {
+        await notifications.create('driver', load.driverId, notifPayload);
+      }
+
+    } else if (action === 'reject') {
+      doc.status = 'Rejected';
+      doc.rejectionReason = rejectionReason || 'Rejected by dispatcher/admin';
+
+      const notifPayload = {
+        type: 'document_rejected',
+        title: `Document Rejected`,
+        body: `${docKey} for Load #${load.loadNumber || load.id} was rejected. Reason: ${doc.rejectionReason}`,
+        data: { loadId: load.id, key: docKey, rejectionReason: doc.rejectionReason },
+      };
+      if (load.driverId) {
+        await notifications.create('driver', load.driverId, notifPayload);
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid action. Must be approve or reject' });
+    }
+
+    await kv.set('haulline:state', JSON.stringify(state));
+    res.json({ ok: true, load });
+
+  } catch (e) {
+    console.error('Document review failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to review document' });
   }
 });
 

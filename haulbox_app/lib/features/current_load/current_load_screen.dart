@@ -555,37 +555,11 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> with SingleTicker
       _riskBadge = '🟢 On Time';
     });
 
+    final token = Provider.of<AuthProvider>(context, listen: false).token ?? '';
+
     LocationService().startTripTracking(
       loadId: load.id,
-      initialMiles: _milesRemaining,
-      onPickupArrived: () {
-        if (mounted && _workflowState == LoadWorkflowState.goingToPickup) {
-          setState(() {
-            _workflowState = LoadWorkflowState.arrivedPickup;
-            _milesRemaining = 0;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('📍 Geofence Detected: Arrived at Pickup Facility! Status: AT PICKUP.'),
-              backgroundColor: Color(0xFFD97706),
-            ),
-          );
-        }
-      },
-      onDeliveryArrived: () {
-        if (mounted && _workflowState == LoadWorkflowState.inTransit) {
-          setState(() {
-            _workflowState = LoadWorkflowState.arrivedDelivery;
-            _milesRemaining = 0;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('📍 Geofence Detected: Arrived at Delivery Destination! Status: AT DELIVERY.'),
-              backgroundColor: Color(0xFFD97706),
-            ),
-          );
-        }
-      },
+      token: token,
     );
 
     _locationSub?.cancel();
@@ -946,24 +920,12 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> with SingleTicker
         _milesRemaining = 118;
       });
 
+      final token = Provider.of<AuthProvider>(context, listen: false).token ?? '';
+      
       // Track to Delivery
       LocationService().startTripTracking(
         loadId: load.id,
-        initialMiles: 118,
-        onGeofenceReached: () {
-          if (mounted) {
-            setState(() {
-              _workflowState = LoadWorkflowState.arrivedDelivery;
-              _milesRemaining = 0;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Arrived at Delivery Facility! Upload signed POD to finalize.'),
-                backgroundColor: AppColors.emeraldPrimary,
-              ),
-            );
-          }
-        },
+        token: token,
       );
 
       _locationSub?.cancel();

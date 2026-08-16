@@ -754,24 +754,45 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
 
   const { status, note } = req.body || {};
   const checkpoint = String(status || '').trim().toUpperCase();
-  if (!DRIVER_CHECKPOINTS.includes(checkpoint)) {
-    return res.status(400).json({ error: 'Invalid status. Must be one of: ' + DRIVER_CHECKPOINTS.join(', ') });
-  }
 
   const { state, driver } = ctx;
   const load = (state.loads || []).find((l) => l.id === req.params.id && l.driverId === driver.id);
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
-  // Validation rules
-  const docs = load.docs || load.documents || {};
-  const hasBol = !!(docs.BOL && (docs.BOL.hasFile || docs.BOL.name || docs.BOL.data));
-  const hasPod = !!(docs.POD && (docs.POD.hasFile || docs.POD.name || docs.POD.data));
+  const STATUS_SEQUENCE = [
+    'ASSIGNED',
+    'ACCEPTED',
+    'AT_PICKUP',
+    'LOADED',
+    'IN_TRANSIT',
+    'AT_DELIVERY',
+    'DELIVERED',
+    'POD_UPLOADED',
+    'PAID',
+    'PAID_CONFIRMED'
+  ];
 
-  if (checkpoint === 'LOADED' && !hasBol) {
-    return res.status(400).json({ error: 'BOL document upload is required before marking as Loaded.' });
+  const currentProgress = String(load.driverProgress || 'ASSIGNED').trim().toUpperCase();
+  const currentIdx = STATUS_SEQUENCE.indexOf(currentProgress);
+  const nextIdx = STATUS_SEQUENCE.indexOf(checkpoint);
+
+  if (currentIdx === -1 || nextIdx === -1) {
+    return res.status(400).json({ error: 'Invalid load status sequence.' });
   }
-  if (checkpoint === 'COMPLETED' && !hasPod) {
-    return res.status(400).json({ error: 'POD document upload is required before marking as Completed.' });
+
+  if (nextIdx !== currentIdx + 1) {
+    return res.status(400).json({ error: `Cannot skip stages. Next status must be ${STATUS_SEQUENCE[currentIdx + 1]}. Current status is ${currentProgress}.` });
+  }
+
+  // Enforce driver-disallowed manual transitions (which are handled automatically)
+  if (checkpoint === 'LOADED') {
+    return res.status(400).json({ error: 'BOL document approval is required. The status updates automatically on approval.' });
+  }
+  if (checkpoint === 'POD_UPLOADED') {
+    return res.status(400).json({ error: 'POD upload is required. The status updates automatically on upload.' });
+  }
+  if (['PAID', 'PAID_CONFIRMED'].includes(checkpoint)) {
+    return res.status(400).json({ error: 'Payment status is updated by the dispatcher.' });
   }
 
   const nowIso = new Date().toISOString();
@@ -784,7 +805,7 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
   else if (checkpoint === 'IN_TRANSIT') { load.timestamps.inTransitAt = nowIso; load.status = 'In Transit'; }
   else if (checkpoint === 'AT_DELIVERY') load.timestamps.arrivedDoAt = nowIso;
   else if (checkpoint === 'POD_UPLOADED') load.timestamps.podUploadedAt = nowIso;
-  else if (checkpoint === 'COMPLETED') { load.timestamps.completedAt = nowIso; load.status = 'Completed'; }
+  else if (checkpoint === 'DELIVERED') { load.timestamps.deliveredAt = nowIso; load.status = 'Delivered'; }
 
   try {
     await saveFullState(state);
@@ -888,7 +909,15 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   load.timestamps = load.timestamps || {};
   const nowIso = new Date().toISOString();
   const isArray = ['PhotosPU', 'PhotosDO', 'Extra'].includes(key);
-  const rec = { name: fileName, fileName, data, uploadedAt: nowIso, uploadedBy: driver.name || driver.id };
+  const rec = { 
+    name: fileName, 
+    fileName, 
+    data, 
+    uploadedAt: nowIso, 
+    uploadedBy: driver.name || driver.id,
+    status: 'Pending Verification',
+    rejectionReason: null
+  };
 
   if (isArray) {
     const arr = (load.docs[key] = load.docs[key] || []);
@@ -904,14 +933,11 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   // Automatic Workflow Progress Transitions on Document Upload
   if (key === 'BOL') {
     load.timestamps.bolUploadedAt = nowIso;
-    load.driverProgress = 'IN_TRANSIT';
-    load.timestamps.inTransitAt = nowIso;
-    load.status = 'In Transit';
+    // Driver progress remains AT_PICKUP until Admin approves
   } else if (key === 'POD') {
     load.timestamps.podUploadedAt = nowIso;
-    load.driverProgress = 'COMPLETED';
-    load.timestamps.completedAt = nowIso;
-    load.status = 'Completed';
+    load.driverProgress = 'POD_UPLOADED';
+    load.status = 'POD Uploaded';
     const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
     if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
   }
@@ -923,55 +949,12 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     const notifPayload = {
       type: 'document_uploaded',
       title: `${driver.name || 'Driver'} uploaded ${key}`,
-      body: `Load #${load.loadNumber || load.id} — ${fileName}` + (key === 'POD' ? ' (Load Completed)' : ''),
+      body: `Load #${load.loadNumber || load.id} — ${fileName}` + (key === 'POD' ? ' (Pending Review)' : ' (Pending Review)'),
       data: { loadId: load.id, key },
     };
     await notifications.create('admin', 'admin', notifPayload);
     if (load.dispatcherId) {
       await notifications.create('dispatcher', load.dispatcherId, notifPayload);
-    }
-
-    // Auto-upload BOL and POD to Google Drive using the admin's connected
-    // account token (drivers have no Google OAuth account of their own).
-    // Fire-and-forget — never blocks the driver's response even on Drive errors.
-    if (['BOL', 'POD'].includes(key)) {
-      (async () => {
-        try {
-          const folderId = driveStore.folderIds()[key];
-          if (!folderId) return; // folder env var not configured — skip silently
-          const adminRecord = await store.get('admin');
-          if (!adminRecord) return; // admin not connected to Google — skip silently
-          const { clientForAccount: cfa } = require('../lib/googleClient');
-          const auth = cfa(adminRecord, store, 'admin');
-          const driveFileName = driveStore.buildFileName(key, {
-            loadNumber: load.loadNumber,
-            driverName: driver.name,
-            originalName: fileName,
-          });
-          const rawBase64 = rec.data ? rec.data.split(',').slice(1).join(',') : '';
-          if (!rawBase64) return;
-          const result = await driveStore.uploadToFolder(auth, {
-            folderId,
-            fileName: driveFileName,
-            mimeType: 'application/octet-stream',
-            base64Data: rawBase64,
-          });
-          if (!result.duplicate) {
-            await driveStore.recordUpload({
-              loadId: load.id,
-              driverId: driver.id,
-              docType: key,
-              driveFileId: result.fileId,
-              fileName: driveFileName,
-              folderId,
-              webViewLink: result.webViewLink,
-              uploadedBy: `driver:${driver.id}`,
-            });
-          }
-        } catch (driveErr) {
-          console.error(`driver ${key} Drive upload failed (non-blocking):`, driveErr.message);
-        }
-      })();
     }
 
     res.json({ ok: true, load: shapeLoadForDriver(load) });

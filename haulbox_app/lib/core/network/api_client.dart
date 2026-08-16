@@ -298,9 +298,8 @@ class ApiClient {
     return null;
   }
 
-  // 12. Send GPS Location
-  static Future<bool> sendLocation(String token, double latitude,
-      double longitude, double? speed, double? heading, String? loadId) async {
+  // 12. Send GPS Location (Single Update)
+  static Future<Map<String, dynamic>?> updateLocation(String token, Map<String, dynamic> locationData) async {
     final uri = Uri.parse('$baseUrl/api/driver/location');
     try {
       final response = await http.post(
@@ -309,14 +308,30 @@ class ApiClient {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'latitude': latitude,
-          'longitude': longitude,
-          'speed': speed,
-          'heading': heading,
-          'loadId': loadId,
-        }),
-      ).timeout(const Duration(seconds: 6));
+        body: jsonEncode(locationData),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // 13. Sync Offline Locations (Batch Update)
+  static Future<bool> syncOfflineLocations(String token, List<Map<String, dynamic>> locations) async {
+    final uri = Uri.parse('$baseUrl/api/driver/location/sync');
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'locations': locations}),
+      ).timeout(const Duration(seconds: 15));
 
       return response.statusCode == 200;
     } catch (_) {
