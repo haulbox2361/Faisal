@@ -3091,6 +3091,23 @@
       // Payment stages are an Admin concern — dispatchers just see the load pipeline.
       return STATE.role === 'admin' ? LB_TABS.concat(PAYMENT_STAGES) : LB_TABS;
     }
+    function populateLoadBoardFilters() {
+      const dispSelect = document.getElementById('loadboard-dispatcher-filter');
+      if (dispSelect) {
+        const curVal = dispSelect.value;
+        dispSelect.innerHTML = '<option value="">All Dispatchers</option>' +
+          (STATE.dispatchers || []).map(d => `<option value="${escapeAttr(d.id)}">${escapeHtml(d.name)}</option>`).join('');
+        if (curVal) dispSelect.value = curVal;
+      }
+      const drvSelect = document.getElementById('loadboard-driver-filter');
+      if (drvSelect) {
+        const curVal = drvSelect.value;
+        drvSelect.innerHTML = '<option value="">All Drivers</option>' +
+          (STATE.drivers || []).map(d => `<option value="${escapeAttr(d.id)}">${escapeHtml(d.name)}</option>`).join('');
+        if (curVal) drvSelect.value = curVal;
+      }
+    }
+
     function renderLoadBoardTabs() {
       const el = document.getElementById('loadboard-tabs');
       if (!el) return;
@@ -3098,16 +3115,37 @@
         const saved = SessionManager.loadUiState();
         if (saved && saved.loadFilter) STATE.loadFilter = saved.loadFilter;
       }
-      el.innerHTML = loadBoardTabs().map(t =>
-        '<button class="tab-btn' + (STATE.loadFilter === t ? ' active' : '') + '" onclick="setLoadFilter(\'' + t + '\')">' + t + '</button>'
-      ).join('');
+      if (!STATE.loadFilter) STATE.loadFilter = 'All Loads';
+
+      const allLoads = visibleLoads();
+      const selDisp = document.getElementById('loadboard-dispatcher-filter') ? document.getElementById('loadboard-dispatcher-filter').value : '';
+      const selDrv = document.getElementById('loadboard-driver-filter') ? document.getElementById('loadboard-driver-filter').value : '';
+      const filteredByDropdowns = allLoads.filter(l => {
+        if (selDisp && String(l.dispatcherId) !== String(selDisp)) return false;
+        if (selDrv && String(l.driverId) !== String(selDrv)) return false;
+        return true;
+      });
+
+      el.innerHTML = loadBoardTabs().map(t => {
+        const count = filteredByDropdowns.filter(l => matchesFilter(l, t)).length;
+        const isActive = (STATE.loadFilter === t);
+        const activeBg = isActive ? 'background:#2563eb;color:#ffffff;border-color:#2563eb;' : 'background:#ffffff;color:#334155;border-color:#cbd5e1;';
+        const badgeBg = isActive ? 'rgba(255,255,255,0.25)' : '#f1f5f9';
+        const badgeColor = isActive ? '#ffffff' : '#64748b';
+
+        return `<button class="tab-btn${isActive ? ' active' : ''}" onclick="setLoadFilter('${escapeAttr(t)}')"
+          style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid;transition:all 0.15s ease;${activeBg}">
+          <span>${escapeHtml(t)}</span>
+          <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:12px;background:${badgeBg};color:${badgeColor};">${count}</span>
+        </button>`;
+      }).join('');
     }
+
     function setLoadFilter(t) {
       STATE.loadFilter = t;
       if (typeof SessionManager !== 'undefined') {
         SessionManager.saveUiState({ loadFilter: t });
       }
-      renderLoadBoardTabs();
       renderLoadBoard();
     }
 
@@ -3120,9 +3158,10 @@
       if (fl === 'pending rc') return st === 'pending rc';
       if (fl === 'booked') return st === 'booked' || st === 'accepted' || prog === 'accepted';
       if (fl === 'loaded') return st === 'loaded' || st === 'in transit' || prog === 'loaded' || prog === 'in_transit' || prog === 'at_pickup';
-      if (fl === 'drop-off') return st === 'drop-off' || st === 'delivered' || st === 'pod uploaded' || prog === 'at_delivery' || prog === 'delivered' || prog === 'completed' || prog === 'pod_uploaded';
+      if (fl === 'drop-off' || fl === 'delivered') return st === 'drop-off' || st === 'delivered' || st === 'pod uploaded' || prog === 'at_delivery' || prog === 'delivered' || prog === 'completed' || prog === 'pod_uploaded';
       return st === fl;
     }
+
     function clearLoadBoardDateRange() {
       const from = document.getElementById('lb-date-from');
       const to = document.getElementById('lb-date-to');
@@ -3130,6 +3169,7 @@
       if (to) to.value = '';
       renderLoadBoard();
     }
+
     /* Correctly checks the chosen date field (System/Pickup/Delivery) against an inclusive from/to range. */
     function inDateRange(dateStr, from, to) {
       if (!from && !to) return true;
@@ -3151,13 +3191,22 @@
     }
 
     function renderLoadBoard() {
+      populateLoadBoardFilters();
+      renderLoadBoardTabs();
+
       const q = (document.getElementById('loadboard-search') ? document.getElementById('loadboard-search').value : '').toLowerCase();
       const currentFilter = STATE.loadFilter || 'All Loads';
+      const selDisp = document.getElementById('loadboard-dispatcher-filter') ? document.getElementById('loadboard-dispatcher-filter').value : '';
+      const selDrv = document.getElementById('loadboard-driver-filter') ? document.getElementById('loadboard-driver-filter').value : '';
+
       const rows = visibleLoads().filter(l => {
         if (!matchesFilter(l, currentFilter)) return false;
+        if (selDisp && String(l.dispatcherId) !== String(selDisp)) return false;
+        if (selDrv && String(l.driverId) !== String(selDrv)) return false;
         if (!q) return true;
         return [l.loadNumber, l.driverName, l.pickup, l.dropoff, l.dispatcherName].join(' ').toLowerCase().includes(q);
       });
+
       const body = document.getElementById('loadboard-body');
       const emptyEl = document.getElementById('loadboard-empty');
       if (emptyEl) emptyEl.style.display = rows.length ? 'none' : 'block';
