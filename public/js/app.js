@@ -737,7 +737,7 @@
 
 
       if (view === 'dashboard') renderDashboard();
-      if (view === 'loadboard') renderLoadBoard();
+      if (view === 'loadboard') { renderLoadBoardTabs(); renderLoadBoard(); }
       if (view === 'drivers') renderDrivers();
       if (view === 'driverpay') renderDriverPay();
       if (view === 'brokers') renderBrokers();
@@ -3112,9 +3112,16 @@
     }
 
     function matchesFilter(load, filter) {
-      if (filter === 'All Loads') return true;
+      if (!filter || filter === 'All Loads') return true;
       if (PAYMENT_STAGES.includes(filter)) return paymentOf(load) === filter;
-      return load.status === filter;
+      const st = String(load.status || '').toLowerCase().trim();
+      const fl = String(filter).toLowerCase().trim();
+      const prog = String(load.driverProgress || '').toLowerCase().trim();
+      if (fl === 'pending rc') return st === 'pending rc';
+      if (fl === 'booked') return st === 'booked' || st === 'accepted' || prog === 'accepted';
+      if (fl === 'loaded') return st === 'loaded' || st === 'in transit' || prog === 'loaded' || prog === 'in_transit' || prog === 'at_pickup';
+      if (fl === 'drop-off') return st === 'drop-off' || st === 'delivered' || st === 'pod uploaded' || prog === 'at_delivery' || prog === 'delivered' || prog === 'completed' || prog === 'pod_uploaded';
+      return st === fl;
     }
     function clearLoadBoardDateRange() {
       const from = document.getElementById('lb-date-from');
@@ -3145,7 +3152,9 @@
 
     function renderLoadBoard() {
       const q = (document.getElementById('loadboard-search') ? document.getElementById('loadboard-search').value : '').toLowerCase();
+      const currentFilter = STATE.loadFilter || 'All Loads';
       const rows = visibleLoads().filter(l => {
+        if (!matchesFilter(l, currentFilter)) return false;
         if (!q) return true;
         return [l.loadNumber, l.driverName, l.pickup, l.dropoff, l.dispatcherName].join(' ').toLowerCase().includes(q);
       });
@@ -3172,7 +3181,7 @@
           </td>` : ''}
         </tr>
       `;
-        }).join('') || `<tr><td colspan="${isAdmin ? 7 : 6}" class="cell-dim" style="text-align:center;padding:24px;color:#94a3b8;">No loads found.</td></tr>`;
+        }).join('') || `<tr><td colspan="${isAdmin ? 7 : 6}" class="cell-dim" style="text-align:center;padding:24px;color:#94a3b8;">No loads found for "${escapeHtml(currentFilter)}".</td></tr>`;
       }
     }
 
