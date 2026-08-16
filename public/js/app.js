@@ -2599,6 +2599,9 @@
     function escapeAttr(t) {
       return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+    function escapeHtml(str) {
+      return escapeAttr(str);
+    }
     function onDriverSelected() {
       const sel = document.getElementById('f-driver');
       if (sel.value === '__add_new__') {

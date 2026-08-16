@@ -26,7 +26,13 @@ class ApiClient {
         body: jsonEncode({'driverId': driverId.trim(), 'pin': pin.trim()}),
       ).timeout(const Duration(seconds: 12));
 
-      final data = jsonDecode(response.body);
+      Map<String, dynamic> data;
+      try {
+        data = jsonDecode(response.body);
+      } catch (e) {
+        return {'success': false, 'error': 'Server returned an invalid response. Please check your Server URL.'};
+      }
+      
       if (response.statusCode == 200 && data['ok'] == true) {
         final driver = DriverModel.fromJson(data['driver'] ?? {});
         final loadsList = (data['loads'] as List<dynamic>?)
@@ -48,7 +54,7 @@ class ApiClient {
         };
       }
     } catch (e) {
-      return {'success': false, 'error': 'Connection error ($baseUrl): $e'};
+      return {'success': false, 'error': 'Connection error ($baseUrl). Please check the Server URL.'};
     }
   }
 
