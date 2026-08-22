@@ -170,33 +170,34 @@ router.post('/auth/claim', express.json(), async (req, res) => {
   } else {
     // FAIL-CLOSED AFFIRMATIVE RESOLUTION:
     // Destination account MUST be affirmatively resolved and confirmed to belong to sessionEmail.
-    // An unresolvable destination ID or missing record MUST be rejected by default.
-    let resolvedEmail = null;
+    // Checks both primary fleet email (d.email) AND Google account email (d.googleAccountEmail).
+    let candidateEmails = [];
 
     try {
       const dataStore = require('../lib/dataStore');
       const state = await dataStore.loadFullState();
       const targetDispatcher = (state.dispatchers || []).find(d => String(d.id) === targetId);
-      if (targetDispatcher && targetDispatcher.email) {
-        resolvedEmail = targetDispatcher.email.toLowerCase().trim();
+      if (targetDispatcher) {
+        if (targetDispatcher.email) candidateEmails.push(targetDispatcher.email.toLowerCase().trim());
+        if (targetDispatcher.googleAccountEmail) candidateEmails.push(targetDispatcher.googleAccountEmail.toLowerCase().trim());
       }
     } catch (e) {
       console.error('[Security Alert] Failed to load state during claim target validation:', e.message);
       return res.status(403).json({ error: 'Forbidden — system error resolving destination account' });
     }
 
-    // Fall back to existing token store record if state did not yield a dispatcher record
-    if (!resolvedEmail) {
+    // Fall back to existing token store record if state did not yield dispatcher email candidates
+    if (candidateEmails.length === 0) {
       const destRec = await store.get(targetId);
       if (destRec && destRec.email) {
-        resolvedEmail = destRec.email.toLowerCase().trim();
+        candidateEmails.push(destRec.email.toLowerCase().trim());
       }
     }
 
     // STRICT FAIL-CLOSED REJECTION:
-    // If destination target cannot be affirmatively resolved OR email mismatches sessionEmail, REJECT WITH 403
-    if (!resolvedEmail || resolvedEmail !== sessionEmail) {
-      console.warn(`[Security Alert] Session ${sessionEmail} attempted unauthorized claim of unresolvable/mismatched target ${targetId}!`);
+    // If destination target cannot be resolved OR sessionEmail matches neither d.email nor d.googleAccountEmail -> REJECT WITH 403
+    if (candidateEmails.length === 0 || !candidateEmails.includes(sessionEmail)) {
+      console.warn(`[Security Alert] Session ${sessionEmail} attempted unauthorized claim of target ${targetId}!`);
       return res.status(403).json({ error: 'Forbidden — destination account cannot be verified for session owner' });
     }
   }
