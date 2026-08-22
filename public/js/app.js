@@ -263,12 +263,42 @@
           STATE.notifications = STATE.notifications || [];
           migrateDrivers();
           migrateLoads();
-          return;
+          return true; // Successfully loaded
         }
-      } catch (e) { /* no saved state yet */ }
-      const seed = seedData();
-      STATE.drivers = seed.drivers; STATE.brokers = seed.brokers; STATE.dispatchers = seed.dispatchers; STATE.loads = seed.loads; STATE.settings = seed.settings; STATE.chat = STATE.chat || {};
-      await persist();
+      } catch (e) {
+        console.error('Database error:', e.message);
+      }
+      // Database unavailable — show error screen instead of fallback to fake data
+      showErrorScreen('Database Unavailable', 
+        'Cannot connect to the database. Please refresh and try again. ' +
+        'If this persists, contact support.');
+      return false; // Failed to load
+    }
+
+    function showErrorScreen(title, message) {
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('login-gate').style.display = 'none';
+      
+      const errorScreen = document.createElement('div');
+      errorScreen.id = 'error-screen';
+      errorScreen.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: #f5f5f5; display: flex; align-items: center; justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; z-index: 9999;
+      `;
+      
+      errorScreen.innerHTML = `
+        <div style="text-align: center; max-width: 500px; padding: 2rem;">
+          <h1 style="color: #d32f2f; margin-bottom: 1rem;">${title}</h1>
+          <p style="color: #666; margin-bottom: 1rem;">${message}</p>
+          <button onclick="location.reload()" style="
+            padding: 0.75rem 1.5rem; background: #2196F3; color: white; 
+            border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;
+          ">Refresh Page</button>
+        </div>
+      `;
+      
+      document.body.appendChild(errorScreen);
     }
 
     let saveTimer = null;
@@ -408,42 +438,56 @@
     };
 
     async function restoreSession() {
-      const session = SessionManager.loadSession();
-      let savedEmail = session ? session.email : '';
-      if (!savedEmail) {
-        try { savedEmail = localStorage.getItem(SESSION_KEY) || ''; } catch (e) { }
+      let sessionToken = '';
+      try { sessionToken = localStorage.getItem('haulbox_web_session_token') || ''; } catch (e) { }
+      
+      // Legacy unauthenticated email strings in localStorage are rejected
+      if (!sessionToken) {
+        try { localStorage.removeItem(SESSION_KEY); } catch (e) { }
+        if (typeof SessionManager !== 'undefined') SessionManager.clearSession();
+        return false;
       }
-      if (!savedEmail) return false;
 
-      const adminEmails = await loadAdminEmailConfig();
-      const matchedDispatcher = STATE.dispatchers.find(d => (d.email || '').trim().toLowerCase() === savedEmail);
+      // Verify token with backend
+      try {
+        const res = await fetch('/auth/verify-session', {
+          headers: { 'Authorization': 'Bearer ' + sessionToken }
+        });
+        const data = res.ok ? await res.json() : null;
+        if (!data || !data.ok || !data.email) {
+          try { localStorage.removeItem('haulbox_web_session_token'); } catch (e) { }
+          if (typeof SessionManager !== 'undefined') SessionManager.clearSession();
+          return false;
+        }
 
-      if (matchedDispatcher) {
-        STATE.role = 'dispatcher';
-        STATE.isSuperAdmin = false;
-        STATE.currentDispatcherId = matchedDispatcher.id;
-        STATE.viewAs = null;
-        STATE.currentUser = { name: matchedDispatcher.name, email: matchedDispatcher.googleAccountEmail || savedEmail, initials: initials(matchedDispatcher.name) };
-        if (typeof SessionManager !== 'undefined') {
-          SessionManager.saveSession(savedEmail, 'dispatcher', STATE.currentUser, matchedDispatcher.id, false);
+        const verifiedEmail = data.email.toLowerCase().trim();
+        const adminEmails = await loadAdminEmailConfig();
+        const matchedDispatcher = STATE.dispatchers.find(d => (d.email || '').trim().toLowerCase() === verifiedEmail);
+
+        if (matchedDispatcher) {
+          STATE.role = 'dispatcher';
+          STATE.isSuperAdmin = false;
+          STATE.currentDispatcherId = matchedDispatcher.id;
+          STATE.viewAs = null;
+          STATE.currentUser = { name: matchedDispatcher.name, email: matchedDispatcher.googleAccountEmail || verifiedEmail, initials: initials(matchedDispatcher.name) };
+          enterApp();
+          return true;
         }
-        enterApp();
-        return true;
-      }
-      if (adminEmails && adminEmails.includes(savedEmail)) {
-        STATE.role = 'admin';
-        STATE.isSuperAdmin = (savedEmail === SUPER_ADMIN_EMAIL_REQUIRED) || (adminEmails[0] === savedEmail);
-        STATE.currentDispatcherId = null;
-        STATE.viewAs = null;
-        STATE.currentUser = { name: (STATE.isSuperAdmin ? 'Super Admin' : (STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin')), email: STATE.settings.googleAccountEmail || savedEmail, initials: initials(savedEmail.split('@')[0]) };
-        if (typeof SessionManager !== 'undefined') {
-          SessionManager.saveSession(savedEmail, 'admin', STATE.currentUser, null, STATE.isSuperAdmin);
+        if (adminEmails && adminEmails.includes(verifiedEmail)) {
+          STATE.role = 'admin';
+          STATE.isSuperAdmin = (verifiedEmail === SUPER_ADMIN_EMAIL_REQUIRED) || (adminEmails[0] === verifiedEmail);
+          STATE.currentDispatcherId = null;
+          STATE.viewAs = null;
+          STATE.currentUser = { name: (STATE.isSuperAdmin ? 'Super Admin' : (STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin')), email: STATE.settings.googleAccountEmail || verifiedEmail, initials: initials(verifiedEmail.split('@')[0]) };
+          enterApp();
+          return true;
         }
-        enterApp();
-        return true;
+      } catch (e) {
+        console.error('[Auth] Session verification error:', e);
       }
+
+      try { localStorage.removeItem('haulbox_web_session_token'); } catch (e) { }
       if (typeof SessionManager !== 'undefined') SessionManager.clearSession();
-      try { localStorage.removeItem(SESSION_KEY); } catch (e) { }
       return false;
     }
 
@@ -492,20 +536,35 @@
         result = await openGoogleOAuthPopup(loginAttemptId);
       } catch (e) {
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-        if (e.message === 'CLOSED') { showLoginStatus(''); return; } // they just closed the popup — no error needed
+        if (e.message === 'CLOSED') { showLoginStatus(''); return; }
         if (e.message === 'POPUP_BLOCKED') { showLoginStatus('Popup blocked — allow popups for this site, then try again.', true); return; }
         showLoginStatus('Sign-in failed: ' + e.message, true);
         return;
       }
       const email = (result.email || '').trim().toLowerCase();
+      const sessionToken = result.sessionToken || '';
+      if (!sessionToken) {
+        showLoginStatus('Sign-in failed: Server did not issue a valid session token.', true);
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        return;
+      }
+
       showLoginStatus('Checking access for ' + result.email + '…');
 
       const adminEmails = await loadAdminEmailConfig();
       const matchedDispatcher = STATE.dispatchers.find(d => (d.email || '').trim().toLowerCase() === email);
 
       if (matchedDispatcher) {
-        try { await backendFetch('/auth/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromAccountId: loginAttemptId, toAccountId: matchedDispatcher.id }) }); }
-        catch (e) { /* claim failing shouldn't block login */ }
+        try {
+          await backendFetch('/auth/claim', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + sessionToken
+            },
+            body: JSON.stringify({ fromAccountId: loginAttemptId, toAccountId: matchedDispatcher.id })
+          });
+        } catch (e) { }
         STATE.role = 'dispatcher';
         STATE.isSuperAdmin = false;
         STATE.currentDispatcherId = matchedDispatcher.id;
@@ -517,19 +576,23 @@
         matchedDispatcher.gmailConnectionStatus = 'Connected';
         matchedDispatcher.gmailLastSync = new Date().toISOString();
         STATE.currentUser = { name: matchedDispatcher.name, email: result.email, initials: initials(matchedDispatcher.name) };
-        if (typeof SessionManager !== 'undefined') {
-          SessionManager.saveSession(email, 'dispatcher', STATE.currentUser, matchedDispatcher.id, false);
-        } else {
-          try { localStorage.setItem(SESSION_KEY, email); } catch (e) { }
-        }
+        try { localStorage.setItem('haulbox_web_session_token', sessionToken); } catch (e) { }
         persist();
         enterApp();
         return;
       }
 
       if (adminEmails && adminEmails.includes(email)) {
-        try { await backendFetch('/auth/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromAccountId: loginAttemptId, toAccountId: 'admin' }) }); }
-        catch (e) { /* claim failing shouldn't block login */ }
+        try {
+          await backendFetch('/auth/claim', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + sessionToken
+            },
+            body: JSON.stringify({ fromAccountId: loginAttemptId, toAccountId: 'admin' })
+          });
+        } catch (e) { }
         STATE.role = 'admin';
         STATE.isSuperAdmin = (email === SUPER_ADMIN_EMAIL_REQUIRED) || (adminEmails[0] === email);
         STATE.currentDispatcherId = null;
@@ -541,11 +604,7 @@
         STATE.settings.gmailConnectionStatus = 'Connected';
         STATE.settings.gmailLastSync = new Date().toISOString();
         STATE.currentUser = { name: (STATE.isSuperAdmin ? 'Super Admin' : (STATE.settings.companyName ? STATE.settings.companyName + ' Admin' : 'Admin')), email: result.email, initials: initials(result.email.split('@')[0]) };
-        if (typeof SessionManager !== 'undefined') {
-          SessionManager.saveSession(email, 'admin', STATE.currentUser, null, STATE.isSuperAdmin);
-        } else {
-          try { localStorage.setItem(SESSION_KEY, email); } catch (e) { }
-        }
+        try { localStorage.setItem('haulbox_web_session_token', sessionToken); } catch (e) { }
         persist();
         enterApp();
         return;
@@ -5999,32 +6058,199 @@ function doPost(e) {
       renderLoadBoard();
     }
 
-    /* ================= CHAT WITH ADMIN =================
-       A direct line between each dispatcher and Admin, for questions and clarifications.
-       One thread per dispatcher: the dispatcher sees only their own, Admin sees them all. */
-    function chatStore() { STATE.chat = STATE.chat || {}; return STATE.chat; }
-    function chatThreadId() {
-      if (STATE.role === 'admin') {
-        const sel = document.getElementById('chat-thread-select');
-        if (sel && sel.value) return sel.value;
-        return (STATE.dispatchers[0] || {}).id || null;
-      }
-      return STATE.currentDispatcherId || null;
-    }
-    let chatPolling = null;
-    let chatConvs = [];
+    // ==========================================
+    // REAL-TIME SOCKET.IO & CHAT SYSTEM
+    // ==========================================
+    let appSocket = null;
+    let renderedMsgIds = new Set();
+    const OFFLINE_CHAT_KEY = 'haulbox_offline_chat_queue';
 
-    async function toggleChat() {
+    function getOfflineChatQueue() {
+      try {
+        return JSON.parse(localStorage.getItem(OFFLINE_CHAT_KEY) || '[]');
+      } catch (e) { return []; }
+    }
+
+    function saveOfflineChatQueue(queue) {
+      try {
+        localStorage.setItem(OFFLINE_CHAT_KEY, JSON.stringify(queue));
+      } catch (e) { }
+    }
+
+    function enqueueOfflineChat(msgPayload) {
+      const q = getOfflineChatQueue();
+      q.push(msgPayload);
+      saveOfflineChatQueue(q);
+    }
+
+    async function flushOfflineChatQueue() {
+      const q = getOfflineChatQueue();
+      if (!q.length) return;
+      console.log('[Socket.IO] Flushing offline chat queue (' + q.length + ' items)...');
+      saveOfflineChatQueue([]);
+
+      for (const item of q) {
+        try {
+          if (appSocket && appSocket.connected) {
+            appSocket.emit('send_message', item);
+          } else {
+            await fetch(`/api/chat/conversations/${item.conversationId}/messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(item)
+            });
+          }
+        } catch (e) {
+          enqueueOfflineChat(item);
+        }
+      }
+    }
+
+    function initAppSocket() {
+      if (typeof io === 'undefined' || appSocket) return;
+      try {
+        appSocket = io();
+
+        appSocket.on('connect', () => {
+          console.log('[Socket.IO] Connected to HaulBoX real-time gateway:', appSocket.id);
+          authenticateAppSocket();
+          const curId = chatThreadId() || (typeof waCurrentConvoId !== 'undefined' ? waCurrentConvoId : null);
+          if (curId) joinSocketConversation(curId);
+          flushOfflineChatQueue();
+        });
+
+        appSocket.on('reconnect', () => {
+          console.log('[Socket.IO] Reconnected to server');
+          authenticateAppSocket();
+          const curId = chatThreadId() || (typeof waCurrentConvoId !== 'undefined' ? waCurrentConvoId : null);
+          if (curId) joinSocketConversation(curId);
+          flushOfflineChatQueue();
+        });
+
+        appSocket.on('new_message', (msg) => {
+          handleIncomingSocketMessage(msg);
+        });
+
+        appSocket.on('user_typing', (data) => {
+          handleSocketTyping(data);
+        });
+
+        appSocket.on('messages_read', (data) => {
+          handleSocketMessagesRead(data);
+        });
+
+        appSocket.on('presence_change', (data) => {
+          console.log('[Socket.IO] Presence update:', data);
+        });
+      } catch (e) {
+        console.error('[Socket.IO] Init failed:', e);
+      }
+    }
+
+    function authenticateAppSocket() {
+      if (!appSocket || !appSocket.connected) return;
+      const accountId = String(STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+      const senderName = STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'Dispatcher');
+      appSocket.emit('authenticate', {
+        accountId,
+        role: STATE.role,
+        name: senderName,
+        type: STATE.role === 'admin' ? 'admin' : (STATE.role === 'driver' ? 'driver' : 'dispatcher')
+      });
+    }
+
+    function joinSocketConversation(convoId) {
+      if (!appSocket || !appSocket.connected || !convoId) return;
+      appSocket.emit('join_conversation', { conversationId: convoId });
+    }
+
+    function handleIncomingSocketMessage(msg) {
+      if (!msg) return;
+      const curId = String(chatThreadId() || (typeof waCurrentConvoId !== 'undefined' ? waCurrentConvoId : ''));
+      const msgConvoId = String(msg.conversationId || '');
+
+      // Check if already rendered (deduplication)
+      const msgKey = String(msg.id || msg.tempId || '');
+      if (msgKey && renderedMsgIds.has(msgKey)) {
+        // Update status of optimistic message to sent
+        const el = document.querySelector(`[data-msg-id="${msgKey}"]`);
+        if (el) {
+          const statusIcon = el.querySelector('.chat-status-tick');
+          if (statusIcon) statusIcon.innerHTML = '✓';
+        }
+        return;
+      }
+      if (msgKey) renderedMsgIds.add(msgKey);
+
+      if (curId && curId === msgConvoId) {
+        const body = document.getElementById('chat-body');
+        if (body) {
+          const accountId = String(STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+          const isMine = String(msg.senderId) === accountId;
+          const wasAtBottom = body.scrollHeight - body.scrollTop <= body.clientHeight + 40;
+
+          const empty = body.querySelector('.chat-empty');
+          if (empty) empty.remove();
+
+          const div = document.createElement('div');
+          div.className = 'chat-msg ' + (isMine ? 'mine' : 'theirs');
+          div.setAttribute('data-msg-id', msg.id || msg.tempId || '');
+          div.innerHTML = '<span class="who">' + escapeChat(msg.senderName || msg.senderId) + '</span>' +
+            escapeChat(msg.body) +
+            '<span class="when">' + new Date(msg.createdAt || Date.now()).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) +
+            (isMine ? ' <span class="chat-status-tick">✓</span>' : '') +
+            '</span>';
+
+          body.appendChild(div);
+          if (wasAtBottom) body.scrollTop = body.scrollHeight;
+        }
+
+        // Also update WhatsApp panel if open
+        if (typeof waLoadMessages === 'function' && typeof waCurrentConvoId !== 'undefined' && String(waCurrentConvoId) === msgConvoId) {
+          waLoadMessages(waCurrentConvoId);
+        }
+      } else {
+        // Update unread count
+        const conv = chatConvs.find(c => String(c.id) === msgConvoId);
+        if (conv) conv.unreadCount = (conv.unreadCount || 0) + 1;
+        updateChatBadge();
+      }
+    }
+
+    function handleSocketTyping(data) {
+      if (!data) return;
+      const curId = String(chatThreadId() || (typeof waCurrentConvoId !== 'undefined' ? waCurrentConvoId : ''));
+      if (curId && curId === String(data.conversationId)) {
+        const typingEl = document.getElementById('chat-typing-indicator');
+        if (typingEl) {
+          typingEl.textContent = data.isTyping ? `${data.user ? data.user.name : 'Someone'} is typing...` : '';
+          typingEl.style.display = data.isTyping ? 'block' : 'none';
+        }
+      }
+    }
+
+    function handleSocketMessagesRead(data) {
+      if (!data) return;
+      const curId = String(chatThreadId() || (typeof waCurrentConvoId !== 'undefined' ? waCurrentConvoId : ''));
+      if (curId && curId === String(data.conversationId)) {
+        document.querySelectorAll('.chat-status-tick').forEach(tick => {
+          tick.innerHTML = '<span style="color:#0284c7;font-weight:900;">✓✓</span>';
+        });
+      }
+    }
+
+    window.addEventListener('online', flushOfflineChatQueue);
+
+    async function toggleChat(open) {
       const panel = document.getElementById('chat-panel');
-      const open = !panel.classList.contains('open');
+      if (!panel) return;
+      if (open === undefined) open = !panel.classList.contains('open');
       panel.classList.toggle('open', open);
       if (open) {
+        initAppSocket();
         await fetchChatConvs();
         renderChat();
-        if (!chatPolling) chatPolling = setInterval(pollChat, 3000);
         setTimeout(() => { const i = document.getElementById('chat-input'); if (i) i.focus(); }, 60);
-      } else {
-        if (chatPolling) { clearInterval(chatPolling); chatPolling = null; }
       }
       updateChatBadge();
     }
@@ -6041,11 +6267,6 @@ function doPost(e) {
       } catch (e) { }
     }
 
-    async function pollChat() {
-      await fetchChatConvs();
-      renderChat();
-    }
-
     function chatThreadId() {
       const sel = document.getElementById('chat-thread-select');
       return sel ? sel.value : null;
@@ -6053,9 +6274,13 @@ function doPost(e) {
 
     function chatKey(e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+      if (appSocket && appSocket.connected) {
+        const id = chatThreadId();
+        if (id) appSocket.emit('typing', { conversationId: id, isTyping: true });
+      }
     }
 
-    async function renderChat() {
+    async function renderChat(isBackgroundSync) {
       const pick = document.getElementById('chat-pick');
       const sel = document.getElementById('chat-thread-select');
       const accountId = String(STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
@@ -6092,29 +6317,41 @@ function doPost(e) {
         return;
       }
 
+      joinSocketConversation(id);
+
       try {
         const res = await fetch(`/api/chat/messages/${id}?accountId=${encodeURIComponent(accountId)}&role=${encodeURIComponent(STATE.role)}`);
         if (res.ok) {
           const d = await res.json();
           const msgs = d.messages || [];
 
-          const wasAtBottom = body.scrollHeight - body.scrollTop <= body.clientHeight + 10;
+          const wasAtBottom = body.scrollHeight - body.scrollTop <= body.clientHeight + 40;
+
+          // Track IDs for deduplication
+          msgs.forEach(m => { if (m.id) renderedMsgIds.add(String(m.id)); });
 
           body.innerHTML = msgs.length ? msgs.map(m => {
             const isMine = String(m.senderId) === accountId;
-            return '<div class="chat-msg ' + (isMine ? 'mine' : 'theirs') + '">' +
+            const statusTick = isMine ? (m.read ? '<span style="color:#0284c7;font-weight:900;">✓✓</span>' : '✓') : '';
+            return '<div class="chat-msg ' + (isMine ? 'mine' : 'theirs') + '" data-msg-id="' + m.id + '">' +
               '<span class="who">' + escapeChat(m.senderName || m.senderId) + '</span>' +
               escapeChat(m.body) +
-              '<span class="when">' + new Date(m.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</span></div>';
+              '<span class="when">' + new Date(m.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) +
+              (statusTick ? ' <span class="chat-status-tick">' + statusTick + '</span>' : '') +
+              '</span></div>';
           }).join('') : '<div class="chat-empty">No messages yet.</div>';
 
-          if (wasAtBottom) body.scrollTop = body.scrollHeight;
+          if (wasAtBottom && !isBackgroundSync) body.scrollTop = body.scrollHeight;
 
           fetch(`/api/chat/read/${id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ accountId: accountId, role: STATE.role })
           }).catch(e => { });
+
+          if (appSocket && appSocket.connected) {
+            appSocket.emit('mark_read', { conversationId: id, accountId: accountId, role: STATE.role });
+          }
         }
       } catch (e) { }
 
@@ -6135,24 +6372,75 @@ function doPost(e) {
 
       input.value = '';
 
-      try {
-        const accountId = STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId);
-        await fetch(`/api/chat/messages/${id}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accountId: accountId,
-            role: STATE.role,
-            senderName: STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'Dispatcher'),
-            body: text
-          })
-        });
-        await pollChat();
-        const body = document.getElementById('chat-body');
+      const accountId = String(STATE.currentUser ? STATE.currentUser.id : (STATE.role === 'admin' ? 'admin' : STATE.currentDispatcherId));
+      const senderName = STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'Dispatcher');
+      const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+
+      // 1. Optimistic UI Render (🕒 sending state)
+      const body = document.getElementById('chat-body');
+      if (body) {
+        const empty = body.querySelector('.chat-empty');
+        if (empty) empty.remove();
+
+        const optDiv = document.createElement('div');
+        optDiv.className = 'chat-msg mine';
+        optDiv.setAttribute('data-msg-id', tempId);
+        optDiv.innerHTML = '<span class="who">' + escapeChat(senderName) + '</span>' +
+          escapeChat(text) +
+          '<span class="when">Just now <span class="chat-status-tick">🕒</span></span>';
+        body.appendChild(optDiv);
         body.scrollTop = body.scrollHeight;
-      } catch (e) {
-        toast('Error', 'Failed to send message');
-        input.value = text;
+      }
+      renderedMsgIds.add(tempId);
+
+      const payload = {
+        conversationId: Number(id),
+        accountId: accountId,
+        role: STATE.role,
+        name: senderName,
+        senderName: senderName,
+        body: text,
+        tempId: tempId
+      };
+
+      // 2. Dispatch via Socket.IO if connected, else fallback to REST or Offline Queue
+      if (appSocket && appSocket.connected) {
+        appSocket.emit('send_message', payload, (ack) => {
+          if (ack && ack.ok) {
+            const el = document.querySelector(`[data-msg-id="${tempId}"]`);
+            if (el) {
+              if (ack.message && ack.message.id) {
+                el.setAttribute('data-msg-id', ack.message.id);
+                renderedMsgIds.add(String(ack.message.id));
+              }
+              const tick = el.querySelector('.chat-status-tick');
+              if (tick) tick.innerHTML = '✓';
+            }
+          }
+        });
+      } else {
+        try {
+          const res = await fetch(`/api/chat/messages/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok) {
+            const d = await res.json();
+            if (d && d.message && d.message.id) {
+              const el = document.querySelector(`[data-msg-id="${tempId}"]`);
+              if (el) {
+                el.setAttribute('data-msg-id', d.message.id);
+                renderedMsgIds.add(String(d.message.id));
+                const tick = el.querySelector('.chat-status-tick');
+                if (tick) tick.innerHTML = '✓';
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Chat] Offline, queuing message for reconnect flush');
+          enqueueOfflineChat(payload);
+        }
       }
     }
 
@@ -6437,7 +6725,15 @@ function doPost(e) {
 
     /* ================= INIT ================= */
     async function init() {
-      if (!STATE._loaded) { await loadState(); STATE._loaded = true; }
+      if (!STATE._loaded) {
+        const loaded = await loadState();
+        STATE._loaded = true;
+        if (!loaded) {
+          // Error screen already shown by loadState(); app initialization stopped
+          console.error('Failed to load application state');
+          return;
+        }
+      }
       const params = new URLSearchParams(window.location.search);
       const shareToken = params.get('share');
       const validShare = shareToken ? (STATE.settings.shares || []).find(x => x.token === shareToken && x.active) : null;

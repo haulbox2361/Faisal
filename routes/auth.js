@@ -29,6 +29,29 @@ function popupResponseHtml(payload) {
 </body></html>`;
 }
 
+// In-memory web session store: sessionToken -> { email, accountId, createdAt, expiresAt }
+const webSessions = new Map();
+
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function verifySessionToken(req) {
+  const authHeader = req.headers['authorization'] || '';
+  if (!authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice(7).trim();
+  if (!token) return null;
+
+  const session = webSessions.get(token);
+  if (!session) return null;
+
+  if (Date.now() > session.expiresAt) {
+    webSessions.delete(token);
+    return null;
+  }
+  return { token, ...session };
+}
+
 // GET /auth/google?accountId=<loginAttemptId | 'admin' | dispatcherId>
 // Kicks off the real Google consent screen for that accountId.
 router.get('/auth/google', (req, res) => {
@@ -85,21 +108,104 @@ router.get('/auth/google/callback', async (req, res) => {
 
     store.set(accountId, { email, tokens });
 
-    return res.send(popupResponseHtml({ type: 'google-auth-success', accountId, email }));
+    // Issue cryptographic server-side session token (24h TTL)
+    const sessionToken = generateSessionToken();
+    webSessions.set(sessionToken, {
+      email: email.toLowerCase().trim(),
+      accountId,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    });
+
+    return res.send(popupResponseHtml({ type: 'google-auth-success', accountId, email, sessionToken }));
   } catch (e) {
     console.error('OAuth callback failed:', e);
     return res.send(popupResponseHtml({ type: 'google-auth-error', error: e.message || 'Google sign-in failed.' }));
   }
 });
 
-// POST /auth/claim  { fromAccountId, toAccountId }
+// GET /auth/verify-session — Validates server-issued session token
+router.get('/auth/verify-session', (req, res) => {
+  const session = verifySessionToken(req);
+  if (!session) {
+    return res.status(401).json({ ok: false, error: 'Invalid or expired session token' });
+  }
+  res.json({ ok: true, email: session.email, accountId: session.accountId });
+});
+
+// POST /auth/claim { fromAccountId, toAccountId }
 // Re-keys tokens stored under a throwaway loginAttemptId to the real
 // 'admin' or dispatcher id once the frontend has matched the signed-in email.
+// STRICT: Requires valid sessionToken AND verifies session email matches target account.
 router.post('/auth/claim', express.json(), async (req, res) => {
+  const session = verifySessionToken(req);
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized — valid session token required to claim account' });
+  }
+
   const { fromAccountId, toAccountId } = req.body || {};
   if (!toAccountId) return res.status(400).json({ error: 'Missing toAccountId' });
+
+  // STRICT DUAL ACCOUNT AUTHORIZATION CHECK:
+  // Validate BOTH the source claim record (fromAccountId) AND the destination target account (toAccountId)
+  const targetId = String(toAccountId).trim();
+  const sessionEmail = session.email.toLowerCase().trim();
+
+  // 1. Source check: Temporary login attempt record MUST exist AND match sessionEmail
+  const tempRec = await store.get(fromAccountId);
+  if (!tempRec || !tempRec.email || tempRec.email.toLowerCase().trim() !== sessionEmail) {
+    console.warn(`[Security Alert] Session ${sessionEmail} attempted unauthorized claim from source ${fromAccountId}!`);
+    return res.status(403).json({ error: 'Forbidden — verified session email does not match claim source or temporary session expired' });
+  }
+
+  // 2. Destination check: Target account MUST be authorized for sessionEmail
+  const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'haulbox2361@gmail.com').toLowerCase().trim();
+  const adminEmails = (process.env.ADMIN_EMAILS || superAdminEmail).split(',').map(e => e.trim().toLowerCase());
+
+  if (targetId === 'admin') {
+    if (!adminEmails.includes(sessionEmail)) {
+      console.warn(`[Security Alert] Session ${sessionEmail} attempted unauthorized claim of admin account!`);
+      return res.status(403).json({ error: 'Forbidden — verified session email is not an authorized Admin' });
+    }
+  } else {
+    // FAIL-CLOSED AFFIRMATIVE RESOLUTION:
+    // Destination account MUST be affirmatively resolved and confirmed to belong to sessionEmail.
+    // An unresolvable destination ID or missing record MUST be rejected by default.
+    let resolvedEmail = null;
+
+    try {
+      const dataStore = require('../lib/dataStore');
+      const state = await dataStore.loadFullState();
+      const targetDispatcher = (state.dispatchers || []).find(d => String(d.id) === targetId);
+      if (targetDispatcher && targetDispatcher.email) {
+        resolvedEmail = targetDispatcher.email.toLowerCase().trim();
+      }
+    } catch (e) {
+      console.error('[Security Alert] Failed to load state during claim target validation:', e.message);
+      return res.status(403).json({ error: 'Forbidden — system error resolving destination account' });
+    }
+
+    // Fall back to existing token store record if state did not yield a dispatcher record
+    if (!resolvedEmail) {
+      const destRec = await store.get(targetId);
+      if (destRec && destRec.email) {
+        resolvedEmail = destRec.email.toLowerCase().trim();
+      }
+    }
+
+    // STRICT FAIL-CLOSED REJECTION:
+    // If destination target cannot be affirmatively resolved OR email mismatches sessionEmail, REJECT WITH 403
+    if (!resolvedEmail || resolvedEmail !== sessionEmail) {
+      console.warn(`[Security Alert] Session ${sessionEmail} attempted unauthorized claim of unresolvable/mismatched target ${targetId}!`);
+      return res.status(403).json({ error: 'Forbidden — destination account cannot be verified for session owner' });
+    }
+  }
+
   try {
     const rec = await store.claim(fromAccountId, toAccountId);
+    // Update session record with verified accountId
+    session.accountId = toAccountId;
+    webSessions.set(session.token, session);
     res.json({ ok: true, connected: !!rec, email: rec ? rec.email : null });
   } catch (e) {
     console.error('claim failed:', e);
@@ -107,8 +213,21 @@ router.post('/auth/claim', express.json(), async (req, res) => {
   }
 });
 
-// POST /auth/disconnect  { accountId }
+// POST /auth/logout — Revokes server session token
+router.post('/auth/logout', express.json(), (req, res) => {
+  const session = verifySessionToken(req);
+  if (session) {
+    webSessions.delete(session.token);
+  }
+  res.json({ ok: true });
+});
+
+// POST /auth/disconnect { accountId }
 router.post('/auth/disconnect', express.json(), async (req, res) => {
+  const session = verifySessionToken(req);
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized — valid session token required' });
+  }
   const { accountId } = req.body || {};
   if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
   const rec = await store.get(accountId);
@@ -118,7 +237,6 @@ router.post('/auth/disconnect', express.json(), async (req, res) => {
       client.setCredentials(rec.tokens);
       await client.revokeCredentials();
     } catch (e) {
-      // Best-effort — token may already be invalid/expired. Still remove locally.
       console.warn('Revoke failed (removing local record anyway):', e.message);
     }
   }
@@ -138,4 +256,5 @@ router.get('/auth/status', async (req, res) => {
   }
 });
 
+router._webSessions = webSessions;
 module.exports = router;
