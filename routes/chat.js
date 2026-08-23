@@ -23,6 +23,7 @@ function requireParty(req, res) {
 }
 
 const kv = require('../lib/kvstore');
+const dataStore = require('../lib/dataStore');
 
 // GET /api/chat/conversations?accountId=...&role=admin|dispatcher
 router.get('/api/chat/conversations', async (req, res) => {
@@ -42,9 +43,7 @@ router.get('/api/chat/contacts', async (req, res) => {
   const me = requireParty(req, res);
   if (!me) return;
   try {
-    const raw = await kv.get('haulline:state');
-    let state = {};
-    try { if (raw) state = JSON.parse(raw); } catch (e) {}
+    const state = (await dataStore.loadFullState()) || {};
     
     const contacts = [];
     
@@ -86,9 +85,7 @@ router.post('/api/chat/start', async (req, res) => {
   const { withType, withId } = req.body || {};
   if (!withType || !withId) return res.status(400).json({ error: 'Missing withType/withId' });
   try {
-    const raw = await kv.get('haulline:state');
-    let state = {};
-    try { if (raw) state = JSON.parse(raw); } catch (e) {}
+    const state = (await dataStore.loadFullState()) || {};
 
     // Authorization check for Dispatchers:
     if (me.type === 'dispatcher') {
@@ -173,7 +170,28 @@ async function postMessageHandler(req, res) {
     // Pass attachment metadata to sendMessage (stored as JSON in the body column if no text)
     const effectiveText = text || (attachment ? `[File: ${attachment.name || 'attachment'}]` : '');
     const sent = await chat.sendMessage(conversationId, { ...me, name }, effectiveText, loadId, loadNumber, attachment);
-    res.json({ ok: true, message: { id: sent.id, createdAt: sent.createdAt, senderType: me.type, senderId: me.id, body: text, loadId, loadNumber, attachment } });
+
+    const msgPayload = {
+      id: sent.id,
+      conversationId,
+      senderType: me.type,
+      senderId: me.id,
+      senderName: name || me.name || me.id,
+      body: text,
+      attachment: attachment || null,
+      loadId: loadId || null,
+      loadNumber: loadNumber || null,
+      read: false,
+      createdAt: sent.createdAt || new Date().toISOString(),
+    };
+
+    // Real-time broadcast to socket room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conv_${conversationId}`).emit('new_message', msgPayload);
+    }
+
+    res.json({ ok: true, message: msgPayload });
   } catch (e) {
     console.error('chat send failed:', e);
     res.status(500).json({ error: 'Failed to send message' });
@@ -190,6 +208,14 @@ router.post('/api/chat/read/:id', async (req, res) => {
   try {
     if (await chat.isParticipant(conversationId, me)) {
       await chat.markConversationRead(conversationId, me);
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`conv_${conversationId}`).emit('messages_read', {
+          conversationId,
+          reader: me,
+          readAt: new Date().toISOString(),
+        });
+      }
     }
     res.json({ ok: true });
   } catch (e) {
@@ -219,6 +245,14 @@ router.post('/api/chat/typing', async (req, res) => {
   if (!conversationId) return res.status(400).json({ error: 'Missing conversationId' });
   try {
     chat.setTypingStatus(Number(conversationId), me, !!isTyping);
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conv_${Number(conversationId)}`).emit('user_typing', {
+        conversationId: Number(conversationId),
+        user: me,
+        isTyping: !!isTyping,
+      });
+    }
     res.json({ ok: true });
   } catch (e) {
     res.json({ ok: true });

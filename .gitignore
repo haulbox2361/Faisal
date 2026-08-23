@@ -33,3 +33,7 @@ haulbox_app/.flutter-plugins-dependencies
 haulbox_app/build/
 haulbox_app/.pub/
 haulbox_app/.pub-cache/
+
+# Nested standalone repos
+vetta-website/
+

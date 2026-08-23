@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
 import '../../shared/models/chat_message_model.dart';
 import '../../shared/models/conversation_model.dart';
+import '../../shared/widgets/voice_input_sheet.dart';
 import 'chat_provider.dart';
 
 class ConversationDetailScreen extends StatefulWidget {
@@ -18,6 +19,25 @@ class ConversationDetailScreen extends StatefulWidget {
 class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
   final _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final provider = Provider.of<ChatProvider>(context, listen: false);
+        provider.joinConversationRoom(widget.conversation.id);
+        provider.markConversationRead(widget.conversation.id);
+      }
+    });
+
+    _textController.addListener(() {
+      if (mounted) {
+        final provider = Provider.of<ChatProvider>(context, listen: false);
+        provider.setTyping(widget.conversation.id, _textController.text.trim().isNotEmpty);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -670,12 +690,18 @@ class _ConversationDetailScreenState extends State<ConversationDetailScreen> {
             ),
             const SizedBox(width: 6),
 
-            // Camera Quick Snap
+            // POL-302: Voice-to-text mic button
             IconButton(
-              icon: const Icon(Icons.camera_alt_outlined, color: AppColors.textMuted, size: 22),
-              onPressed: () {
-                provider.sendImageMessage(widget.conversation.id, 'camera_photo.jpg');
-                _scrollToBottom();
+              icon: const Icon(Icons.mic_rounded, color: AppColors.textMuted, size: 24),
+              tooltip: 'Voice to text',
+              onPressed: () async {
+                final transcribed = await VoiceInputSheet.show(context);
+                if (transcribed != null && transcribed.isNotEmpty) {
+                  _textController.text = transcribed;
+                  _textController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: transcribed.length),
+                  );
+                }
               },
             ),
 

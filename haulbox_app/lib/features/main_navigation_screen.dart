@@ -3,9 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/widgets/haulbox_bottom_navigation.dart';
 import 'auth/auth_provider.dart';
-import 'chat/chat_provider.dart';
-import 'chat/chat_screen.dart';
 import 'current_load/current_load_screen.dart';
+import 'documents/documents_screen.dart';
 import 'loads/loads_screen.dart';
 import 'payments/payments_screen.dart';
 import 'profile/profile_screen.dart';
@@ -19,7 +18,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen>
     with WidgetsBindingObserver {
-  // Index 2 is the Center 'Current Load' primary action (default)
+  // Index 2 is the Center 'HOME' / Current Load primary action (default)
   int _currentIndex = 2;
 
   late final List<Widget> _screens;
@@ -31,9 +30,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     _restoreLastTab();
     _screens = [
       const LoadsScreen(),
-      const PaymentsScreen(),
+      const DocumentsScreen(),
       CurrentLoadScreen(onNavigateTab: (idx) => _switchTab(idx)),
-      const ChatScreen(),
+      const PaymentsScreen(),
       const ProfileScreen(),
     ];
   }
@@ -47,10 +46,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Trigger background sync on app resume
       if (mounted) {
         Provider.of<AuthProvider>(context, listen: false).syncAllData(silent: true);
-        Provider.of<ChatProvider>(context, listen: false).syncLiveChats();
       }
     }
   }
@@ -93,4 +90,3 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
   }
 }
-

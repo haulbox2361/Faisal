@@ -43,6 +43,10 @@ dependencies:
   permission_handler: ^11.3.1
   battery_plus: ^6.0.0
   connectivity_plus: ^6.0.4
+  socket_io_client: ^3.0.2
+  image_picker: ^1.1.2
+  camera: ^0.11.1
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:

@@ -8059,15 +8059,416 @@ function doPost(e) {
       }
     }
 
-    // Global ESC key to close About modal
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' || e.keyCode === 27) {
-        const modal = document.getElementById('modal-about');
-        if (modal && modal.classList.contains('active')) {
-          closeAboutModal();
-        }
+    window.setDriverPage = function(page) {
+      document.querySelectorAll('.drv-page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.drv-nav-btn').forEach(b => b.classList.remove('active'));
+      
+      const targetPage = document.getElementById('drv-page-' + page);
+      if (targetPage) targetPage.classList.add('active');
+      const targetBtn = document.querySelector(`.drv-nav-btn[data-page="${page}"]`);
+      if (targetBtn) targetBtn.classList.add('active');
+
+      if (page === 'documents' && typeof window.renderDriverDocumentsTab === 'function') {
+        window.renderDriverDocumentsTab();
       }
-    });
+    };
+
+    // =========================================================================
+    // HAULBOX REDESIGN: KPI MODALS, SOFT DELETE, INVOICE PRINT, DOC VIEWER
+    // =========================================================================
+
+    window.openDeleteLoadReasonModal = function(loadId) {
+      if (STATE.role !== 'admin' && STATE.role !== 'super_admin') {
+        return toast('Permission Denied', 'Only Admins can delete loads.');
+      }
+      const load = (STATE.loads || []).find(l => String(l.id) === String(loadId));
+      if (!load) return toast('Load Not Found', 'Could not locate load ' + loadId);
+      document.getElementById('delete-load-id').value = load.id;
+      document.getElementById('delete-load-ref-text').textContent = 'Load #' + (load.loadNumber || load.id);
+      document.getElementById('delete-load-reason').value = '';
+      openModal('modal-delete-load-reason');
+    };
+
+    window.confirmDeleteLoadSubmit = async function(e) {
+      if (e) e.preventDefault();
+      const loadId = document.getElementById('delete-load-id').value;
+      const reason = document.getElementById('delete-load-reason').value.trim();
+      if (!reason) {
+        return toast('Reason Required', 'Please explain why this load is being deleted.');
+      }
+      const btn = document.getElementById('delete-load-confirm-btn');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/loads/${encodeURIComponent(loadId)}/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || 'Failed to delete load.');
+        }
+        STATE.loads = (STATE.loads || []).filter(l => String(l.id) !== String(loadId));
+        closeModal('modal-delete-load-reason');
+        closeModal('modal-load');
+        toast('Load Deleted', data.message || 'Load removed successfully.', true);
+        renderLoadBoard();
+        renderDashboard();
+      } catch (err) {
+        toast('Delete Failed', err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    window.openDocumentViewer = function(docUrl, docName, docType) {
+      const modal = document.getElementById('modal-doc-viewer');
+      const title = document.getElementById('doc-viewer-title');
+      const sub = document.getElementById('doc-viewer-sub');
+      const dlBtn = document.getElementById('doc-viewer-download-btn');
+      const content = document.getElementById('doc-viewer-content');
+      if (!modal || !content) return;
+
+      title.textContent = (docType ? docType + ' — ' : '') + (docName || 'Document Preview');
+      sub.textContent = docUrl ? docUrl.split('/').pop() : 'In-App Preview';
+      dlBtn.href = docUrl || '#';
+      dlBtn.download = docName || 'document';
+
+      content.innerHTML = '';
+      if (!docUrl) {
+        content.innerHTML = '<div style="padding:40px;color:#94a3b8;font-size:14px;">No preview available for this document.</div>';
+      } else if (docUrl.toLowerCase().endsWith('.pdf') || docUrl.includes('application/pdf')) {
+        content.innerHTML = `<iframe src="${docUrl}" style="width:100%;height:100%;border:none;"></iframe>`;
+      } else {
+        content.innerHTML = `<img src="${docUrl}" alt="Preview" style="max-width:100%;max-height:100%;object-fit:contain;padding:12px;">`;
+      }
+
+      openModal('modal-doc-viewer');
+    };
+
+    window.openPrintInvoiceModal = function(driverId) {
+      const driver = (STATE.drivers || []).find(d => String(d.id) === String(driverId) || String(d.code) === String(driverId));
+      if (!driver) return toast('Driver Not Found', 'Please select a valid driver to generate statement.');
+
+      const driverLoads = (STATE.loads || []).filter(l => {
+        const lDrv = String(l.driverId || l.driverCode || (l.driver && l.driver.id) || '').toLowerCase();
+        return lDrv === String(driver.id).toLowerCase() || lDrv === String(driver.code || '').toLowerCase();
+      });
+
+      const payPct = Number(driver.payPct || driver.pay_percentage || 88);
+      let totalGross = 0;
+      let totalDriverPay = 0;
+
+      const rowsHtml = driverLoads.map(l => {
+        const gross = Number(l.brokerRate || l.rate || l.grossAmount || 0);
+        const drvPay = Number(l.driverPay || (gross * payPct / 100));
+        totalGross += gross;
+        totalDriverPay += drvPay;
+        const dateStr = l.deliveryDate || l.pickupDate || l.date || '—';
+        return `
+          <tr style="border-bottom:1px solid #e2e8f0;font-size:12.5px;">
+            <td style="padding:10px 8px;font-weight:700;color:#0f172a;">${l.loadNumber || l.id}</td>
+            <td style="padding:10px 8px;color:#64748b;">${dateStr}</td>
+            <td style="padding:10px 8px;color:#334155;">${l.pickup || '—'} → ${l.dropoff || '—'}</td>
+            <td style="padding:10px 8px;font-weight:600;text-align:right;">$${gross.toLocaleString()}</td>
+            <td style="padding:10px 8px;text-align:center;color:#64748b;">${payPct}%</td>
+            <td style="padding:10px 8px;font-weight:700;text-align:right;color:#0284c7;">$${drvPay.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+          </tr>
+        `;
+      }).join('') || `<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">No delivered loads on record for this settlement period.</td></tr>`;
+
+      const printableArea = document.getElementById('invoice-printable-area');
+      if (printableArea) {
+        printableArea.innerHTML = `
+          <div id="invoice-doc-body" style="font-family:'Inter',system-ui,sans-serif;color:#0f172a;max-width:700px;margin:0 auto;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f172a;padding-bottom:16px;margin-bottom:20px;">
+              <div>
+                <div style="font-size:24px;font-weight:900;letter-spacing:-0.03em;color:#0f172a;">Haul<span style="color:#0284c7;">BoX</span> Dispatch</div>
+                <div style="font-size:12px;color:#64748b;margin-top:3px;">Driver Settlement Statement &amp; Remittance Advice</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:12px;font-weight:700;color:#0f172a;">STATEMENT DATE</div>
+                <div style="font-size:12px;color:#475569;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:24px;">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Payee / Driver</div>
+                <div style="font-size:16px;font-weight:800;color:#0f172a;margin-top:2px;">${driver.name || 'Driver'}</div>
+                <div style="font-size:12px;color:#475569;">Driver ID: ${driver.code || driver.id || '—'}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Equipment &amp; Terms</div>
+                <div style="font-size:13px;font-weight:700;color:#0f172a;margin-top:2px;">Truck: ${driver.truck || '—'} | Trailer: ${driver.trailerType || '—'}</div>
+                <div style="font-size:12px;color:#0284c7;font-weight:600;">Agreed Pay Rate: ${payPct}% of Gross</div>
+              </div>
+            </div>
+
+            <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+              <thead>
+                <tr style="border-bottom:2px solid #cbd5e1;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;text-align:left;">
+                  <th style="padding:8px 8px;">Load #</th>
+                  <th style="padding:8px 8px;">Date</th>
+                  <th style="padding:8px 8px;">Lane</th>
+                  <th style="padding:8px 8px;text-align:right;">Gross</th>
+                  <th style="padding:8px 8px;text-align:center;">Pay %</th>
+                  <th style="padding:8px 8px;text-align:right;">Driver Pay</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+
+            <div style="display:flex;justify-content:flex-end;margin-bottom:30px;">
+              <div style="width:280px;background:#f8fafc;border:1.5px solid #0f172a;border-radius:10px;padding:16px;">
+                <div style="display:flex;justify-content:space-between;font-size:12.5px;color:#475569;margin-bottom:6px;">
+                  <span>Total Load Gross:</span>
+                  <span style="font-weight:700;color:#0f172a;">$${totalGross.toLocaleString()}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12.5px;color:#475569;margin-bottom:10px;">
+                  <span>Driver Pay Cut:</span>
+                  <span style="font-weight:700;color:#0284c7;">${payPct}%</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;color:#0f172a;border-top:1.5px dashed #cbd5e1;padding-top:10px;">
+                  <span>TOTAL DRIVER PAYMENT:</span>
+                  <span style="color:#16a34a;">$${totalDriverPay.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-size:11px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:12px;">
+              Generated by HaulBoX Logistics Platform • Single Source of Truth
+            </div>
+          </div>
+        `;
+      }
+      openModal('modal-print-invoice');
+    };
+
+    window.triggerPrintInvoice = function() {
+      const content = document.getElementById('invoice-printable-area');
+      if (!content) return;
+      const printWin = window.open('', '_blank', 'width=800,height=900');
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>HaulBoX Settlement Statement</title>
+            <style>
+              @page { size: auto; margin: 15mm; }
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; color: #0f172a; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { padding: 8px; text-align: left; }
+            </style>
+          </head>
+          <body>
+            ${content.innerHTML}
+            <script>
+              window.onload = function() { window.print(); window.close(); }
+            </script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+    };
+
+    window.openKpiAvailableDrivers = function() {
+      const drivers = (STATE.drivers || []).filter(d => d.status !== 'inactive');
+      const available = drivers.filter(d => !d.currentLoadId && d.availability !== 'on_road');
+      const modalBody = document.getElementById('kpi-modal-body');
+      document.getElementById('kpi-modal-title').textContent = 'Driver Availability Overview';
+      modalBody.innerHTML = `
+        <div style="margin-bottom:14px;font-size:13px;color:#475569;">
+          <strong>${available.length}</strong> of <strong>${drivers.length}</strong> registered drivers are currently available for assignment.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${drivers.map(d => {
+            const isFree = !d.currentLoadId && d.availability !== 'on_road';
+            return `
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+                <div>
+                  <div style="font-weight:700;color:#0f172a;">${d.name} (${d.code || d.id || '—'})</div>
+                  <div style="font-size:12px;color:#64748b;">Truck #${d.truck || '—'} • ${d.hometown || 'USA'}</div>
+                </div>
+                <span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:12px;background:${isFree ? '#dcfce7' : '#fee2e2'};color:${isFree ? '#16a34a' : '#dc2626'};">
+                  ${isFree ? '🟢 Available' : '🔴 On Road'}
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+      openModal('modal-kpi-detail');
+    };
+
+    window.openKpiActiveLoads = function() {
+      switchView('loadboard');
+      setLoadFilter('active');
+    };
+
+    window.openKpiTodayPickups = function() {
+      const today = new Date().toISOString().slice(0, 10);
+      const pickups = (STATE.loads || []).filter(l => (l.pickupDate || '').slice(0, 10) === today);
+      const modalBody = document.getElementById('kpi-modal-body');
+      document.getElementById('kpi-modal-title').textContent = `Today's Pickups (${pickups.length})`;
+      modalBody.innerHTML = pickups.length ? `
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${pickups.map(l => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;" onclick="closeModal('modal-kpi-detail');openLoadModal('${l.id}')">
+              <div>
+                <div style="font-weight:700;color:#0f172a;">Load #${l.loadNumber || l.id}</div>
+                <div style="font-size:12px;color:#64748b;">PU: ${l.pickup || '—'} @ ${l.pickupTime || '08:00'}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:700;color:#0284c7;">$${Number(l.brokerRate || l.rate || 0).toLocaleString()}</div>
+                <div style="font-size:11px;color:#64748b;">Driver: ${l.driverName || 'Unassigned'}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `<div style="padding:20px;text-align:center;color:#94a3b8;">No pickups scheduled for today.</div>`;
+      openModal('modal-kpi-detail');
+    };
+
+    window.openKpiTodayDeliveries = function() {
+      const today = new Date().toISOString().slice(0, 10);
+      const deliveries = (STATE.loads || []).filter(l => (l.deliveryDate || '').slice(0, 10) === today);
+      const modalBody = document.getElementById('kpi-modal-body');
+      document.getElementById('kpi-modal-title').textContent = `Today's Deliveries (${deliveries.length})`;
+      modalBody.innerHTML = deliveries.length ? `
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${deliveries.map(l => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;" onclick="closeModal('modal-kpi-detail');openLoadModal('${l.id}')">
+              <div>
+                <div style="font-weight:700;color:#0f172a;">Load #${l.loadNumber || l.id}</div>
+                <div style="font-size:12px;color:#64748b;">DO: ${l.dropoff || '—'} @ ${l.deliveryTime || '17:00'}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:700;color:#16a34a;">$${Number(l.brokerRate || l.rate || 0).toLocaleString()}</div>
+                <div style="font-size:11px;color:#64748b;">Driver: ${l.driverName || 'Unassigned'}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `<div style="padding:20px;text-align:center;color:#94a3b8;">No deliveries scheduled for today.</div>`;
+      openModal('modal-kpi-detail');
+    };
+
+    window.openDriverContactDispatchModal = function() {
+      openModal('modal-driver-contact-dispatch');
+    };
+
+    window.submitDriverContactDispatch = async function(e) {
+      if (e) e.preventDefault();
+      const subject = document.getElementById('drv-contact-subject').value;
+      const message = document.getElementById('drv-contact-message').value.trim();
+      const btn = document.getElementById('drv-contact-send-btn');
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/driver/contact-dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subject,
+            message,
+            urgent: subject.includes('Breakdown') || subject.includes('🚨')
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to send message.');
+        closeModal('modal-driver-contact-dispatch');
+        document.getElementById('drv-contact-message').value = '';
+        toast('Alert Sent', 'Dispatch team has been notified.', true);
+      } catch (err) {
+        toast('Send Failed', err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    window.renderDriverDocumentsTab = async function() {
+      const reqWrap = document.getElementById('drv-required-docs-wrap');
+      const optWrap = document.getElementById('drv-optional-photos-wrap');
+      const pastWrap = document.getElementById('drv-past-docs-wrap');
+      if (!reqWrap) return;
+
+      try {
+        const res = await fetch('/api/driver/documents');
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to fetch documents');
+        const feed = data.documentsFeed || [];
+        const current = feed[0];
+
+        if (!current) {
+          reqWrap.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">No active load assigned.</div>';
+          if (optWrap) optWrap.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">No photos required.</div>';
+          return;
+        }
+
+        const badgeDot = (s) => {
+          if (s === 'APPROVED') return '🟢 Approved';
+          if (s === 'REJECTED') return '🔴 Fix Required';
+          if (s === 'CHECKING') return '🟡 Checking';
+          return '⚪ Upload Required';
+        };
+
+        reqWrap.innerHTML = `
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">
+            <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:10px;">Load #${current.loadNumber || current.loadId}</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              ${['RC', 'BOL', 'POD'].map(type => {
+                const doc = current.requiredDocs[type] || {};
+                return `
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#f8fafc;border-radius:8px;">
+                    <div>
+                      <div style="font-weight:700;font-size:13px;color:#0f172a;">${type}</div>
+                      <div style="font-size:11px;color:#64748b;">${badgeDot(doc.status)}</div>
+                    </div>
+                    <button class="btn btn-sm btn-ghost" onclick="openDriverUploadModal('${type}', '${current.loadId}')" style="font-weight:600;color:#0284c7;">
+                      ${doc.hasFile ? 'Replace / View' : 'Upload'}
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        if (optWrap) {
+          optWrap.innerHTML = `
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <button class="btn btn-ghost" onclick="openDriverPhotoUploadModal('PU', '${current.loadId}')" style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:10px;font-size:12px;font-weight:700;color:#0f172a;">
+                  📸 Pickup Photos
+                </button>
+                <button class="btn btn-ghost" onclick="openDriverPhotoUploadModal('DO', '${current.loadId}')" style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:10px;font-size:12px;font-weight:700;color:#0f172a;">
+                  📸 Delivery Photos
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        if (pastWrap) {
+          const pastLoads = feed.slice(1);
+          pastWrap.innerHTML = pastLoads.length ? pastLoads.map(p => `
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-weight:700;font-size:13px;color:#0f172a;">Load #${p.loadNumber || p.loadId}</div>
+                <div style="font-size:11px;color:#64748b;">${p.pickup || '—'} → ${p.dropoff || '—'}</div>
+              </div>
+              <div style="font-size:11px;color:#16a34a;font-weight:700;">🟢 Docs Complete</div>
+            </div>
+          `).join('') : '<div style="padding:10px;color:#94a3b8;font-size:12px;">No past loads on record.</div>';
+        }
+      } catch (err) {
+        console.error('Failed to load driver documents tab:', err);
+      }
+    };
 
     // Auto-restore session on page load (F5 refresh)
     (async function bootApp() {

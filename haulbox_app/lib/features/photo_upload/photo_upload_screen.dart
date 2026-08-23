@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
 import '../../shared/models/load_model.dart';
 import '../../shared/widgets/haulbox_button.dart';
 import '../../shared/widgets/section_header.dart';
+import 'document_camera_screen.dart';
 
 class PhotoUploadScreen extends StatefulWidget {
   final LoadModel load;
@@ -15,24 +17,29 @@ class PhotoUploadScreen extends StatefulWidget {
 }
 
 class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
-  int _selectedTab = 0; // 0 = Loading / Pickup, 1 = Unloading / Delivery
+  int _selectedTab = 0;
   bool _isUploading = false;
 
-  final Map<String, bool> _slots = {
-    'Pickup BOL Scan': true,
-    'Cargo Condition (Pallets)': false,
-    'Trailer Door Seal': false,
-    'Odometer at Pickup': false,
-    'Signed POD Receipt': true,
-    'Unloaded Cargo Condition': false,
-    'Receiving Dock Stamp': false,
-    'Odometer at Delivery': false,
+  final Map<String, File?> _capturedFiles = {
+    'Pickup BOL Scan': null,
+    'Cargo Condition (Pallets)': null,
+    'Trailer Door Seal': null,
+    'Odometer at Pickup': null,
+    'Signed POD Receipt': null,
+    'Unloaded Cargo Condition': null,
+    'Receiving Dock Stamp': null,
+    'Odometer at Delivery': null,
   };
 
-  void _toggleSlot(String title) {
-    setState(() {
-      _slots[title] = !(_slots[title] ?? false);
-    });
+  Future<void> _captureSlot(String title) async {
+    final file = await DocumentCameraScreen.capture(
+      context,
+      slotLabel: title,
+      loadNumber: widget.load.loadNumber,
+    );
+    if (file != null && mounted) {
+      setState(() => _capturedFiles[title] = file);
+    }
   }
 
   void _submitUpload() async {
@@ -121,10 +128,11 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
                   itemCount: activeList.length,
                   itemBuilder: (context, idx) {
                     final title = activeList[idx];
-                    final isUploaded = _slots[title] == true;
+                    final capturedFile = _capturedFiles[title];
+                    final isUploaded = capturedFile != null;
 
                     return GestureDetector(
-                      onTap: () => _toggleSlot(title),
+                      onTap: () => _captureSlot(title),
                       child: Container(
                         decoration: BoxDecoration(
                           color: isUploaded ? AppColors.emeraldSoft : AppColors.cardDark,
@@ -138,18 +146,29 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isUploaded ? AppColors.emeraldPrimary : AppColors.surfaceDark,
-                                shape: BoxShape.circle,
+                            if (isUploaded)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  capturedFile,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceDark,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.add_a_photo_outlined,
+                                  size: 24,
+                                  color: AppColors.emeraldPrimary,
+                                ),
                               ),
-                              child: Icon(
-                                isUploaded ? Icons.check_rounded : Icons.add_a_photo_outlined,
-                                size: 24,
-                                color: isUploaded ? const Color(0xFF06251A) : AppColors.emeraldPrimary,
-                              ),
-                            ),
                             const SizedBox(height: 12),
                             Text(
                               title,
@@ -164,7 +183,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              isUploaded ? 'Photo Attached' : 'Tap to Capture',
+                              isUploaded ? 'Tap to Retake' : 'Tap to Capture',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: isUploaded ? FontWeight.w700 : FontWeight.w500,

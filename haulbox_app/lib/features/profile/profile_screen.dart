@@ -7,6 +7,7 @@ import '../../shared/widgets/haulbox_button.dart';
 import '../../shared/widgets/status_badge.dart';
 import '../auth/auth_provider.dart';
 import '../documents/document_detail_screen.dart';
+import '../../core/theme/theme_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,7 +20,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Accordion expansion states
   bool _isDriverDocsExpanded = false;
   bool _isTruckDocsExpanded = false;
-  bool _isLoadDocsExpanded = false;
   bool _isTruckGalleryExpanded = false;
   bool _isUploadingPhoto = false;
 
@@ -121,15 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ),
   ];
 
-  // 3. Load Documents List
-  final List<Map<String, String>> _loadDocs = [
-    {'title': 'Bill of Lading (BOL)', 'status': 'VERIFIED', 'doc': 'BOL_HBX20241042.pdf'},
-    {'title': 'Proof of Delivery (POD)', 'status': 'PENDING', 'doc': 'POD_Signed_Delivery.pdf'},
-    {'title': 'Rate Confirmation (RC)', 'status': 'VERIFIED', 'doc': 'Rate_Confirmation_RC.pdf'},
-    {'title': 'Freight Settlement Invoice', 'status': 'AVAILABLE', 'doc': 'Invoice_Settlement.pdf'},
-  ];
-
-  // 4. Truck Gallery 8 Photo Slots
+  // 3. Truck Gallery 8 Photo Slots
   final List<TruckGalleryPhoto> _galleryPhotos = [
     TruckGalleryPhoto(id: 'g-1', slotKey: 'truck_front', label: 'Truck Front', isUploaded: true),
     TruckGalleryPhoto(id: 'g-2', slotKey: 'truck_driver_side', label: 'Truck Driver Side', isUploaded: true),
@@ -406,16 +398,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final driver = authProvider.driver;
+    final isDark = themeProvider.isDarkMode;
 
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Driver Profile',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.4),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: isDark ? const Color(0xFFFACC15) : Colors.white,
+            ),
+            tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            onPressed: () => themeProvider.toggleTheme(),
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.statusDanger),
             tooltip: 'Sign Out',
@@ -466,20 +468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 14),
 
-              // 5. LOAD DOCUMENTS ACCORDION
-              _buildAccordionSection(
-                icon: Icons.folder_outlined,
-                title: 'Load Documents',
-                count: _loadDocs.length,
-                isExpanded: _isLoadDocsExpanded,
-                onToggle: () => setState(() => _isLoadDocsExpanded = !_isLoadDocsExpanded),
-                child: Column(
-                  children: _loadDocs.map((doc) => _buildLoadDocTile(doc)).toList(),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // 6. TRUCK GALLERY ACCORDION
+              // 5. TRUCK GALLERY ACCORDION
               _buildAccordionSection(
                 icon: Icons.photo_camera_outlined,
                 title: 'Truck Gallery',
@@ -489,6 +478,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onToggle: () => setState(() => _isTruckGalleryExpanded = !_isTruckGalleryExpanded),
                 child: _buildTruckGalleryGrid(),
               ),
+              const SizedBox(height: 14),
+
+              // 6. POL-303: THEME & APPEARANCE SETTINGS CARD
+              _buildThemeSettingsCard(themeProvider),
               const SizedBox(height: 24),
 
               // 7. SIGN OUT BUTTON
@@ -1011,70 +1004,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLoadDocTile(Map<String, String> doc) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bgLight,
-        borderRadius: AppRadius.mdBorder,
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => DocumentDetailScreen(
-                title: doc['title']!,
-                documentNumber: doc['doc'],
-                issueDate: 'May 15, 2026',
-                status: doc['status']!,
-                category: 'TRUCK',
-              ),
-            ),
-          );
-        },
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: AppColors.emeraldSoft,
-                borderRadius: BorderRadius.all(Radius.circular(10)),
-              ),
-              child: const Icon(
-                Icons.folder_open_outlined,
-                size: 18,
-                color: AppColors.emeraldDark,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    doc['title']!,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textDark),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    doc['doc']!,
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
-                  ),
-                ],
-              ),
-            ),
-            StatusBadge(status: doc['status']!, isSmall: true),
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textSubtle, size: 18),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildTruckGalleryGrid() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1180,6 +1109,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildThemeSettingsCard(ThemeProvider themeProvider) {
+    final isDark = themeProvider.isDarkMode;
+    final currentMode = themeProvider.themeModeEnum;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: AppRadius.lgBorder,
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : AppColors.borderLight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.emeraldPrimary.withValues(alpha: 0.15)
+                      : AppColors.emeraldSoft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  color: AppColors.emeraldPrimary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'App Theme & Appearance',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : AppColors.textDark,
+                      ),
+                    ),
+                    Text(
+                      isDark ? 'Dark Mode Active' : 'Light Mode Active',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white60 : AppColors.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: isDark,
+                activeThumbColor: AppColors.emeraldPrimary,
+                onChanged: (_) => themeProvider.toggleTheme(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          const Text(
+            'THEME PREFERENCE',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSubtle,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildThemeChip(
+                label: 'Light',
+                icon: Icons.light_mode_outlined,
+                isSelected: currentMode == AppThemeMode.light,
+                onTap: () => themeProvider.setThemeMode(AppThemeMode.light),
+              ),
+              const SizedBox(width: 8),
+              _buildThemeChip(
+                label: 'Dark',
+                icon: Icons.dark_mode_outlined,
+                isSelected: currentMode == AppThemeMode.dark,
+                onTap: () => themeProvider.setThemeMode(AppThemeMode.dark),
+              ),
+              const SizedBox(width: 8),
+              _buildThemeChip(
+                label: 'System',
+                icon: Icons.settings_brightness_outlined,
+                isSelected: currentMode == AppThemeMode.system,
+                onTap: () => themeProvider.setThemeMode(AppThemeMode.system),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThemeChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.emeraldPrimary
+                : (isDark ? const Color(0xFF0F172A) : AppColors.bgSecondary),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.emeraldPrimary
+                  : (isDark ? const Color(0xFF334155) : AppColors.borderLight),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : AppColors.textDark),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.white70 : AppColors.textDark),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

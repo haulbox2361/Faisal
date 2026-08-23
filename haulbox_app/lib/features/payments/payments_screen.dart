@@ -4,10 +4,11 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
 import '../../shared/models/date_range_filter.dart';
 import '../../shared/models/payment_model.dart';
-import '../../shared/widgets/haulbox_card.dart';
+import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/range_selector.dart';
 import '../../shared/widgets/status_badge.dart';
 import '../auth/auth_provider.dart';
+import '../documents/document_detail_screen.dart';
 import 'payment_detail_screen.dart';
 
 class PaymentsScreen extends StatefulWidget {
@@ -17,38 +18,45 @@ class PaymentsScreen extends StatefulWidget {
   State<PaymentsScreen> createState() => _PaymentsScreenState();
 }
 
-class _PaymentsScreenState extends State<PaymentsScreen> {
-  // Default range is This Week (Current Monday -> Today)
+class _PaymentsScreenState extends State<PaymentsScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   DateRangeFilterType _selectedDateRange = DateRangeFilterType.thisWeek;
   DateTimeRange? _customDateRange;
-  String _selectedStatusFilter = 'ALL';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  // Filter payments by date range, status, and search query
-  List<PaymentModel> _filterPayments(List<PaymentModel> allPayments) {
+  List<PaymentModel> _filterPayments(List<PaymentModel> allPayments, {required bool isAvailableTab}) {
     final range = DateRangeHelper.calculateRange(_selectedDateRange, customRange: _customDateRange);
 
-    // 1. Date Range Filter
+    // 1. Tab Segmentation (Available/Scheduled vs. Past Settlements)
     List<PaymentModel> list = allPayments.where((p) {
-      final pDate = p.parsedDate;
-      return pDate.isAfter(range.start.subtract(const Duration(seconds: 1))) &&
-          pDate.isBefore(range.end.add(const Duration(seconds: 1)));
+      final isPaid = p.status.toUpperCase() == 'PAID';
+      return isAvailableTab ? !isPaid : isPaid;
     }).toList();
 
-    // 2. Status Filter
-    if (_selectedStatusFilter == 'PAID') {
-      list = list.where((p) => p.status.toUpperCase() == 'PAID').toList();
-    } else if (_selectedStatusFilter == 'PENDING') {
-      list = list.where((p) => p.status.toUpperCase() == 'PENDING').toList();
-    } else if (_selectedStatusFilter == 'PROCESSING') {
-      list = list.where((p) => p.status.toUpperCase() == 'PROCESSING').toList();
+    // 2. Date Range Filter
+    if (_selectedDateRange != DateRangeFilterType.allTime) {
+      list = list.where((p) {
+        final pDate = p.parsedDate;
+        return pDate.isAfter(range.start.subtract(const Duration(seconds: 1))) &&
+            pDate.isBefore(range.end.add(const Duration(seconds: 1)));
+      }).toList();
     }
 
     // 3. Search Query Filter
@@ -66,279 +74,223 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     return list;
   }
 
+  void _downloadSettlementPdf(PaymentModel payment) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DocumentDetailScreen(
+          title: 'Settlement Statement (Load #${payment.loadNumber})',
+          documentNumber: 'ST-${payment.loadNumber}',
+          issueDate: payment.date,
+          status: payment.status,
+          category: 'TRUCK',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final allPayments = auth.payments;
 
-    // Payments in selected date range (for hero earnings card)
-    final range = DateRangeHelper.calculateRange(_selectedDateRange, customRange: _customDateRange);
-    final periodPayments = allPayments.where((p) {
-      final pDate = p.parsedDate;
-      return pDate.isAfter(range.start.subtract(const Duration(seconds: 1))) &&
-          pDate.isBefore(range.end.add(const Duration(seconds: 1)));
-    }).toList();
+    final availablePayments = _filterPayments(allPayments, isAvailableTab: true);
+    final settlementPayments = _filterPayments(allPayments, isAvailableTab: false);
 
-    final filteredList = _filterPayments(allPayments);
-
-    // Dynamic Earnings calculation based on selected period
-    final periodTotalEarnings = periodPayments
-        .where((p) => p.status.toUpperCase() == 'PAID')
-        .fold<double>(0.0, (sum, p) => sum + p.amount);
-
-    final periodCompletedLoads = periodPayments.where((p) => p.status.toUpperCase() == 'PAID').length;
-
-    final periodPendingAmount = periodPayments
-        .where((p) => ['PENDING', 'PROCESSING'].contains(p.status.toUpperCase()))
-        .fold<double>(0.0, (sum, p) => sum + p.amount);
+    final totalAvailableAmount = availablePayments.fold<double>(0.0, (sum, p) => sum + p.amount);
+    final totalSettledAmount = settlementPayments.fold<double>(0.0, (sum, p) => sum + p.amount);
 
     return Scaffold(
       backgroundColor: AppColors.bgLight,
       appBar: AppBar(
         title: const Text(
-          'Payments',
+          'Payments & Settlements',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.4),
         ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => auth.syncAllData(),
-        color: AppColors.emeraldPrimary,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            // 1. DYNAMIC EARNINGS HERO SUMMARY CARD (Navy #0F172A)
-            _buildEarningsSummaryCard(periodTotalEarnings, periodCompletedLoads, periodPendingAmount),
-            const SizedBox(height: 14),
-
-            // 2. UNIFIED RANGE SELECTOR DROPDOWN (Same control across Loads & Payments)
-            RangeSelector(
-              selectedType: _selectedDateRange,
-              customRange: _customDateRange,
-              onRangeChanged: (type, custom) {
-                setState(() {
-                  _selectedDateRange = type;
-                  _customDateRange = custom;
-                });
-              },
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(height: 12),
+            child: TabBar(
+              controller: _tabController,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              labelColor: AppColors.textDark,
+              unselectedLabelColor: Colors.white.withValues(alpha: 0.8),
+              labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              tabs: const [
+                Tab(text: 'AVAILABLE & SCHEDULED'),
+                Tab(text: 'PAST SETTLEMENTS'),
+              ],
+            ),
+          ),
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // TAB 1: Available & Scheduled Payouts
+          _buildAvailablePayoutsTab(availablePayments, totalAvailableAmount, auth),
+          // TAB 2: Past Settlements with PDF Download
+          _buildPastSettlementsTab(settlementPayments, totalSettledAmount, auth),
+        ],
+      ),
+    );
+  }
 
-            // 3. SEARCH & STATUS FILTER CHIPS
-            _buildSearchBar(),
-            const SizedBox(height: 10),
-            _buildStatusFilterChips(),
-            const SizedBox(height: 14),
-
-            // 4. PAYMENT TRANSACTIONS LIST
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'PAYMENT TRANSACTIONS (${filteredList.length})',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textSubtle,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                Text(
-                  DateRangeHelper.getDisplayText(_selectedDateRange, customRange: _customDateRange).toUpperCase(),
-                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.emeraldDark),
+  Widget _buildAvailablePayoutsTab(List<PaymentModel> payments, double totalAvailable, AuthProvider auth) {
+    return RefreshIndicator(
+      onRefresh: () => auth.syncAllData(),
+      color: AppColors.emeraldPrimary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+        children: [
+          // Hero Card for Available / Pending Balance
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: AppRadius.xlBorder,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            if (filteredList.isEmpty)
-              _buildEmptyState()
-            else
-              ...filteredList.map((payment) => _buildPaymentRowCard(context, payment)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 1. DYNAMIC EARNINGS SUMMARY HERO CARD (Navy #0F172A Premium Anchor)
-  Widget _buildEarningsSummaryCard(double totalEarnings, int completedLoads, double pendingAmount) {
-    final periodName = DateRangeHelper.getDisplayText(_selectedDateRange, customRange: _customDateRange);
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.navyDark,
-        borderRadius: AppRadius.xlBorder,
-        border: Border.all(color: const Color(0xFF1E293B)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navyDark.withValues(alpha: 0.15),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'TOTAL EARNINGS',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF94A3B8),
-                  letterSpacing: 0.6,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.emeraldPrimary.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.4), width: 0.8),
-                ),
-                child: Row(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.check_circle_outline, size: 12, color: AppColors.emeraldPrimary),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$completedLoads Completed Loads',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF4ADE80)),
-                    ),
+                    Text('AVAILABLE BALANCE', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                    Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF4ADE80), size: 20),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  '\$${totalAvailable.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Scheduled for ACH Direct Deposit on next Friday cutoff',
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            '\$${totalEarnings.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
+          const SizedBox(height: 18),
+
+          const Text(
+            'PENDING & IN-PROCESS PAYOUTS',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textDark, letterSpacing: 0.6),
+          ),
+          const SizedBox(height: 10),
+
+          if (payments.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 30),
+              child: EmptyState(
+                title: 'No Pending Payouts',
+                description: 'All completed loads have been settled or are up to date.',
+                icon: Icons.check_circle_outline_rounded,
+              ),
+            )
+          else
+            ...payments.map((p) => _buildPaymentCard(p, isPastSettlement: false)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPastSettlementsTab(List<PaymentModel> payments, double totalSettled, AuthProvider auth) {
+    return RefreshIndicator(
+      onRefresh: () => auth.syncAllData(),
+      color: AppColors.emeraldPrimary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+        children: [
+          // Filter & Search Box
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
               color: Colors.white,
-              letterSpacing: -0.8,
+              borderRadius: AppRadius.lgBorder,
+              border: Border.all(color: AppColors.borderLight),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            periodName,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(color: Color(0xFF334155), height: 1),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: _buildNavyMetricCol('Settled (Paid)', '\$${totalEarnings.toStringAsFixed(2)}', const Color(0xFF4ADE80)),
-              ),
-              Container(width: 1, height: 28, color: const Color(0xFF334155)),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 14),
-                  child: _buildNavyMetricCol('Pending Settlement', '\$${pendingAmount.toStringAsFixed(2)}', const Color(0xFFFBBF24)),
+            child: Column(
+              children: [
+                Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.bgSecondary,
+                    borderRadius: AppRadius.mdBorder,
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    style: const TextStyle(fontSize: 13, color: AppColors.textDark, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      hintText: 'Search past settlements by Load #...',
+                      hintStyle: const TextStyle(color: AppColors.textSubtle, fontSize: 12.5),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavyMetricCol(String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
-        const SizedBox(height: 1),
-        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
-      ],
-    );
-  }
-
-  // 3. SEARCH BAR
-  Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AppRadius.lgBorder,
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (val) => setState(() => _searchQuery = val),
-        decoration: InputDecoration(
-          icon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
-          hintText: 'Search payments by Load #, Broker...',
-          hintStyle: const TextStyle(color: AppColors.textSubtle, fontSize: 13),
-          border: InputBorder.none,
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 16, color: AppColors.textSubtle),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
+                const SizedBox(height: 10),
+                RangeSelector(
+                  selectedType: _selectedDateRange,
+                  customRange: _customDateRange,
+                  onRangeChanged: (type, custom) {
+                    setState(() {
+                      _selectedDateRange = type;
+                      _customDateRange = custom;
+                    });
                   },
-                )
-              : null,
-        ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          if (payments.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 30),
+              child: EmptyState(
+                title: 'No Past Settlements Found',
+                description: 'No completed settlements match your selected range.',
+                icon: Icons.history_rounded,
+              ),
+            )
+          else
+            ...payments.map((p) => _buildPaymentCard(p, isPastSettlement: true)),
+        ],
       ),
     );
   }
 
-  // 4. STATUS FILTER CHIPS
-  Widget _buildStatusFilterChips() {
-    final filters = ['ALL', 'PAID', 'PENDING', 'PROCESSING'];
-
-    return Row(
-      children: filters.map((filter) {
-        final isSelected = _selectedStatusFilter == filter;
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedStatusFilter = filter),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.emeraldPrimary : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? AppColors.emeraldPrimary : AppColors.borderLight,
-                ),
-              ),
-              child: Text(
-                filter,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected ? Colors.white : AppColors.textDark,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // 5. PAYMENT TRANSACTION ROW CARD
-  Widget _buildPaymentRowCard(BuildContext context, PaymentModel payment) {
+  Widget _buildPaymentCard(PaymentModel p, {required bool isPastSettlement}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -362,103 +314,87 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => PaymentDetailScreen(payment: payment),
+                builder: (_) => PaymentDetailScreen(payment: p),
               ),
             );
           },
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Row(
+            child: Column(
               children: [
-                // Icon Avatar
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: payment.status == 'PAID' ? AppColors.emeraldSoft : AppColors.bgSecondary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Icon(
-                      payment.status == 'PAID' ? Icons.check_circle_outline_rounded : Icons.schedule_rounded,
-                      color: payment.status == 'PAID' ? AppColors.emeraldDark : const Color(0xFFD97706),
-                      size: 22,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Load #${p.loadNumber}',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.textDark),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${p.broker} • ${p.date}',
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                        ),
+                      ],
                     ),
-                  ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '\$${p.amount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.emeraldDark),
+                        ),
+                        const SizedBox(height: 2),
+                        StatusBadge(status: p.status, isSmall: true),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-
-                // Load Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (isPastSettlement) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(color: AppColors.borderLight, height: 1),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        payment.loadNumber,
-                        style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                      const Text(
+                        'Direct Deposit • Batch #ST-902',
+                        style: TextStyle(fontSize: 11, color: AppColors.textSubtle, fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${payment.broker} • ${payment.date}',
-                        style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        payment.paymentMethod,
-                        style: const TextStyle(fontSize: 11, color: AppColors.textSubtle),
+                      InkWell(
+                        onTap: () => _downloadSettlementPdf(p),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEE2E2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.picture_as_pdf_outlined, size: 13, color: Color(0xFFDC2626)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Download PDF',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFB91C1C),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-
-                // Amount & Status Badge
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '\$${payment.amount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.emeraldDark,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    StatusBadge(status: payment.status, isSmall: true),
-                  ],
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textSubtle, size: 20),
+                ],
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    final periodName = DateRangeHelper.getDisplayText(_selectedDateRange, customRange: _customDateRange);
-
-    return HaulBoxCard(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: Column(
-            children: [
-              const Icon(Icons.receipt_long_outlined, size: 42, color: AppColors.textSubtle),
-              const SizedBox(height: 10),
-              Text(
-                'No payments found for $periodName',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textDark),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Try selecting a different date range or status filter.',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-                textAlign: TextAlign.center,
-              ),
-            ],
           ),
         ),
       ),

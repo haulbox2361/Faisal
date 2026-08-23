@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/socket_service.dart';
 import '../../shared/models/chat_message_model.dart';
 import '../../shared/models/conversation_model.dart';
 
@@ -16,8 +17,13 @@ class ChatProvider extends ChangeNotifier {
 
   final Map<String, List<ChatMessageModel>> _messages = {};
   final Map<String, bool> _typingStates = {};
-  Timer? _chatSyncTimer;
   String? _token;
+  String? _driverId;
+
+  StreamSubscription<Map<String, dynamic>>? _msgSub;
+  StreamSubscription<Map<String, dynamic>>? _typingSub;
+  StreamSubscription<Map<String, dynamic>>? _readSub;
+  StreamSubscription<bool>? _connSub;
 
   ConversationModel get adminConversation => _adminConversation;
   ConversationModel get dispatcherConversation => _dispatcherConversation;
@@ -39,12 +45,15 @@ class ChatProvider extends ChangeNotifier {
 
   ChatProvider() {
     _initializeConversations();
-    _startChatSync();
+    _initSocketAndSync();
   }
 
   @override
   void dispose() {
-    _chatSyncTimer?.cancel();
+    _connSub?.cancel();
+    _msgSub?.cancel();
+    _typingSub?.cancel();
+    _readSub?.cancel();
     super.dispose();
   }
 
@@ -93,11 +102,122 @@ class ChatProvider extends ChangeNotifier {
     _messages['conv-group'] = [];
   }
 
-  void _startChatSync() {
-    _chatSyncTimer?.cancel();
-    _chatSyncTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      syncLiveChats();
+  Future<void> _initSocketAndSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('token');
+    _driverId = prefs.getString('driverId') ?? 'driver-101';
+    final driverName = prefs.getString('driverName') ?? 'Driver';
+
+    // 1. Establish live Socket.IO connection & authenticate
+    SocketService().connect(driverId: _driverId!, driverName: driverName);
+
+    // 2. Subscribe to connection updates: trigger backfill sync on reconnect
+    _connSub?.cancel();
+    _connSub = SocketService().connectionStream.listen((isConnected) {
+      if (isConnected) {
+        debugPrint('[ChatProvider] Socket reconnected — triggering historical backfill sync');
+        syncLiveChats();
+      }
     });
+
+    // 3. Subscribe to real-time incoming messages
+    _msgSub?.cancel();
+    _msgSub = SocketService().messageStream.listen((data) {
+      _handleIncomingSocketMessage(data);
+    });
+
+    // 4. Subscribe to live typing indicators
+    _typingSub?.cancel();
+    _typingSub = SocketService().typingStream.listen((data) {
+      final convoId = data['conversationId']?.toString();
+      final isTyping = data['isTyping'] == true;
+      if (convoId != null) {
+        _typingStates[convoId] = isTyping;
+        notifyListeners();
+      }
+    });
+
+    // 5. Subscribe to live read receipts
+    _readSub?.cancel();
+    _readSub = SocketService().readStream.listen((data) {
+      final convoId = data['conversationId']?.toString();
+      if (convoId != null && _messages.containsKey(convoId)) {
+        for (int i = 0; i < _messages[convoId]!.length; i++) {
+          if (_messages[convoId]![i].isMe) {
+            _messages[convoId]![i] = _messages[convoId]![i].copyWith(
+              status: MessageDeliveryStatus.read,
+            );
+          }
+        }
+        notifyListeners();
+      }
+    });
+
+    // 6. Initial historical sync on startup
+    await syncLiveChats();
+  }
+
+  void _handleIncomingSocketMessage(Map<String, dynamic> m) {
+    final convoId = m['conversationId']?.toString() ?? '';
+    final isMe = m['senderType'] == 'driver' || m['senderId']?.toString() == _driverId;
+    final createdAt = m['createdAt'] != null
+        ? DateTime.tryParse(m['createdAt'].toString())
+        : DateTime.now();
+    final timeStr =
+        '${createdAt!.hour > 12 ? createdAt.hour - 12 : (createdAt.hour == 0 ? 12 : createdAt.hour)}:${createdAt.minute.toString().padLeft(2, '0')} ${createdAt.hour >= 12 ? 'PM' : 'AM'}';
+
+    final newMsg = ChatMessageModel(
+      id: m['id']?.toString() ?? 'msg-${DateTime.now().millisecondsSinceEpoch}',
+      conversationId: convoId,
+      sender: isMe ? 'Me' : (m['senderName'] ?? 'Dispatch'),
+      text: m['body']?.toString() ?? '',
+      time: timeStr,
+      dateGroup: 'TODAY',
+      isMe: isMe,
+      type: MessageType.text,
+      status: isMe ? MessageDeliveryStatus.sent : MessageDeliveryStatus.read,
+    );
+
+    // Find target slot
+    String slotId = 'conv-admin';
+    if (_messages.containsKey(convoId)) {
+      slotId = convoId;
+    } else if (convoId.isNotEmpty) {
+      slotId = convoId;
+    }
+
+    if (!_messages.containsKey(slotId)) {
+      _messages[slotId] = [];
+    }
+
+    // Deduplication check by ID and tempId
+    final existingIdx = _messages[slotId]!.indexWhere((msg) =>
+        msg.id == newMsg.id ||
+        (m['tempId'] != null && msg.id == m['tempId']));
+
+    if (existingIdx != -1) {
+      _messages[slotId]![existingIdx] = newMsg;
+    } else {
+      _messages[slotId]!.add(newMsg);
+      _updateConversationLastMessage(slotId, newMsg.text, newMsg.time);
+    }
+    notifyListeners();
+  }
+
+  void joinConversationRoom(dynamic conversationId) {
+    SocketService().joinConversation(conversationId);
+  }
+
+  void leaveConversationRoom(dynamic conversationId) {
+    SocketService().leaveConversation(conversationId);
+  }
+
+  void setTyping(dynamic conversationId, bool isTyping) {
+    SocketService().sendTyping(conversationId, isTyping);
+  }
+
+  void markConversationRead(dynamic conversationId) {
+    SocketService().markRead(conversationId);
   }
 
   Future<String?> _getToken() async {
@@ -107,7 +227,7 @@ class ChatProvider extends ChangeNotifier {
     return _token;
   }
 
-  // Sync Live Messages from Backend Database
+  // Sync Live Messages from Backend Database with Deduplication
   Future<void> syncLiveChats() async {
     final token = await _getToken();
     if (token == null) return;
@@ -120,13 +240,15 @@ class ChatProvider extends ChangeNotifier {
           final serverMsgs = await ApiClient.fetchChatMessages(token, convoId);
           if (serverMsgs.isNotEmpty) {
             final mapped = serverMsgs.map((m) {
-              final isMe = m['senderType'] == 'driver';
+              final isMe = m['senderType'] == 'driver' || m['senderId']?.toString() == _driverId;
               final createdAt = m['createdAt'] != null
                   ? DateTime.tryParse(m['createdAt'].toString())
                   : null;
               final timeStr = createdAt != null
                   ? '${createdAt.hour > 12 ? createdAt.hour - 12 : (createdAt.hour == 0 ? 12 : createdAt.hour)}:${createdAt.minute.toString().padLeft(2, '0')} ${createdAt.hour >= 12 ? 'PM' : 'AM'}'
                   : 'Recent';
+
+              final isRead = m['read'] == true;
 
               return ChatMessageModel(
                 id: m['id']?.toString() ?? '',
@@ -137,25 +259,43 @@ class ChatProvider extends ChangeNotifier {
                 dateGroup: 'TODAY',
                 isMe: isMe,
                 type: MessageType.text,
-                status: MessageDeliveryStatus.read,
+                status: isRead ? MessageDeliveryStatus.read : MessageDeliveryStatus.sent,
               );
             }).toList();
 
             // Match conversation slot
             String slotId = 'conv-admin';
             if (chatJson['type'] == 'dispatcher' ||
-                chatJson['title']?.toString().toLowerCase().contains('disp') ==
-                    true) {
+                chatJson['title']?.toString().toLowerCase().contains('disp') == true) {
               slotId = 'conv-dispatcher';
-            } else if (chatJson['type'] == 'group' ||
-                chatJson['type'] == 'ops') {
+            } else if (chatJson['type'] == 'group' || chatJson['type'] == 'ops') {
               slotId = 'conv-group';
             }
 
-            _messages[slotId] = mapped;
-            if (mapped.isNotEmpty) {
-              _updateConversationLastMessage(
-                  slotId, mapped.last.text, mapped.last.time);
+            // Deduplicate: merge server messages with any currently sending local messages
+            final existingList = _messages[slotId] ?? [];
+            final pendingLocal = existingList.where((msg) => msg.status == MessageDeliveryStatus.sending).toList();
+
+            final seenIds = <String>{};
+            final merged = <ChatMessageModel>[];
+
+            for (final sm in mapped) {
+              if (sm.id.isNotEmpty && !seenIds.contains(sm.id)) {
+                seenIds.add(sm.id);
+                merged.add(sm);
+              }
+            }
+
+            // Append pending messages that are not yet acknowledged
+            for (final pm in pendingLocal) {
+              if (!seenIds.contains(pm.id)) {
+                merged.add(pm);
+              }
+            }
+
+            _messages[slotId] = merged;
+            if (merged.isNotEmpty) {
+              _updateConversationLastMessage(slotId, merged.last.text, merged.last.time);
             }
           }
         }
@@ -167,15 +307,16 @@ class ChatProvider extends ChangeNotifier {
   List<ChatMessageModel> getMessages(String conversationId) =>
       _messages[conversationId] ?? [];
 
-  // Send Live Text Message
+  // Send Live Text Message with Optimistic UI & Socket.IO Primary Dispatch
   Future<void> sendTextMessage(String conversationId, String text) async {
     final now = DateTime.now();
     final timeStr =
         '${now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour)}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
-    final msgId = 'msg-${now.millisecondsSinceEpoch}';
+    final tempMsgId = 'temp-${now.millisecondsSinceEpoch}';
 
+    // 1. Optimistic Local Bubble (🕒 sending)
     final localMsg = ChatMessageModel(
-      id: msgId,
+      id: tempMsgId,
       conversationId: conversationId,
       sender: 'Me',
       text: text,
@@ -183,7 +324,7 @@ class ChatProvider extends ChangeNotifier {
       dateGroup: 'TODAY',
       isMe: true,
       type: MessageType.text,
-      status: MessageDeliveryStatus.sent,
+      status: MessageDeliveryStatus.sending,
     );
 
     if (!_messages.containsKey(conversationId)) {
@@ -193,17 +334,52 @@ class ChatProvider extends ChangeNotifier {
     _updateConversationLastMessage(conversationId, text, timeStr);
     notifyListeners();
 
+    // 2. Primary Dispatch via Socket.IO if connected
+    if (SocketService().isConnected) {
+      SocketService().sendMessage(
+        conversationId: conversationId,
+        body: text,
+        tempId: tempMsgId,
+        onAck: (ack) {
+          if (ack['ok'] == true) {
+            final idx = _messages[conversationId]?.indexWhere((m) => m.id == tempMsgId) ?? -1;
+            if (idx != -1) {
+              _messages[conversationId]![idx] = localMsg.copyWith(
+                id: ack['message']?['id']?.toString() ?? tempMsgId,
+                status: MessageDeliveryStatus.sent,
+              );
+              notifyListeners();
+            }
+          }
+        },
+      );
+      return;
+    }
+
+    // 3. Fallback Dispatch via REST API
     final token = await _getToken();
     if (token != null) {
-      // Send to server backend
-      await ApiClient.sendChatMessage(token, conversationId, text);
-      syncLiveChats();
+      try {
+        final res = await ApiClient.sendChatMessage(token, conversationId, text);
+        if (res != null) {
+          final idx = _messages[conversationId]?.indexWhere((m) => m.id == tempMsgId) ?? -1;
+          if (idx != -1) {
+            _messages[conversationId]![idx] = localMsg.copyWith(
+              id: res['id']?.toString() ?? tempMsgId,
+              status: MessageDeliveryStatus.sent,
+            );
+            notifyListeners();
+          }
+        }
+        syncLiveChats();
+      } catch (e) {
+        // Retain sending status for offline retry on next syncLiveChats()
+      }
     }
   }
 
   // Send Image Attachment
-  Future<void> sendImageMessage(
-      String conversationId, String imagePath) async {
+  Future<void> sendImageMessage(String conversationId, String imagePath) async {
     final now = DateTime.now();
     final timeStr =
         '${now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour)}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
@@ -228,8 +404,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   // Send Document Attachment
-  Future<void> sendDocumentMessage(
-      String conversationId, String docName, String docSize) async {
+  Future<void> sendDocumentMessage(String conversationId, String docName, String docSize) async {
     final now = DateTime.now();
     final timeStr =
         '${now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour)}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
@@ -254,40 +429,33 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void markAsRead(dynamic conversationId) {
+    markConversationRead(conversationId);
+  }
+
   void _updateConversationLastMessage(
-      String conversationId, String lastMsg, String time) {
-    if (conversationId == 'conv-admin') {
-      _adminConversation = _adminConversation.copyWith(
-        lastMessage: lastMsg,
-        lastMessageTime: time,
-      );
-    } else if (conversationId == 'conv-dispatcher') {
-      _dispatcherConversation = _dispatcherConversation.copyWith(
-        lastMessage: lastMsg,
-        lastMessageTime: time,
-      );
-    } else if (conversationId == 'conv-group') {
-      _groupConversation = _groupConversation.copyWith(
-        lastMessage: lastMsg,
-        lastMessageTime: time,
-      );
+      String conversationId, String message, String time) {
+    switch (conversationId) {
+      case 'conv-admin':
+        _adminConversation = _adminConversation.copyWith(
+          lastMessage: message,
+          lastMessageTime: time,
+        );
+        break;
+      case 'conv-dispatcher':
+        _dispatcherConversation = _dispatcherConversation.copyWith(
+          lastMessage: message,
+          lastMessageTime: time,
+        );
+        break;
+      case 'conv-group':
+        _groupConversation = _groupConversation.copyWith(
+          lastMessage: message,
+          lastMessageTime: time,
+        );
+        break;
+      default:
+        break;
     }
-  }
-
-  void markAsRead(String conversationId) {
-    if (conversationId == 'conv-admin') {
-      _adminConversation = _adminConversation.copyWith(unreadCount: 0);
-    } else if (conversationId == 'conv-dispatcher') {
-      _dispatcherConversation =
-          _dispatcherConversation.copyWith(unreadCount: 0);
-    } else if (conversationId == 'conv-group') {
-      _groupConversation = _groupConversation.copyWith(unreadCount: 0);
-    }
-    notifyListeners();
-  }
-
-  void setTyping(String conversationId, bool typing) {
-    _typingStates[conversationId] = typing;
-    notifyListeners();
   }
 }

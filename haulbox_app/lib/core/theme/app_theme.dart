@@ -77,4 +77,82 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get darkTheme {
+    const darkBg = Color(0xFF0F172A);
+    const darkCard = Color(0xFF1E293B);
+    const darkBorder = Color(0xFF334155);
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      primaryColor: AppColors.emeraldPrimary,
+      scaffoldBackgroundColor: darkBg,
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.emeraldPrimary,
+        onPrimary: Colors.white,
+        secondary: Color(0xFF38BDF8),
+        onSecondary: Colors.black,
+        surface: darkCard,
+        onSurface: Colors.white,
+        error: AppColors.statusDanger,
+        onError: Colors.white,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF0B1329),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        iconTheme: IconThemeData(color: Colors.white, size: 22),
+        actionsIconTheme: IconThemeData(color: Colors.white, size: 22),
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+          letterSpacing: -0.3,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: darkCard,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.lgBorder,
+          side: const BorderSide(color: darkBorder, width: 1),
+        ),
+        margin: EdgeInsets.zero,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFF0B1329),
+        selectedItemColor: AppColors.emeraldPrimary,
+        unselectedItemColor: Color(0xFF94A3B8),
+        type: BottomNavigationBarType.fixed,
+        elevation: 8,
+        selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+        unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkCard,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13.5, fontWeight: FontWeight.w500),
+        border: OutlineInputBorder(
+          borderRadius: AppRadius.mdBorder,
+          borderSide: const BorderSide(color: darkBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppRadius.mdBorder,
+          borderSide: const BorderSide(color: darkBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppRadius.mdBorder,
+          borderSide: const BorderSide(color: AppColors.emeraldPrimary, width: 1.5),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: darkBorder,
+        thickness: 1,
+        space: 1,
+      ),
+    );
+  }
 }

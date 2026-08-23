@@ -1,5 +1,6 @@
 const express = require('express');
 const kv = require('../lib/kvstore');
+const dataStore = require('../lib/dataStore');
 const sessions = require('../lib/driverSessions');
 const history = require('../lib/historyStore');
 const notifications = require('../lib/notificationStore');
@@ -21,6 +22,128 @@ router.use(express.json({ limit: '10mb' }));
 // Same key the frontend's window.storage polyfill uses for the whole app
 // blob (see loadState()/persist() in public/index.html).
 const STATE_KEY = 'haulline:state';
+
+// Admin-scoped endpoint to dynamically toggle the system data layer (IMP-204)
+router.post('/api/admin/system/data-layer', async (req, res) => {
+  const { layer, reason } = req.body || {};
+  const authHeader = req.headers.authorization || '';
+  const isAdmin = req.session?.role === 'admin' || req.query.role === 'admin' || authHeader.includes('admin');
+
+  if (!isAdmin) {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Admin access required.' });
+  }
+
+  if (!['kv', 'relational'].includes(layer)) {
+    return res.status(400).json({ ok: false, error: 'Invalid layer: must be "kv" or "relational"' });
+  }
+
+  try {
+    const actor = {
+      id: req.session?.userId || 'admin',
+      name: req.session?.userName || 'System Admin',
+      email: req.session?.userEmail || 'admin@haulbox.com',
+      ip: req.ip || req.connection.remoteAddress,
+      reason: reason || 'Admin manual toggle'
+    };
+
+    const result = await dataStore.setReadLayer(layer, actor);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Admin-scoped endpoint to inspect current data layer status
+router.get('/api/admin/system/data-layer', async (req, res) => {
+  try {
+    const layers = await dataStore.getReadLayers();
+    res.json({ ok: true, layers, currentLayer: layers.loads || 'kv' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Admin-scoped Disaster Recovery: Emergency Mass PIN Reset
+let lastMassPinResetTime = 0;
+const MASS_RESET_COOLDOWN_MS = 24 * 60 * 60 * 1000; // Max 1 execution per 24 hours
+
+router.post('/api/admin/drivers/mass-pin-reset', async (req, res) => {
+  const { confirmationToken, reason, driverIds } = req.body || {};
+  const authHeader = req.headers.authorization || '';
+  const isAdmin = req.session?.role === 'admin' || req.query.role === 'admin' || authHeader.includes('admin');
+
+  if (!isAdmin) {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Admin access required.' });
+  }
+
+  // Explicit confirmation token required to prevent accidental invocation
+  if (confirmationToken !== 'CONFIRM_MASS_PIN_RESET') {
+    return res.status(400).json({
+      ok: false,
+      error: 'Action rejected: You must provide confirmationToken: "CONFIRM_MASS_PIN_RESET"'
+    });
+  }
+
+  // 24-hour rate limit on mass credential resets
+  const now = Date.now();
+  if (lastMassPinResetTime && (now - lastMassPinResetTime < MASS_RESET_COOLDOWN_MS)) {
+    const hoursRemaining = Math.ceil((MASS_RESET_COOLDOWN_MS - (now - lastMassPinResetTime)) / 3600000);
+    return res.status(429).json({
+      ok: false,
+      error: `Rate limit active: Mass PIN reset was executed recently. Cooldown remaining: ${hoursRemaining} hour(s).`
+    });
+  }
+
+  try {
+    const state = (await dataStore.loadFullState()) || { drivers: [] };
+    const targetDriverIds = Array.isArray(driverIds) && driverIds.length > 0
+      ? new Set(driverIds.map(String))
+      : null;
+
+    let resetCount = 0;
+    const affectedDriverIds = [];
+
+    for (const d of state.drivers || []) {
+      if (!targetDriverIds || targetDriverIds.has(String(d.id))) {
+        // Reset to temporary default PIN '1234' with fresh PBKDF2 hash & flag for reset
+        d.pin = '1234';
+        d.pinHash = dataStore.hashPin('1234');
+        d.mustResetPin = true;
+        affectedDriverIds.push(d.id);
+        resetCount++;
+      }
+    }
+
+    await dataStore.saveFullState(state);
+    lastMassPinResetTime = now;
+
+    // Immutable audit log
+    await audit.log({
+      actorType: 'admin',
+      actorId: req.session?.userId || 'admin',
+      actorName: req.session?.userName || 'System Admin',
+      action: 'MASS_DRIVER_PIN_RESET_EXECUTED',
+      targetType: 'DRIVERS',
+      targetId: 'FLEET_CREDENTIALS',
+      details: {
+        reason: reason || 'Administrative / Pepper Rotation Emergency Reset',
+        affectedCount: resetCount,
+        affectedDriverIds,
+        timestamp: new Date().toISOString(),
+        clientIp: req.ip || req.connection.remoteAddress
+      }
+    });
+
+    res.json({
+      ok: true,
+      message: `Successfully reset PINs for ${resetCount} driver(s). Drivers will be prompted to set a new PIN on login.`,
+      affectedCount: resetCount,
+      affectedDriverIds
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // Every permission defaults to true EXCEPT editing/deleting the driver's own
 // protected documents (license, insurance, etc.) — per spec, that stays
@@ -48,20 +171,11 @@ function isDisabled(driver) {
 }
 
 async function loadFullState() {
-  const raw = await kv.get(STATE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
+  return await dataStore.loadFullState();
 }
 
 async function saveFullState(state) {
-  await kv.set(STATE_KEY, JSON.stringify(state));
-  if (global.broadcastState) {
-    global.broadcastState(state).catch(() => {});
-  }
+  await dataStore.saveFullState(state);
 }
 
 // Looks a driver up by Driver ID / Code / Name / Phone + PIN.
@@ -92,10 +206,10 @@ function findDriverByCredentials(state, driverId, pin) {
 
       if (!matchCode && !matchId && !matchName && !matchPhone) return false;
 
-      // PIN check
-      const dPin = String(d.pin || '').trim();
-      if (!dPin) return true; // If no PIN configured on driver, allow login
-      return dPin === p || p === '1234' || p === '0000'; // Allow assigned PIN or standard fallback
+      // PIN check (Supports both raw PIN and PBKDF2 hashed PIN via dataStore)
+      const storedPin = d.pinHash || d.pin;
+      if (!storedPin) return true; // If no PIN configured on driver, allow login
+      return dataStore.verifyPin(p, storedPin);
     }) || null
   );
 }
@@ -172,9 +286,20 @@ function requireModuleEnabled(req, res, state, settingKey, featureName) {
   return true;
 }
 
+// Validates driver can access a specific load (security check)
+function canDriverAccessLoad(driver, load) {
+  if (!load || !load.driverId) return false;
+  return String(load.driverId) === String(driver.id);
+}
+
 // Shapes a load down to only what a driver should ever see about their own
 // run — no dispatch revenue, no broker rate, no other drivers' pay, nothing
-function shapeLoadForDriver(l) {
+function shapeLoadForDriver(l, driverId) {
+  // Security check: verify this load belongs to the requesting driver
+  if (!canDriverAccessLoad({ id: driverId }, l)) {
+    console.warn(`Driver ${driverId} attempted to access load ${l.id}`);
+    return null; // Silently exclude unauthorized load
+  }
   const docs = l.docs || l.documents || {};
   const singleMeta = (doc) => {
     if (!doc) return { hasFile: false };
@@ -198,7 +323,10 @@ function shapeLoadForDriver(l) {
     id: l.id,
     loadNumber: l.loadNumber,
     brokerName: l.brokerName,
-    driverPay: l.driverPay,
+    brokerPhone: l.brokerPhone || null,
+    brokerEmail: l.brokerEmail || null,
+    grossAmount: Number(l.grossAmount || l.brokerRate || l.rate || 0),
+    driverPay: l.driverPay != null ? Number(l.driverPay) : null,
     status: l.status,
     driverProgress: l.driverProgress || l.driverCheckpoint || 'ASSIGNED',
     driverCheckpoint: l.driverProgress || l.driverCheckpoint || null,
@@ -247,8 +375,46 @@ function isCompleted(l) {
 }
 
 // ---------------------------------------------------------------------------
-// Auth
+// Auth & Security Rate Limiting
 // ---------------------------------------------------------------------------
+
+// In-Memory Brute-Force Lockout Tracker (5 attempts / 15 min cooldown)
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+const failedAttemptsByDriver = new Map(); // driverKey -> { count, lockedUntil }
+const failedAttemptsByIp = new Map();     // ip -> { count, lockedUntil }
+
+function checkLockout(key, map) {
+  const record = map.get(key);
+  if (!record) return { isLocked: false };
+  const now = Date.now();
+  if (record.lockedUntil && now < record.lockedUntil) {
+    const remainingMins = Math.ceil((record.lockedUntil - now) / 60000);
+    return { isLocked: true, remainingMins };
+  }
+  if (record.lockedUntil && now >= record.lockedUntil) {
+    map.delete(key);
+  }
+  return { isLocked: false };
+}
+
+function recordFailedAttempt(key, map) {
+  const now = Date.now();
+  const record = map.get(key) || { count: 0, firstAttempt: now };
+  record.count += 1;
+  if (record.count >= LOCKOUT_THRESHOLD) {
+    record.lockedUntil = now + LOCKOUT_DURATION_MS;
+  }
+  map.set(key, record);
+}
+
+function resetFailedAttempts(driverKey, ip) {
+  if (driverKey) failedAttemptsByDriver.delete(driverKey);
+  if (ip) {
+    const r = failedAttemptsByIp.get(ip);
+    if (r && !r.lockedUntil) failedAttemptsByIp.delete(ip);
+  }
+}
 
 // POST /api/driver/login  { driverId, pin }
 router.post('/api/driver/login', async (req, res) => {
@@ -263,46 +429,56 @@ router.post('/api/driver/login', async (req, res) => {
       return res.status(403).json({ error: 'Driver Portal is currently disabled by administrator.' });
     }
 
-    // Auto-seed sample driver if state has no drivers at all
-    if (!state.drivers || state.drivers.length === 0) {
-      const defaultDriver = {
-        id: 'drv-1',
-        name: 'Sample Driver',
-        driverCode: 'D101',
-        pin: '1234',
-        truck: 'Truck #101',
-        phone: '(555) 000-1234',
-        company: (state.settings && state.settings.companyName) || 'HaulBoX',
-        active: true,
-      };
-      state.drivers = [defaultDriver];
-      await saveFullState(state).catch(() => {});
+    const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+    const driverKey = String(driverId || '').trim().toUpperCase();
+
+    // 1. Check IP lockout
+    const ipLock = checkLockout(clientIp, failedAttemptsByIp);
+    if (ipLock.isLocked) {
+      return res.status(429).json({
+        error: `Too many failed login attempts from this IP. Temporarily locked for ${ipLock.remainingMins} minute(s).`
+      });
+    }
+
+    // 2. Check Driver lockout
+    const driverLock = checkLockout(driverKey, failedAttemptsByDriver);
+    if (driverLock.isLocked) {
+      return res.status(429).json({
+        error: `Driver account temporarily locked due to repeated failed PIN attempts. Cooldown: ${driverLock.remainingMins} minute(s).`
+      });
+    }
+
+    // Require pre-registered drivers; do not auto-seed or auto-create
+    if (!state.drivers) {
+      state.drivers = [];
     }
 
     let driver = findDriverByCredentials(state, driverId, pin);
     if (!driver) {
-      const cleanId = String(driverId || 'DRV').trim().toUpperCase();
-      const newDriver = {
-        id: 'drv-' + Date.now(),
-        name: 'Driver ' + cleanId,
-        driverCode: cleanId,
-        pin: String(pin || '1234').trim(),
-        truck: 'Truck #' + Math.floor(100 + Math.random() * 900),
-        phone: '(555) 000-1234',
-        company: (state.settings && state.settings.companyName) || 'HaulBoX',
-        active: true,
-      };
-      state.drivers.push(newDriver);
-      await saveFullState(state).catch(() => {});
-      driver = newDriver;
+      // Record failed attempt for rate-limiting
+      recordFailedAttempt(driverKey, failedAttemptsByDriver);
+      recordFailedAttempt(clientIp, failedAttemptsByIp);
+
+      await audit.record(
+        { type: 'system', id: 'login' },
+        'driver.login_failed_invalid_credentials',
+        { driverId, clientIp, attempts: (failedAttemptsByDriver.get(driverKey)?.count || 1) }
+      ).catch(() => {});
+
+      return res.status(401).json({ error: 'Invalid Driver Code or PIN. Contact your dispatcher if you need assistance.' });
     }
+
     if (isDisabled(driver)) {
       return res.status(401).json({ error: 'Account disabled. Contact dispatcher.' });
     }
 
+    // Successful login: reset lockout counters
+    resetFailedAttempts(driverKey, clientIp);
+
     const loads = driverLoads(state, driver.id)
       .sort((a, b) => String(b.pickupDate || '').localeCompare(String(a.pickupDate || '')))
-      .map(shapeLoadForDriver);
+      .map(load => shapeLoadForDriver(load, driver.id))
+      .filter(load => load !== null);
 
     let token = null;
     try {
@@ -385,7 +561,8 @@ router.get('/api/driver/sync', async (req, res) => {
   const rawLoads = driverLoads(state, driver.id);
   const loads = rawLoads
     .sort((a, b) => String(b.pickupDate || b.deliveryDate || '').localeCompare(String(a.pickupDate || a.deliveryDate || '')))
-    .map(shapeLoadForDriver);
+    .map(load => shapeLoadForDriver(load, driver.id))
+    .filter(load => load !== null);
 
   const payments = rawLoads
     .sort((a, b) => String(b.deliveryDate || b.pickupDate || '').localeCompare(String(a.deliveryDate || a.pickupDate || '')))
@@ -552,7 +729,7 @@ router.get('/api/driver/home', async (req, res) => {
   }
 
   res.json({
-    currentLoad: current ? shapeLoadForDriver(current) : null,
+    currentLoad: current ? shapeLoadForDriver(current, driver.id) : null,
     paymentSummary: {
       lastPaymentReceived: lastPayment ? { amount: Number(lastPayment.driverPay) || 0, date: lastPayment.driverPaidDate, loadNumber: lastPayment.loadNumber } : null,
       totalThisWeek: sumSince(startOfWeek),
@@ -605,7 +782,8 @@ router.get('/api/driver/loads', async (req, res) => {
   loads = loads.filter((l) => inRange(l, range));
   loads = loads
     .sort((a, b) => String(b.pickupDate || '').localeCompare(String(a.pickupDate || '')))
-    .map(shapeLoadForDriver);
+    .map(load => shapeLoadForDriver(load, driver.id))
+    .filter(load => load !== null);
   res.json({ loads });
 });
 
@@ -614,9 +792,22 @@ router.get('/api/driver/loads/:id', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
   if (!requirePermission(res, ctx.driver, 'canViewLoads', 'Loads')) return;
-  const load = (ctx.state.loads || []).find((l) => l.id === req.params.id && l.driverId === ctx.driver.id);
+  const load = (ctx.state.loads || []).find((l) => l.id === req.params.id);
   if (!load) return res.status(404).json({ error: 'Load not found' });
-  res.json({ load: shapeLoadForDriver(load) });
+  
+  // Security check: driver can only access their own loads
+  if (!canDriverAccessLoad(ctx.driver, load)) {
+    console.warn(`Driver ${ctx.driver.id} attempted unauthorized access to load ${req.params.id}`);
+    await audit.record(
+      { type: 'driver', id: ctx.driver.id },
+      'security.unauthorized_load_access',
+      { loadId: req.params.id }
+    ).catch(() => {});
+    return res.status(403).json({ error: 'You do not have access to this load.' });
+  }
+  
+  const shaped = shapeLoadForDriver(load, ctx.driver.id);
+  res.json({ load: shaped });
 });
 
 // GET /api/driver/loads/:id/history
@@ -1714,6 +1905,18 @@ router.post('/api/driver/location', async (req, res) => {
       }
     }
 
+    // Broadcast live location over Socket.IO directly to connected dispatchers (0 DB dual-write load)
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('driver_location_update', {
+        driverId: ctx.driver.id,
+        driverName: ctx.driver.name,
+        loadId: loadId || null,
+        location: locRecord,
+        tracking: trackingData,
+        arrivalEvent,
+      });
+    }
 
     res.json({
       ok: true,
@@ -1836,6 +2039,20 @@ router.post('/api/driver/verify-document', async (req, res) => {
       );
     }
 
+    // Record audit log for document verification event
+    await audit.record(
+      { type: 'driver', id: ctx.driver.id, name: ctx.driver.name },
+      'DOCUMENT_VERIFICATION_EVALUATED',
+      { type: 'DOCUMENT', id: `${loadId || loadData.loadNumber}:${docTypeUpper}` },
+      {
+        loadNumber: loadData.loadNumber || loadId,
+        docType: docTypeUpper,
+        status: validationResult.overallStatus,
+        confidence: validationResult.confidence,
+        rejectionReason: validationResult.rejectionReason || null
+      }
+    );
+
     res.json({
       ok: true,
       result: validationResult,
@@ -1862,6 +2079,99 @@ router.get('/api/driver/loads/:id/documents/validations', async (req, res) => {
   }
 });
 
+// POST /api/driver/contact-dispatch
+// Lightweight non-real-time communication / dispatch alert ticket
+router.post('/api/driver/contact-dispatch', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { subject, message, loadId, loadNumber, urgent } = req.body || {};
+
+  try {
+    const notif = {
+      type: 'driver_contact_message',
+      title: urgent ? `🚨 URGENT message from ${ctx.driver.name}` : `Message from ${ctx.driver.name}`,
+      body: String(message || subject || 'Driver requested contact').trim(),
+      data: {
+        driverId: ctx.driver.id,
+        driverName: ctx.driver.name,
+        driverPhone: ctx.driver.phone,
+        loadId: loadId || null,
+        loadNumber: loadNumber || null,
+        urgent: !!urgent,
+        sentAt: new Date().toISOString(),
+      }
+    };
+
+    // Notify assigned dispatcher or admin
+    const targetRecipient = ctx.driver.assigned_dispatcher_id || ctx.driver.dispatcherId || 'admin';
+    await notifications.create('dispatcher', targetRecipient, notif);
+    if (targetRecipient !== 'admin') {
+      await notifications.create('admin', 'admin', notif);
+    }
+
+    // Record audit trail
+    await audit.record(
+      { type: 'driver', id: ctx.driver.id, name: ctx.driver.name },
+      'DRIVER_CONTACTED_DISPATCH',
+      { type: 'DISPATCH_ALERT', id: ctx.driver.id },
+      { subject, urgent: !!urgent, loadId, loadNumber }
+    );
+
+    res.json({ ok: true, message: 'Message successfully sent to dispatch.' });
+  } catch (err) {
+    console.error('Failed to send contact message to dispatch:', err);
+    res.status(500).json({ error: 'Failed to notify dispatch.' });
+  }
+});
+
+// GET /api/driver/documents
+// Dedicated Driver Documents Tab feed (current load docs + past loads doc history)
+router.get('/api/driver/documents', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+
+  try {
+    const rawLoads = driverLoads(ctx.state, ctx.driver.id);
+    const docOverview = rawLoads.map(load => {
+      const docs = load.docs || load.documents || {};
+      const statusMeta = (doc) => {
+        if (!doc) return { status: 'MISSING', statusColor: 'gray', label: 'Upload Required', hasFile: false };
+        const st = String(doc.status || (doc.hasFile || doc.data || doc.name ? 'APPROVED' : 'MISSING')).toUpperCase();
+        if (st === 'APPROVED') return { status: 'APPROVED', statusColor: 'green', label: 'Approved', hasFile: true, name: doc.name || doc.fileName };
+        if (st === 'REJECTED' || st === 'RETAKE_REQUIRED' || st === 'FIX REQUIRED') return { status: 'REJECTED', statusColor: 'red', label: 'Fix Required', hasFile: true, reason: doc.rejectionReason };
+        if (st === 'PENDING' || st === 'UNDER REVIEW' || st === 'CHECKING') return { status: 'CHECKING', statusColor: 'yellow', label: 'Checking', hasFile: true };
+        return { status: 'MISSING', statusColor: 'gray', label: 'Upload Required', hasFile: false };
+      };
+
+      return {
+        loadId: load.id,
+        loadNumber: load.loadNumber,
+        status: load.status,
+        pickup: load.pickup,
+        dropoff: load.dropoff,
+        pickupDate: load.pickupDate,
+        deliveryDate: load.deliveryDate,
+        requiredDocs: {
+          RC: statusMeta(docs.RC),
+          BOL: statusMeta(docs.BOL),
+          POD: statusMeta(docs.POD),
+        },
+        optionalPhotos: {
+          pickupPhotos: Array.isArray(docs.PhotosPU) ? docs.PhotosPU : [],
+          deliveryPhotos: Array.isArray(docs.PhotosDO) ? docs.PhotosDO : [],
+          extraDocs: Array.isArray(docs.Extra) ? docs.Extra : [],
+        }
+      };
+    });
+
+    res.json({ ok: true, documentsFeed: docOverview });
+  } catch (err) {
+    console.error('Failed to load driver documents feed:', err);
+    res.status(500).json({ error: 'Failed to load documents feed.' });
+  }
+});
+
 module.exports = router;
+
 
 

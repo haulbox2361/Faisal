@@ -24,7 +24,7 @@
 </head>
 <body>
 
-  <!-- ============ LOGIN GATE (mock Google OAuth) ============ -->
+  <!-- ============ LOGIN GATE (Google OAuth for Staff) ============ -->
   <div id="login-gate">
     <div class="login-card">
       <div id="haulbox-3d-cube-login"
@@ -46,12 +46,9 @@
         Sign in with Google
       </button>
       <div id="login-status" style="min-height:16px;font-size:11.5px;margin-top:10px;color:var(--text-faint);"></div>
-      <div class="login-foot">Only Google accounts registered as Admin or a Dispatcher can get in — everyone else is
-        turned away automatically. Ask your Admin to add your email under Dispatchers if you're locked out.</div>
+      <div class="login-foot">Only Google accounts registered as Super Admin, Admin, or Dispatcher can access Dispatcher Web. No self-registration.</div>
       <div class="login-foot" style="margin-top:10px;display:flex;justify-content:center;gap:14px;">
         <a href="#" onclick="showDriverLogin();return false;" style="color:var(--accent);text-decoration:none;font-weight:600;">Driver Login →</a>
-        <span style="color:var(--text-faint);">•</span>
-        <a href="#" onclick="openAboutModal();return false;" style="color:#60a5fa;text-decoration:none;font-weight:600;">About Us ✨</a>
       </div>
     </div>
   </div>
@@ -76,13 +73,13 @@
       </form>
       <div id="driver-login-status" style="min-height:16px;font-size:11.5px;margin-top:12px;color:var(--text-faint);">
       </div>
-      <div class="login-foot">Ask your dispatcher or admin for your Driver ID and PIN.</div>
+      <div class="login-foot">Ask your administrator for your assigned Driver ID and 4-digit PIN.</div>
       <div class="login-foot" style="margin-top:10px;"><a href="#" onclick="showStaffLogin();return false;"
           style="color:var(--accent);text-decoration:none;font-weight:600;">← Staff sign-in</a></div>
     </div>
   </div>
 
-  <!-- ============ DRIVER APP (mobile) ============ -->
+  <!-- ============ DRIVER APP (mobile-first web view) ============ -->
   <div id="driver-app" style="display:none;">
     <header class="drv-header">
       <div class="drv-header-brand">
@@ -92,13 +89,18 @@
           <div class="drv-header-truck" id="drv-truck-line">—</div>
         </div>
       </div>
-      <button class="icon-mini" id="drv-signout-btn" onclick="driverSignOut()" title="Sign out">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-          <path d="M16 17l5-5-5-5" />
-          <path d="M21 12H9" />
-        </svg>
-      </button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-sm btn-ghost" onclick="openDriverContactDispatchModal()" style="font-size:11px;font-weight:700;color:#0284c7;background:rgba(2,132,199,0.08);border-radius:20px;padding:4px 10px;">
+          📞 Contact Dispatch
+        </button>
+        <button class="icon-mini" id="drv-signout-btn" onclick="driverSignOut()" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <path d="M16 17l5-5-5-5" />
+            <path d="M21 12H9" />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <div class="drv-body" id="drv-body">
@@ -107,6 +109,16 @@
       <section class="drv-page active" id="drv-page-home">
         <div class="drv-section-title">Current Load</div>
         <div id="drv-current-wrap"></div>
+
+        <div class="drv-section-title">Quick Actions</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+          <button class="btn btn-ghost" onclick="setDriverPage('documents')" style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:12px;display:flex;align-items:center;gap:8px;justify-content:center;font-weight:700;color:#0f172a;">
+            📄 Upload Docs
+          </button>
+          <button class="btn btn-ghost" onclick="openDriverContactDispatchModal()" style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px;border-radius:12px;display:flex;align-items:center;gap:8px;justify-content:center;font-weight:700;color:#0284c7;">
+            💬 Alert Dispatch
+          </button>
+        </div>
 
         <div class="drv-section-title">This Week</div>
         <div class="drv-stat-row">
@@ -123,6 +135,18 @@
             <div class="drv-summary-label">Gross Pay</div>
           </div>
         </div>
+      </section>
+
+      <!-- ---- DOCUMENTS (Dedicated Driver Docs Tab) ---- -->
+      <section class="drv-page" id="drv-page-documents">
+        <div class="drv-section-title" style="margin-top:0;">Required Documents</div>
+        <div id="drv-required-docs-wrap" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;"></div>
+
+        <div class="drv-section-title">Optional Photos (Pickup &amp; Delivery)</div>
+        <div id="drv-optional-photos-wrap" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;"></div>
+
+        <div class="drv-section-title">Past Loads Documents</div>
+        <div id="drv-past-docs-wrap" style="display:flex;flex-direction:column;gap:10px;"></div>
       </section>
 
       <!-- ---- LOADS (history) ---- -->
@@ -151,14 +175,8 @@
             <div class="drv-summary-label">Pending</div>
           </div>
         </div>
-        <div class="drv-section-title">Transaction History</div>
+        <div class="drv-section-title">Settlement Breakdown</div>
         <div id="drv-txn-list"></div>
-      </section>
-
-      <!-- ---- CHAT ---- -->
-      <section class="drv-page" id="drv-page-chat">
-        <div class="drv-section-title" style="margin-top:0;">Chat</div>
-        <div id="drv-chat-list" class="drv-load-list" style="padding:0;"></div>
       </section>
 
       <!-- ---- PROFILE ---- -->
@@ -173,22 +191,14 @@
         <div class="drv-section-title">Your Details</div>
         <div class="drv-info-list" id="drv-info-list"></div>
 
-
-
         <div class="drv-section-title">&nbsp;</div>
         <button class="btn btn-ghost" style="width:100%;color:var(--red);" onclick="driverSignOut()">Sign Out</button>
       </section>
 
     </div>
 
+    <!-- DRIVER BOTTOM NAVIGATION: Exactly Loads — Documents — HOME — Payments — Profile -->
     <nav class="drv-bottomnav">
-      <button class="drv-nav-btn active" data-page="home" onclick="setDriverPage('home')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 11l9-8 9 8" />
-          <path d="M5 10v10h14V10" />
-        </svg>
-        Home
-      </button>
       <button class="drv-nav-btn" data-page="loads" onclick="setDriverPage('loads')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -196,19 +206,28 @@
         </svg>
         Loads
       </button>
+      <button class="drv-nav-btn" data-page="documents" onclick="setDriverPage('documents')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+        Documents
+      </button>
+      <button class="drv-nav-btn active" data-page="home" onclick="setDriverPage('home')">
+        <div style="background:#0284c7;color:#fff;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 2px;box-shadow:0 3px 10px rgba(2,132,199,0.4);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+            <path d="M3 11l9-8 9 8" />
+            <path d="M5 10v10h14V10" />
+          </svg>
+        </div>
+        Home
+      </button>
       <button class="drv-nav-btn" data-page="pay" onclick="setDriverPage('pay')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="2" y="6" width="20" height="12" rx="2" />
           <circle cx="12" cy="12" r="2.5" />
         </svg>
-        Pay
-      </button>
-      <button class="drv-nav-btn" data-page="chat" onclick="setDriverPage('chat')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a4 4 0 01-4 4H8l-5 3V6a4 4 0 014-4h10a4 4 0 014 4z" />
-        </svg>
-        Chat
-        <span class="drv-nav-badge" id="drv-chat-nav-badge" style="display:none;">0</span>
+        Payments
       </button>
       <button class="drv-nav-btn" data-page="profile" onclick="setDriverPage('profile')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -234,7 +253,7 @@
     </div>
   </div>
 
-  <!-- ============ DRIVER ROW CONTACT POPUP (Truck #, Phone, Email) ============ -->
+  <!-- ============ DRIVER CONTACT POPUP ============ -->
   <div class="modal-overlay" id="modal-driver-contact">
     <div class="modal" style="max-width:360px;">
       <div class="modal-head">
@@ -245,27 +264,6 @@
           </svg></div>
       </div>
       <div class="modal-body" id="driver-contact-body"></div>
-    </div>
-  </div>
-
-  <!-- ============ DRIVER CHAT THREAD MODAL ============ -->
-  <div class="modal-overlay" id="modal-driver-chat">
-    <div class="modal" style="max-width:480px;display:flex;flex-direction:column;height:72vh;max-height:72vh;">
-      <div class="modal-head">
-        <h3 id="drv-chat-thread-title">Chat</h3>
-        <div class="modal-close" onclick="closeDriverChatThread()"><svg viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg></div>
-      </div>
-      <div class="modal-body" id="drv-chat-thread-msgs"
-        style="flex:1;overflow-y:auto;display:flex;flex-direction:column;"></div>
-      <div style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border-soft);">
-        <input id="drv-chat-input" placeholder="Type a message…"
-          style="flex:1;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();sendDriverChatMessage();}">
-        <button class="btn btn-accent btn-sm" onclick="sendDriverChatMessage()">Send</button>
-      </div>
     </div>
   </div>
 
@@ -290,21 +288,34 @@
     </div>
   </div>
 
-  <!-- ============ DRIVER PROFILE DOC MODAL (upload w/ expiry date) ============ -->
-  <div class="modal-overlay" id="modal-driver-doc">
-    <div class="modal" style="max-width:400px;">
+  <!-- ============ DRIVER CONTACT DISPATCH MODAL ============ -->
+  <div class="modal-overlay" id="modal-driver-contact-dispatch">
+    <div class="modal" style="max-width:420px;">
       <div class="modal-head">
-        <h3 id="drv-doc-modal-title">Document</h3>
-        <div class="modal-close" onclick="closeModal('modal-driver-doc')"><svg viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg></div>
+        <h3>Contact Dispatch</h3>
+        <div class="modal-close" onclick="closeModal('modal-driver-contact-dispatch')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
       </div>
       <div class="modal-body">
-        <form onsubmit="return submitDriverDocUpload(event)" style="display:flex;flex-direction:column;gap:12px;">
-          <div class="field"><label>File</label><input type="file" id="drv-doc-file" required></div>
-          <div class="field"><label>Expiry Date (optional)</label><input type="date" id="drv-doc-expiry"></div>
-          <button class="btn btn-accent" type="submit">Upload</button>
+        <p style="font-size:13px;color:#64748b;margin:0 0 14px;">Need urgent help or have a question about your load? Send a message directly to your dispatcher team.</p>
+        <form onsubmit="return submitDriverContactDispatch(event)">
+          <div class="field" style="margin-bottom:12px;">
+            <label>Subject / Topic</label>
+            <select id="drv-contact-subject" style="width:100%;">
+              <option value="General Question">General Question</option>
+              <option value="Pickup Delay">Pickup Delay / Waiting at Shipper</option>
+              <option value="Delivery Issue">Delivery Issue / Receiver Closed</option>
+              <option value="Breakdown / Emergency">🚨 Breakdown / Emergency</option>
+              <option value="Document Question">Document / Rate Confirmation Question</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:14px;">
+            <label>Message</label>
+            <textarea id="drv-contact-message" rows="3" placeholder="Describe the situation or note for dispatch..." required style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;"></textarea>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button type="button" class="btn btn-ghost" onclick="closeModal('modal-driver-contact-dispatch')">Cancel</button>
+            <button type="submit" class="btn btn-accent" id="drv-contact-send-btn">Send Message</button>
+          </div>
         </form>
       </div>
     </div>
@@ -363,28 +374,6 @@
           </svg>
           Dispatchers
         </div>
-        <div class="nav-item" data-view="brokers">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 7h-7L10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
-          </svg>
-          Brokers
-        </div>
-
-        <div class="nav-item" data-view="chat" id="nav-chat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          Chat <span class="badge" id="chat-sidebar-badge"
-            style="display:none;margin-left:auto;background:var(--accent);color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;">0</span>
-        </div>
-        <div class="nav-item" data-view="driverpay" data-role-view="admin">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="6" width="20" height="12" rx="2" />
-            <circle cx="12" cy="12" r="2.6" />
-            <path d="M6 12h.01M18 12h.01" />
-          </svg>
-          Payments
-        </div>
         <div class="nav-item" data-view="docreview">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -393,7 +382,15 @@
             <line x1="16" y1="17" x2="8" y2="17" />
             <polyline points="10 9 9 9 8 9" />
           </svg>
-          Doc Review <span class="badge" id="doc-review-badge" style="display:none;margin-left:auto;background:#f59e0b;color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;">0</span>
+          Documents <span class="badge" id="doc-review-badge" style="display:none;margin-left:auto;background:#f59e0b;color:#fff;font-size:11px;padding:2px 6px;border-radius:10px;">0</span>
+        </div>
+        <div class="nav-item" data-view="driverpay" data-role-view="admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="6" width="20" height="12" rx="2" />
+            <circle cx="12" cy="12" r="2.6" />
+            <path d="M6 12h.01M18 12h.01" />
+          </svg>
+          Payments
         </div>
         <div class="nav-item" data-view="statistics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -415,14 +412,6 @@
               d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z" />
           </svg>
           Settings
-        </div>
-        <div class="nav-item" onclick="openAboutModal()" style="color:#60a5fa;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="12"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-          </svg>
-          About Us
         </div>
       </nav>
       <div class="sidebar-foot" style="padding:10px 14px;border-top:1px solid #1e293b;">
@@ -2323,6 +2312,201 @@
           <div class="doc-grid" id="d-docs-list"></div>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
             <button type="button" class="btn btn-sm btn-ghost" id="driver-add-doc-btn" onclick="addDriverDocSlot()">+
+            stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg></div>
+      </div>
+      <div class="modal-body" style="padding:22px 20px;">
+        <p style="font-size:13px;color:var(--text-dim);margin:0 0 16px;line-height:1.5;">Enter the 6-digit security PIN to unlock the Settings page.</p>
+        <form onsubmit="return submitSettingsPin(event)">
+          <div style="margin-bottom:16px;">
+            <input type="password" id="settings-pin-input" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="••••••"
+              style="font-size:24px;letter-spacing:10px;text-align:center;font-weight:800;padding:10px;width:100%;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text);"
+              autocomplete="off" required>
+          </div>
+          <div id="settings-pin-error" style="color:var(--red,#ef4444);font-size:12px;font-weight:600;min-height:18px;margin-bottom:14px;"></div>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button type="button" class="btn btn-ghost" onclick="cancelSettingsPin()" style="flex:1;">Cancel</button>
+            <button type="submit" id="settings-pin-submit-btn" class="btn btn-accent" style="flex:1.2;font-weight:700;">Unlock</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-driver">
+    <div class="modal" style="max-width:780px;">
+      <div class="modal-head">
+        <h3 id="driver-modal-title">Add Driver</h3>
+        <div class="modal-close" onclick="closeModal('modal-driver')"><svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg></div>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="return saveDriver(event)">
+          <input type="hidden" id="d-id">
+
+          <div class="form-section-title">Driver Info</div>
+          <div class="form-grid">
+            <div class="field"><label>Driver Name <span class="req">*</span></label><input type="text" id="d-name"
+                required></div>
+            <div class="field"><label>Phone Number</label><input type="text" id="d-phone"></div>
+            <div class="field"><label>Email</label><input type="email" id="d-email"></div>
+            <div class="field"><label>Company Name</label><input type="text" id="d-company"></div>
+            <div class="field"><label>Hometown</label><input type="text" id="d-hometown" placeholder="e.g. Wichita, KS">
+            </div>
+            <div class="field">
+              <label>OTR or Local</label>
+              <select id="d-otr-local">
+                <option value="">—</option>
+                <option value="OTR">OTR</option>
+                <option value="Local">Local</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Team or Solo</label>
+              <select id="d-team">
+                <option value="No">Solo</option>
+                <option value="Yes">Team</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Dispatch Fee %</label>
+              <input type="number" id="d-fee" min="0" max="100" step="0.1" value="10">
+              <div class="hint" id="d-fee-hint" style="display:none;">Set by Admin only.</div>
+            </div>
+            <div class="field" data-role-view="admin">
+              <label>Driver Pay % (Lease)</label>
+              <input type="number" id="d-paypct" min="0" max="100" step="0.1" value="88">
+              <div class="hint">Share of each load's gross this leased driver is paid. Admin only — dispatchers never
+                see this field or the Driver Pay page.</div>
+            </div>
+            <div class="field span-2" data-role-view="admin">
+              <label>Assigned Dispatcher</label>
+              <select id="d-dispatcher">
+                <option value="">Unassigned — hidden from every dispatcher</option>
+              </select>
+              <div class="hint">A driver is only visible to the dispatcher Admin assigns them to here. Leave unassigned
+                and only Admin will see this driver — no dispatcher will.</div>
+            </div>
+          </div>
+
+          <div class="form-section-title" data-role-view="admin">Driver App Login</div>
+          <div class="form-grid" data-role-view="admin">
+            <div class="field">
+              <label>Driver ID</label>
+              <div style="display:flex;gap:6px;">
+                <input type="text" id="d-drivercode" style="flex:1;" placeholder="e.g. D4821">
+                <button type="button" class="btn btn-sm btn-ghost"
+                  onclick="document.getElementById('d-drivercode').value=genUniqueDriverCode()">Generate</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>PIN</label>
+              <div style="display:flex;gap:6px;">
+                <input type="text" id="d-pin" style="flex:1;" inputmode="numeric" maxlength="4"
+                  placeholder="4-digit PIN">
+                <button type="button" class="btn btn-sm btn-ghost"
+                  onclick="document.getElementById('d-pin').value=genDriverPin()">Generate</button>
+              </div>
+            </div>
+            <div class="field span-2">
+              <button type="button" class="btn btn-sm" onclick="copyDriverLoginInfo()">Copy Login Info to Share</button>
+              <div class="hint">The driver opens this app on their phone, taps <b>Driver Login</b>, and enters this
+                Driver ID + PIN to see only their own loads and pay — nothing else in HaulBoX.</div>
+              <div class="hint" style="margin-top:4px;">Portal link: <a id="d-driver-link" href="/driver"
+                  target="_blank" rel="noopener"></a></div>
+            </div>
+          </div>
+
+          <div class="form-section-title">Truck &amp; Trailer</div>
+          <div class="form-grid">
+            <div class="field"><label>Truck Number</label><input type="text" id="d-truck"></div>
+            <div class="field"><label>Truck Type</label><input type="text" id="d-truck-type"
+                placeholder="e.g. Sleeper, Day Cab"></div>
+            <div class="field"><label>Trailer Type</label><input type="text" id="d-trailer-type"
+                placeholder="e.g. Dry Van, Reefer, Flatbed"></div>
+            <div class="field"><label>Trailer Size</label><input type="text" id="d-trailer-size"
+                placeholder="e.g. 53ft"></div>
+            <div class="field span-2"><label>Max Weight Can Carry</label><input type="text" id="d-max-weight"
+                placeholder="e.g. 45,000 lbs"></div>
+          </div>
+
+          <div class="form-section-title">Equipment</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Ramps</label>
+              <select id="d-ramps" onchange="onDriverRampsChanged()">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div class="field" id="d-ramp-type-wrap" style="display:none;">
+              <label>Ramp Type</label>
+              <input type="text" id="d-ramp-type" placeholder="e.g. Aluminum beavertail ramps">
+            </div>
+            <div class="field">
+              <label>Tarps</label>
+              <select id="d-tarps">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Chains</label>
+              <select id="d-chains">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Binders</label>
+              <select id="d-binders">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-section-title">Certifications &amp; Compliance</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>CDL</label>
+              <select id="d-cdl">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Hazmat</label>
+              <select id="d-hazmat">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Background Clear</label>
+              <select id="d-background-clear">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>US Citizen</label>
+              <select id="d-us-citizen">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-section-title">Driver Documents</div>
+          <p class="hint" id="d-docs-hint" style="margin:-4px 0 10px;">Free-form document slots — label each one as
+            needed (CDL, Truck VIN #, Truck Plate #, Insurance, Medical Card, MVR, etc.) and attach the file.</p>
+          <div class="doc-grid" id="d-docs-list"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-ghost" id="driver-add-doc-btn" onclick="addDriverDocSlot()">+
               Add Document Slot</button>
             <button type="button" class="btn btn-sm" id="driver-download-all-btn" onclick="downloadDriverDocs()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -2348,33 +2532,68 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-broker">
-    <div class="modal">
+  <!-- ============ DELETE LOAD MANDATORY REASON MODAL ============ -->
+  <div class="modal-overlay" id="modal-delete-load-reason">
+    <div class="modal" style="max-width:480px;">
       <div class="modal-head">
-        <h3 id="broker-modal-title">Add Broker</h3>
-        <div class="modal-close" onclick="closeModal('modal-broker')"><svg viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg></div>
+        <h3 style="color:#ef4444;display:flex;align-items:center;gap:8px;">
+          <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
+          </svg>
+          Delete Load
+        </h3>
+        <div class="modal-close" onclick="closeModal('modal-delete-load-reason')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
       </div>
       <div class="modal-body">
-        <form onsubmit="return saveBroker(event)">
-          <input type="hidden" id="b-id">
-          <div class="form-grid">
-            <div class="field"><label>Broker Name <span class="req">*</span></label><input type="text" id="b-name"
-                required></div>
-            <div class="field"><label>MC Number</label><input type="text" id="b-mc" oninput="onBrokerModalMCInput()">
-              <div class="hint" id="b-mc-hint"></div>
-            </div>
-            <div class="field"><label>Phone</label><input type="text" id="b-phone"></div>
-            <div class="field"><label>Email</label><input type="email" id="b-email"></div>
-            <div class="field span-2"><label>Notes</label><textarea id="b-notes"></textarea></div>
+        <p style="font-size:13.5px;color:#334155;margin:0 0 14px;line-height:1.5;">
+          You are about to delete <strong id="delete-load-ref-text">Load #</strong>. This action is restricted to Admins and will be permanently recorded in the system audit log.
+        </p>
+        <form onsubmit="return confirmDeleteLoadSubmit(event)">
+          <input type="hidden" id="delete-load-id">
+          <div class="field" style="margin-bottom:16px;">
+            <label style="color:#0f172a;font-weight:700;">Why are you deleting this load? <span style="color:#ef4444;">*</span></label>
+            <textarea id="delete-load-reason" rows="3" required placeholder="Please provide the exact operational reason (e.g. Load cancelled by broker, duplicate entry, rate agreement voided)..." style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;"></textarea>
           </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-ghost" onclick="closeModal('modal-broker')">Cancel</button>
-            <button type="submit" class="btn btn-accent">Save Broker</button>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button type="button" class="btn btn-ghost" onclick="closeModal('modal-delete-load-reason')">Cancel</button>
+            <button type="submit" class="btn" id="delete-load-confirm-btn" style="background:#ef4444;color:#fff;font-weight:700;">Confirm Deletion</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ IN-APP DOCUMENT VIEWER MODAL ============ -->
+  <div class="modal-overlay" id="modal-doc-viewer">
+    <div class="modal" style="max-width:860px;width:90%;height:85vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+      <div class="modal-head" style="padding:14px 20px;border-bottom:1px solid #e2e8f0;">
+        <div>
+          <h3 id="doc-viewer-title" style="margin:0;font-size:16px;">Document Viewer</h3>
+          <div id="doc-viewer-sub" style="font-size:12px;color:#64748b;margin-top:2px;">—</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <a id="doc-viewer-download-btn" href="#" download class="btn btn-sm btn-ghost" style="color:#0284c7;font-weight:600;">Download</a>
+          <div class="modal-close" onclick="closeModal('modal-doc-viewer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+        </div>
+      </div>
+      <div class="modal-body" id="doc-viewer-content" style="flex:1;padding:0;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+        <!-- In-app preview -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PRINT DRIVER STATEMENT / INVOICE MODAL ============ -->
+  <div class="modal-overlay" id="modal-print-invoice">
+    <div class="modal" style="max-width:780px;width:92%;max-height:90vh;overflow-y:auto;">
+      <div class="modal-head" style="border-bottom:1px solid #e2e8f0;">
+        <h3 id="invoice-modal-title">Driver Settlement Statement</h3>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="btn btn-accent btn-sm" onclick="triggerPrintInvoice()">🖨️ Print Statement</button>
+          <div class="modal-close" onclick="closeModal('modal-print-invoice')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+        </div>
+      </div>
+      <div class="modal-body" id="invoice-printable-area" style="padding:24px 28px;background:#ffffff;">
+        <!-- Printable template rendered dynamically -->
       </div>
     </div>
   </div>
@@ -2457,38 +2676,6 @@
           </svg></div>
       </div>
       <div class="modal-body" id="kpi-modal-body" style="padding:16px 20px;max-height:75vh;overflow-y:auto;"></div>
-    </div>
-  </div>
-
-  <!-- ============ CHAT WITH ADMIN (floating, bottom-right) ============ -->
-  <button id="chat-launcher" onclick="toggleChat()" title="Chat with Admin">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path
-        d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 4 11.5a8.5 8.5 0 0 1 8.5-8.5A8.4 8.4 0 0 1 21 11.5z" />
-    </svg>
-    <span class="chat-badge" id="chat-badge" style="display:none;">0</span>
-  </button>
-
-  <div id="chat-panel">
-    <div class="chat-head">
-      <div>
-        <div class="chat-title" id="chat-title">Chat with Admin</div>
-        <div class="chat-sub" id="chat-sub">Ask questions, get clarifications</div>
-      </div>
-      <button class="modal-close" onclick="toggleChat()" title="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-    <div class="chat-pick" id="chat-pick" style="display:none;">
-      <select id="chat-thread-select" onchange="renderChat()"></select>
-    </div>
-    <div class="chat-body" id="chat-body"></div>
-    <div class="chat-input-row" id="chat-input-row">
-      <textarea id="chat-input" rows="1" placeholder="Type a message… (Enter to send)"
-        onkeydown="chatKey(event)"></textarea>
-      <button class="btn btn-accent btn-sm" onclick="sendChat()">Send</button>
     </div>
   </div>
 

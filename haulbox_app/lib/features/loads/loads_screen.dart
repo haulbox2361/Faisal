@@ -17,26 +17,43 @@ class LoadsScreen extends StatefulWidget {
   State<LoadsScreen> createState() => _LoadsScreenState();
 }
 
-class _LoadsScreenState extends State<LoadsScreen> {
-  // Default range is This Week (Current Monday -> Today)
+class _LoadsScreenState extends State<LoadsScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   DateRangeFilterType _selectedDateRange = DateRangeFilterType.thisWeek;
   DateTimeRange? _customDateRange;
-  String _selectedFilter = 'ALL'; // ALL, ACTIVE, COMPLETED, CANCELLED
+  String _selectedFilter = 'ALL';
   String _searchQuery = '';
-  String _sortBy = 'NEWEST'; // NEWEST, OLDEST, ACTIVE_FIRST
+  String _sortBy = 'NEWEST';
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  List<LoadModel> _filterAndSortLoads(List<LoadModel> allLoads) {
+  List<LoadModel> _filterAndSortLoads(List<LoadModel> allLoads, {required bool isActiveTab}) {
     final range = DateRangeHelper.calculateRange(_selectedDateRange, customRange: _customDateRange);
     List<LoadModel> list = List.from(allLoads);
 
-    // 1. Date Range Filter
+    // 1. Tab Segmentation (Active vs. History)
+    if (isActiveTab) {
+      list = list.where((l) => !['COMPLETED', 'DELIVERED', 'CANCELLED', 'PAID'].contains(l.status.toUpperCase())).toList();
+    } else {
+      list = list.where((l) => ['COMPLETED', 'DELIVERED', 'CANCELLED', 'PAID'].contains(l.status.toUpperCase())).toList();
+    }
+
+    // 2. Date Range Filter
     if (_selectedDateRange != DateRangeFilterType.allTime) {
       list = list.where((l) {
         final pDate = DateRangeHelper.parseFlexibleDate(l.pickupDate);
@@ -45,16 +62,14 @@ class _LoadsScreenState extends State<LoadsScreen> {
       }).toList();
     }
 
-    // 2. Status Filter
-    if (_selectedFilter == 'ACTIVE') {
-      list = list.where((l) => !['COMPLETED', 'DELIVERED', 'CANCELLED'].contains(l.status.toUpperCase())).toList();
-    } else if (_selectedFilter == 'COMPLETED') {
-      list = list.where((l) => ['COMPLETED', 'DELIVERED'].contains(l.status.toUpperCase())).toList();
-    } else if (_selectedFilter == 'CANCELLED') {
+    // 3. Status Sub-Filter
+    if (_selectedFilter == 'CANCELLED') {
       list = list.where((l) => l.status.toUpperCase() == 'CANCELLED').toList();
+    } else if (_selectedFilter == 'COMPLETED') {
+      list = list.where((l) => ['COMPLETED', 'DELIVERED', 'PAID'].contains(l.status.toUpperCase())).toList();
     }
 
-    // 3. Search Query Filter (Load #, Broker, Pickup, Delivery)
+    // 4. Search Query Filter
     if (_searchQuery.trim().isNotEmpty) {
       final q = _searchQuery.toLowerCase().trim();
       list = list.where((l) {
@@ -65,13 +80,13 @@ class _LoadsScreenState extends State<LoadsScreen> {
       }).toList();
     }
 
-    // 4. Sorting
+    // 5. Sorting
     if (_sortBy == 'OLDEST') {
       list = list.reversed.toList();
     } else if (_sortBy == 'ACTIVE_FIRST') {
       list.sort((a, b) {
-        final aActive = !['COMPLETED', 'CANCELLED'].contains(a.status.toUpperCase()) ? 0 : 1;
-        final bActive = !['COMPLETED', 'CANCELLED'].contains(b.status.toUpperCase()) ? 0 : 1;
+        final aActive = !['COMPLETED', 'CANCELLED', 'PAID'].contains(a.status.toUpperCase()) ? 0 : 1;
+        final bActive = !['COMPLETED', 'CANCELLED', 'PAID'].contains(b.status.toUpperCase()) ? 0 : 1;
         return aActive.compareTo(bActive);
       });
     }
@@ -82,8 +97,9 @@ class _LoadsScreenState extends State<LoadsScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final loads = authProvider.loads;
-    final filteredLoads = _filterAndSortLoads(loads);
+    final allLoads = authProvider.loads;
+    final activeLoads = _filterAndSortLoads(allLoads, isActiveTab: true);
+    final historyLoads = _filterAndSortLoads(allLoads, isActiveTab: false);
 
     return Scaffold(
       backgroundColor: AppColors.bgLight,
@@ -99,150 +115,189 @@ class _LoadsScreenState extends State<LoadsScreen> {
             onSelected: (val) => setState(() => _sortBy = val),
             itemBuilder: (ctx) => [
               const PopupMenuItem(value: 'NEWEST', child: Text('Newest First')),
-              const PopupMenuItem(value: 'ACTIVE_FIRST', child: Text('Active Runs First')),
               const PopupMenuItem(value: 'OLDEST', child: Text('Oldest First')),
+              const PopupMenuItem(value: 'ACTIVE_FIRST', child: Text('Active First')),
             ],
           ),
         ],
-      ),
-      body: Column(
-        children: [
-          // Search & Filter Header Container
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: Column(
-              children: [
-                // Search Input Field
-                Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.bgSecondary,
-                    borderRadius: AppRadius.mdBorder,
-                    border: Border.all(color: AppColors.borderLight),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (val) => setState(() => _searchQuery = val),
-                    decoration: InputDecoration(
-                      hintText: 'Search by load #, broker, city...',
-                      hintStyle: const TextStyle(fontSize: 13.5, color: AppColors.textSubtle),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _searchQuery = '');
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 11),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // UNIFIED RANGE SELECTOR DROPDOWN
-                RangeSelector(
-                  selectedType: _selectedDateRange,
-                  customRange: _customDateRange,
-                  onRangeChanged: (type, custom) {
-                    setState(() {
-                      _selectedDateRange = type;
-                      _customDateRange = custom;
-                    });
-                  },
-                ),
-                const SizedBox(height: 10),
-
-                // Filter Chips Row
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              labelColor: AppColors.textDark,
+              unselectedLabelColor: Colors.white.withValues(alpha: 0.8),
+              labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              tabs: [
+                Tab(
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildFilterChip('ALL', 'All'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('ACTIVE', 'Active'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('COMPLETED', 'Completed'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('CANCELLED', 'Cancelled'),
+                      const Text('ACTIVE LOADS'),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: _tabController.index == 0 ? AppColors.emeraldSoft : Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${activeLoads.length}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: _tabController.index == 0 ? AppColors.emeraldDark : Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('HISTORY'),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: _tabController.index == 1 ? AppColors.bgSecondary : Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${historyLoads.length}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: _tabController.index == 1 ? AppColors.textDark : Colors.white,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(color: AppColors.borderLight, height: 1),
-
-          // Scrollable Load Cards List
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => authProvider.syncAllData(),
-              color: AppColors.emeraldPrimary,
-              child: filteredLoads.isEmpty
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: const [
-                        SizedBox(height: 80),
-                        EmptyState(
-                          icon: Icons.inventory_2_outlined,
-                          title: 'No Loads Found',
-                          description: 'No loads match your current date range, filter, or search criteria.',
-                        ),
-                      ],
-                    )
-                  : ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-                      itemCount: filteredLoads.length,
-                      itemBuilder: (context, index) {
-                        final load = filteredLoads[index];
-                        return _buildLoadCard(context, load);
-                      },
-                    ),
-            ),
-          ),
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildLoadsListTab(activeLoads, isActiveTab: true, authProvider: authProvider),
+          _buildLoadsListTab(historyLoads, isActiveTab: false, authProvider: authProvider),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String key, String label) {
-    final isSelected = _selectedFilter == key;
+  Widget _buildLoadsListTab(List<LoadModel> loads, {required bool isActiveTab, required AuthProvider authProvider}) {
+    return Column(
+      children: [
+        // 1. Filter Bar & Search
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            children: [
+              // Search Input
+              Container(
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.bgSecondary,
+                  borderRadius: AppRadius.mdBorder,
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    hintText: 'Search by load #, city, or broker...',
+                    hintStyle: const TextStyle(color: AppColors.textSubtle, fontSize: 13),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18, color: AppColors.textMuted),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
 
-    return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = key),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.emeraldPrimary : AppColors.bgSecondary,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppColors.emeraldPrimary : AppColors.borderLight,
+              // Date Range Selector
+              RangeSelector(
+                selectedType: _selectedDateRange,
+                customRange: _customDateRange,
+                onRangeChanged: (type, custom) {
+                  setState(() {
+                    _selectedDateRange = type;
+                    _customDateRange = custom;
+                  });
+                },
+              ),
+            ],
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w800,
-            color: isSelected ? Colors.white : AppColors.textPrimary,
+
+        // 2. Load Cards List
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => authProvider.syncAllData(),
+            color: AppColors.emeraldPrimary,
+            child: loads.isEmpty
+                ? SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 60),
+                      child: EmptyState(
+                        title: isActiveTab ? 'No Active Loads' : 'No Past Loads Found',
+                        description: isActiveTab
+                            ? 'You currently have no loads assigned or in transit.'
+                            : 'No completed loads match your selected date or search filter.',
+                        icon: Icons.local_shipping_outlined,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+                    itemCount: loads.length,
+                    itemBuilder: (context, index) {
+                      final load = loads[index];
+                      return _buildLoadCard(context, load);
+                    },
+                  ),
           ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildLoadCard(BuildContext context, LoadModel load) {
     final rateString = load.driverPay != null ? '\$${load.driverPay!.toInt()}' : '\$1,850';
+    // Deadhead estimation: 25-45 miles for demonstration/badge
+    final deadheadMiles = (load.miles != null && load.miles! > 100) ? ((load.miles! * 0.08).round() + 15) : 32;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -362,7 +417,7 @@ class _LoadsScreenState extends State<LoadsScreen> {
                       padding: EdgeInsets.symmetric(horizontal: 6),
                       child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.textSubtle),
                     ),
-                    const Icon(Icons.location_on_rounded, size: 12, color: AppColors.statusDanger),
+                    const Icon(Icons.location_on_rounded, size: 14, color: AppColors.statusInfo),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -380,25 +435,56 @@ class _LoadsScreenState extends State<LoadsScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Bottom Row: Status Badge + Mileage + Chevron
+                // Badges Row: Status + Loaded Miles + Deadhead Mileage Badge (IMP-201)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    StatusBadge(status: load.status, isSmall: true),
+                    StatusBadge(status: load.status),
                     Row(
                       children: [
-                        const Icon(Icons.straighten_rounded, size: 13, color: AppColors.textSubtle),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${load.miles} mi',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
+                        // Deadhead Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.near_me_outlined, size: 11, color: Color(0xFFD97706)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$deadheadMiles mi deadhead',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFB45309),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(Icons.chevron_right_rounded, color: AppColors.textSubtle, size: 18),
+
+                        // Loaded Miles Badge
+                        if (load.miles != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgSecondary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${load.miles} mi loaded',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ],

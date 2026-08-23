@@ -6,6 +6,7 @@ const store = require('../lib/store');
 const { clientForAccount } = require('../lib/googleClient');
 const driveStore = require('../lib/driveStore');
 const kv = require('../lib/kvstore');
+const dataStore = require('../lib/dataStore');
 const { getLatestLocationsForDrivers } = require('../lib/db');
 const { calculateLoadTracking } = require('../lib/etaEngine');
 
@@ -653,8 +654,7 @@ router.post('/api/webhook-sync', async (req, res) => {
 // Admin receives all active drivers; Dispatcher receives only assigned drivers.
 router.get('/api/tracking/live', async (req, res) => {
   try {
-    const stateBlob = await kv.get('haulline:state');
-    const state = typeof stateBlob === 'string' ? JSON.parse(stateBlob) : (stateBlob || {});
+    const state = (await dataStore.loadFullState()) || {};
     const loads = state.loads || [];
     const role = String(req.query.role || 'admin').toLowerCase();
     const userId = String(req.query.userId || '').trim();
@@ -702,8 +702,7 @@ router.post('/api/documents/review', async (req, res) => {
   }
 
   try {
-    const raw = await kv.get('haulline:state');
-    const state = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+    const state = (await dataStore.loadFullState()) || {};
     const loads = state.loads || [];
     const load = loads.find(l => String(l.id) === String(loadId));
     if (!load) return res.status(404).json({ error: 'Load not found' });
@@ -807,10 +806,7 @@ router.post('/api/documents/review', async (req, res) => {
       return res.status(400).json({ error: 'Invalid action. Must be approve or reject' });
     }
 
-    await kv.set('haulline:state', JSON.stringify(state));
-    if (global.broadcastState) {
-      global.broadcastState(state).catch(() => {});
-    }
+    await dataStore.saveFullState(state);
     res.json({ ok: true, load });
 
   } catch (e) {
@@ -819,4 +815,398 @@ router.post('/api/documents/review', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/loads/:id/delete
+// Admin / Super Admin ONLY: Soft-deletes a load with required reason and audit log
+// ---------------------------------------------------------------------------
+router.post('/api/loads/:id/delete', async (req, res) => {
+  const { reason, userRole, userId, userName } = req.body || {};
+  const loadId = req.params.id;
+
+  const role = String(userRole || req.query.role || '').toLowerCase();
+  if (role !== 'admin' && role !== 'super_admin' && role !== 'superadmin') {
+    return res.status(403).json({ ok: false, error: 'Forbidden — Only Admin or Super Admin can delete loads.' });
+  }
+
+  const cleanReason = String(reason || '').trim();
+  if (!cleanReason) {
+    return res.status(400).json({ ok: false, error: 'A mandatory reason is required to delete a load.' });
+  }
+
+  try {
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { loads: [] };
+    const load = (state.loads || []).find(l => String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId));
+
+    if (!load) {
+      return res.status(404).json({ ok: false, error: 'Load not found' });
+    }
+
+    const nowIso = new Date().toISOString();
+    load.is_deleted = true;
+    load.deleted_at = nowIso;
+    load.deleted_by = userName || userId || role;
+    load.delete_reason = cleanReason;
+
+    await dataStore.saveFullState(state);
+
+    // Record immutable audit log
+    await auditStore.record(
+      { type: role, id: userId || 'admin', name: userName || 'Admin' },
+      'LOAD_SOFT_DELETED',
+      { type: 'LOAD', id: load.id },
+      {
+        loadNumber: load.loadNumber,
+        reason: cleanReason,
+        deletedAt: nowIso,
+        brokerName: load.brokerName,
+        driverName: load.driverName,
+      }
+    );
+
+    res.json({
+      ok: true,
+      message: `Load #${load.loadNumber || load.id} successfully soft-deleted.`,
+      loadId: load.id
+    });
+  } catch (err) {
+    console.error('Load soft-delete failed:', err);
+    res.status(500).json({ ok: false, error: err.message || 'Failed to delete load' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/dashboard/stats
+// Returns the 5 core KPIs for the Dispatcher Web Dashboard with Monday-start Weekly Gross
+// ---------------------------------------------------------------------------
+router.get('/api/dashboard/stats', async (req, res) => {
+  try {
+    const state = (await dataStore.loadFullState()) || { loads: [], drivers: [] };
+    const loads = (state.loads || []).filter(l => !l.is_deleted && !l.deleted);
+    const drivers = state.drivers || [];
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    // 1. Available Drivers vs Total
+    const activeDriverIdsWithLoads = new Set(
+      loads
+        .filter(l => l.status && !['DELIVERED', 'Delivered', 'Drop-off', 'PAID', 'Cancelled'].includes(l.status))
+        .map(l => String(l.driverId))
+        .filter(Boolean)
+    );
+    const activeDrivers = drivers.filter(d => d.active !== false && String(d.status || '').toLowerCase() !== 'inactive');
+    const availableCount = activeDrivers.filter(d => !activeDriverIdsWithLoads.has(String(d.id))).length;
+    const totalDriversCount = activeDrivers.length;
+
+    // 2. Active Loads
+    const activeLoadsList = loads.filter(l => !['DELIVERED', 'Delivered', 'Drop-off', 'PAID', 'Cancelled'].includes(l.status));
+
+    // 3. Today's Pickups
+    const todayPickupsList = loads.filter(l => {
+      if (!l.pickupDate) return false;
+      const d = String(l.pickupDate).slice(0, 10);
+      return d === todayStr;
+    });
+
+    // 4. Today's Deliveries
+    const todayDeliveriesList = loads.filter(l => {
+      if (!l.deliveryDate && !l.dropoffDate) return false;
+      const d = String(l.deliveryDate || l.dropoffDate).slice(0, 10);
+      return d === todayStr;
+    });
+
+    // 5. Weekly Gross: Business week starts MONDAY, calculated on delivery/drop-off date
+    // Calculate Monday of current week
+    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const diffToMonday = (currentDay === 0 ? -6 : 1) - currentDay;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    let weeklyGrossTotal = 0;
+    const weeklyLoads = [];
+
+    loads.forEach(l => {
+      const delivDateRaw = l.deliveryDate || l.dropoffDate || l.deliveredAt;
+      if (!delivDateRaw) return;
+      const delivDate = new Date(delivDateRaw);
+      if (!isNaN(delivDate.getTime()) && delivDate >= monday && delivDate <= sunday) {
+        const rate = Number(l.brokerRate || l.rate || 0);
+        weeklyGrossTotal += rate;
+        weeklyLoads.push(l);
+      }
+    });
+
+    res.json({
+      ok: true,
+      stats: {
+        availableDrivers: {
+          available: availableCount,
+          total: totalDriversCount,
+          formatted: `${availableCount} / ${totalDriversCount}`,
+          activeOnRoad: activeDriverIdsWithLoads.size
+        },
+        activeLoads: {
+          count: activeLoadsList.length,
+          loads: activeLoadsList
+        },
+        todayPickups: {
+          count: todayPickupsList.length,
+          loads: todayPickupsList
+        },
+        todayDeliveries: {
+          count: todayDeliveriesList.length,
+          loads: todayDeliveriesList
+        },
+        weeklyGross: {
+          total: weeklyGrossTotal,
+          formatted: `$${weeklyGrossTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`,
+          weekStartMonday: monday.toISOString().slice(0, 10),
+          weekEndSunday: sunday.toISOString().slice(0, 10),
+          loadCount: weeklyLoads.length
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Dashboard stats calculation failed:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AUDIT-LOGGED MUTATION ENDPOINTS (DOCUMENT REVIEW, PROFILE EDITS, PAYMENTS, ROLES)
+// ---------------------------------------------------------------------------
+
+// Helper to strip sensitive credentials before sending driver objects to dispatchers
+function sanitizeDriverForDispatcher(driver) {
+  if (!driver) return null;
+  const d = { ...driver };
+  delete d.pin;
+  delete d.pinHash;
+  delete d.pin_hash;
+  return d;
+}
+
+// POST /api/documents/review — Audit-logged document status update
+router.post('/api/documents/review', async (req, res) => {
+  const { loadId, docType, status, reason, userRole, userId, userName } = req.body || {};
+  if (!loadId || !docType || !status) {
+    return res.status(400).json({ ok: false, error: 'Missing required parameters (loadId, docType, status)' });
+  }
+
+  try {
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { loads: [] };
+    const load = (state.loads || []).find(l => String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId));
+
+    if (!load) return res.status(404).json({ ok: false, error: 'Load not found' });
+    load.docs = load.docs || {};
+    load.docs[docType] = load.docs[docType] || {};
+    load.docs[docType].status = status;
+    if (reason) load.docs[docType].rejectionReason = reason;
+
+    await dataStore.saveFullState(state);
+
+    await auditStore.record(
+      { type: userRole || 'dispatcher', id: userId || 'dispatcher', name: userName || 'Dispatcher' },
+      'DOCUMENT_STATUS_CHANGED',
+      { type: 'LOAD_DOCUMENT', id: `${load.id}:${docType}` },
+      { loadNumber: load.loadNumber, docType, newStatus: status, reason: reason || null }
+    );
+
+    res.json({ ok: true, message: `Document ${docType} status updated to ${status}.` });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/drivers/:id/update — Audit-logged driver profile update with credential protection
+router.post('/api/drivers/:id/update', async (req, res) => {
+  const driverId = req.params.id;
+  const { updates, userRole, userId, userName } = req.body || {};
+
+  try {
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { drivers: [] };
+    const driver = (state.drivers || []).find(d => String(d.id) === String(driverId));
+
+    if (!driver) return res.status(404).json({ ok: false, error: 'Driver not found' });
+
+    // Apply allowed profile updates
+    const safeUpdates = { ...(updates || {}) };
+    delete safeUpdates.pinHash;
+    delete safeUpdates.pin_hash;
+
+    // PIN change only allowed by Admin or the driver themselves
+    if (safeUpdates.pin) {
+      if (userRole !== 'admin' && userRole !== 'super_admin') {
+        delete safeUpdates.pin;
+      } else {
+        driver.pinHash = dataStore.hashPin(safeUpdates.pin);
+        delete safeUpdates.pin;
+      }
+    }
+
+    Object.assign(driver, safeUpdates);
+    await dataStore.saveFullState(state);
+
+    await auditStore.record(
+      { type: userRole || 'admin', id: userId || 'admin', name: userName || 'Admin' },
+      'DRIVER_PROFILE_EDITED',
+      { type: 'DRIVER', id: driver.id },
+      { driverName: driver.name, updatedFields: Object.keys(safeUpdates) }
+    );
+
+    res.json({ ok: true, driver: sanitizeDriverForDispatcher(driver) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/payments/update-stage — Audit-logged payment stage changes
+router.post('/api/payments/update-stage', async (req, res) => {
+  const { loadId, paymentStage, userRole, userId, userName } = req.body || {};
+  if (userRole !== 'admin' && userRole !== 'super_admin') {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can modify payment stages.' });
+  }
+
+  try {
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { loads: [] };
+    const load = (state.loads || []).find(l => String(l.id) === String(loadId));
+
+    if (!load) return res.status(404).json({ ok: false, error: 'Load not found' });
+    const oldStage = load.payment || 'Payment Not Requested';
+    load.payment = paymentStage;
+
+    await dataStore.saveFullState(state);
+
+    await auditStore.record(
+      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      'PAYMENT_STAGE_CHANGED',
+      { type: 'LOAD_PAYMENT', id: load.id },
+      { loadNumber: load.loadNumber, oldStage, newStage: paymentStage }
+    );
+
+    res.json({ ok: true, message: `Payment stage updated to ${paymentStage}` });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/dispatchers/create — Audit-logged Dispatcher/Admin account creation
+router.post('/api/dispatchers/create', async (req, res) => {
+  const { name, email, phone, role, userRole, userId, userName } = req.body || {};
+  if (userRole !== 'admin' && userRole !== 'super_admin') {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can create dispatch accounts.' });
+  }
+  if (!name || !email) {
+    return res.status(400).json({ ok: false, error: 'Name and email are required.' });
+  }
+
+  try {
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { dispatchers: [] };
+    const newId = 'disp_' + Date.now();
+    const newDispatcher = {
+      id: newId,
+      name,
+      email: email.toLowerCase().trim(),
+      phone: phone || null,
+      role: role === 'admin' ? 'admin' : 'dispatcher',
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+
+    state.dispatchers = state.dispatchers || [];
+    state.dispatchers.push(newDispatcher);
+    await dataStore.saveFullState(state);
+
+    await auditStore.record(
+      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      'ACCOUNT_CREATED',
+      { type: 'DISPATCHER', id: newId },
+      { name, email: newDispatcher.email, role: newDispatcher.role }
+    );
+
+    res.json({ ok: true, dispatcher: newDispatcher });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/dispatchers/:id/role — Audit-logged role promotion / demotion
+router.post('/api/dispatchers/:id/role', async (req, res) => {
+  const dispatcherId = req.params.id;
+  const { newRole, userRole, userId, userName } = req.body || {};
+  if (userRole !== 'admin' && userRole !== 'super_admin') {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can modify account roles.' });
+  }
+  if (!['dispatcher', 'admin', 'super_admin'].includes(newRole)) {
+    return res.status(400).json({ ok: false, error: 'Invalid role specified.' });
+  }
+
+  try {
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { dispatchers: [] };
+    const disp = (state.dispatchers || []).find(d => String(d.id) === String(dispatcherId));
+
+    if (!disp) return res.status(404).json({ ok: false, error: 'Dispatcher account not found.' });
+    const oldRole = disp.role || 'dispatcher';
+    disp.role = newRole;
+
+    await dataStore.saveFullState(state);
+
+    await auditStore.record(
+      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      'USER_ROLE_CHANGED',
+      { type: 'DISPATCHER', id: disp.id },
+      { name: disp.name, email: disp.email, oldRole, newRole }
+    );
+
+    res.json({ ok: true, message: `${disp.name} role changed from ${oldRole} to ${newRole}.` });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/dispatchers/:id/delete — Audit-logged account removal / deactivation
+router.post('/api/dispatchers/:id/delete', async (req, res) => {
+  const dispatcherId = req.params.id;
+  const { userRole, userId, userName } = req.body || {};
+  if (userRole !== 'admin' && userRole !== 'super_admin') {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can remove dispatch accounts.' });
+  }
+
+  try {
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { dispatchers: [] };
+    const disp = (state.dispatchers || []).find(d => String(d.id) === String(dispatcherId));
+
+    if (!disp) return res.status(404).json({ ok: false, error: 'Dispatcher account not found.' });
+    disp.active = false;
+    state.dispatchers = state.dispatchers.filter(d => String(d.id) !== String(dispatcherId));
+
+    await dataStore.saveFullState(state);
+
+    await auditStore.record(
+      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      'ACCOUNT_REMOVED',
+      { type: 'DISPATCHER', id: disp.id },
+      { name: disp.name, email: disp.email, role: disp.role }
+    );
+
+    res.json({ ok: true, message: `Account ${disp.name} has been removed.` });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 module.exports = router;
+
+

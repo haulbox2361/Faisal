@@ -3,6 +3,7 @@ class LoadModel {
   final String loadNumber;
   final String brokerName;
   final dynamic driverPay;
+  final dynamic grossAmount;
   final String status;
   final String driverProgress;
   final String pickup;
@@ -39,6 +40,7 @@ class LoadModel {
     required this.loadNumber,
     required this.brokerName,
     this.driverPay,
+    this.grossAmount,
     required this.status,
     required this.driverProgress,
     required this.pickup,
@@ -165,6 +167,7 @@ class LoadModel {
       loadNumber: json['loadNumber']?.toString() ?? json['load_number']?.toString() ?? 'Load',
       brokerName: json['brokerName']?.toString() ?? json['broker_name']?.toString() ?? 'Broker',
       driverPay: json['driverPay'] ?? json['driver_pay'] ?? json['brokerRate'] ?? json['rate'] ?? 0,
+      grossAmount: json['grossAmount'] ?? json['loadAmount'] ?? json['brokerRate'] ?? json['rate'] ?? json['driverPay'] ?? 0,
       status: (json['status']?.toString() ?? 'ASSIGNED').toUpperCase(),
       driverProgress: (json['driverProgress']?.toString() ?? json['driver_progress']?.toString() ?? json['status']?.toString() ?? 'ASSIGNED').toUpperCase(),
       pickup: json['pickup']?.toString() ?? '',
@@ -203,6 +206,7 @@ class LoadModel {
     'loadNumber': loadNumber,
     'brokerName': brokerName,
     'driverPay': driverPay,
+    'grossAmount': grossAmount,
     'status': status,
     'driverProgress': driverProgress,
     'pickup': pickup,
@@ -225,4 +229,9 @@ class LoadModel {
     'paymentStatus': paymentStatus,
     'paymentDate': paymentDate,
   };
+
+  Map<String, dynamic>? get docs => documents;
+  String get pickupCityState => pickup.isNotEmpty ? pickup : (pickupAddress ?? 'Origin');
+  String get dropoffCityState => dropoff.isNotEmpty ? dropoff : (dropoffAddress ?? 'Destination');
+  double get fullGrossRate => double.tryParse((grossAmount ?? driverPay ?? 0).toString()) ?? 0.0;
 }

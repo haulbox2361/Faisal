@@ -10,6 +10,7 @@ const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const mistralRoutes = require('./routes/mistral');
 const { ensureSchema } = require('./lib/db');
+const { consistencyWorker } = require('./lib/consistencyWorker');
 
 // Admin and Super Admin Google accounts allowed to sign in.
 // Supports comma-separated emails or SUPER_ADMIN_EMAIL / ADMIN_EMAIL env vars.
@@ -143,12 +144,171 @@ const io = new Server(server, {
   }
 });
 
-app.set('io', io); // Make it accessible in routes if needed
+app.set('io', io); // Make it accessible in routes
+
+const chatStore = require('./lib/chatStore');
 
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  console.log(`[Socket.IO] Client connected: ${socket.id}`);
+
+  // 1. Client Authentication & Personal Room Registration
+  socket.on('authenticate', (data) => {
+    const { accountId, role, name, type } = data || {};
+    const partyType = type || (role === 'dispatcher' ? 'dispatcher' : (role === 'driver' ? 'driver' : 'admin'));
+    const partyId = String(accountId || (partyType === 'admin' ? 'admin' : '')).trim();
+
+    if (partyId) {
+      socket.user = { type: partyType, id: partyId, name: name || partyType };
+      const userRoom = `user_${partyType}_${partyId}`;
+      socket.join(userRoom);
+      chatStore.setUserPresence(socket.user, true);
+      io.emit('presence_change', { user: socket.user, isOnline: true, lastSeen: new Date().toISOString() });
+      socket.emit('authenticated', { ok: true, user: socket.user, room: userRoom });
+      console.log(`[Socket.IO] Authenticated socket ${socket.id} as ${partyType}:${partyId}`);
+    }
+  });
+
+  // 2. Join Conversation Room
+  socket.on('join_conversation', async (data, ack) => {
+    const { conversationId, accountId, role, name } = data || {};
+    const convId = Number(conversationId);
+    if (!convId) {
+      if (typeof ack === 'function') ack({ ok: false, error: 'Invalid conversationId' });
+      return;
+    }
+
+    if (!socket.user && accountId) {
+      const partyType = role === 'dispatcher' ? 'dispatcher' : (role === 'driver' ? 'driver' : 'admin');
+      socket.user = { type: partyType, id: String(accountId).trim(), name: name || partyType };
+    }
+
+    const roomName = `conv_${convId}`;
+    socket.join(roomName);
+    console.log(`[Socket.IO] Socket ${socket.id} joined room: ${roomName}`);
+    if (typeof ack === 'function') ack({ ok: true, room: roomName, conversationId: convId });
+  });
+
+  // 3. Leave Conversation Room
+  socket.on('leave_conversation', (data) => {
+    const { conversationId } = data || {};
+    const convId = Number(conversationId);
+    if (convId) {
+      const roomName = `conv_${convId}`;
+      socket.leave(roomName);
+      console.log(`[Socket.IO] Socket ${socket.id} left room: ${roomName}`);
+    }
+  });
+
+  // 4. Send Message via Socket
+  socket.on('send_message', async (data, ack) => {
+    const { conversationId, body, loadId, loadNumber, attachment, tempId, accountId, role, name } = data || {};
+    const convId = Number(conversationId);
+    const user = socket.user || (accountId ? {
+      type: role === 'dispatcher' ? 'dispatcher' : (role === 'driver' ? 'driver' : 'admin'),
+      id: String(accountId).trim(),
+      name: name || 'User'
+    } : null);
+
+    if (!convId || !user) {
+      if (typeof ack === 'function') ack({ ok: false, error: 'Missing conversationId or auth' });
+      return;
+    }
+
+    const text = String(body || '').trim();
+    if (!text && !attachment) {
+      if (typeof ack === 'function') ack({ ok: false, error: 'Message cannot be empty' });
+      return;
+    }
+
+    try {
+      if (!(await chatStore.isParticipant(convId, user))) {
+        if (typeof ack === 'function') ack({ ok: false, error: 'Not authorized for this chat' });
+        return;
+      }
+
+      const effectiveText = text || (attachment ? `[File: ${attachment.name || 'attachment'}]` : '');
+      const sent = await chatStore.sendMessage(convId, user, effectiveText, loadId, loadNumber, attachment);
+
+      const msgPayload = {
+        id: sent.id,
+        conversationId: convId,
+        senderType: user.type,
+        senderId: user.id,
+        senderName: user.name,
+        body: text,
+        attachment: attachment || null,
+        loadId: loadId || null,
+        loadNumber: loadNumber || null,
+        read: false,
+        createdAt: sent.createdAt || new Date().toISOString(),
+        tempId: tempId || null,
+      };
+
+      // Broadcast to all clients in this conversation room
+      io.to(`conv_${convId}`).emit('new_message', msgPayload);
+
+      if (typeof ack === 'function') {
+        ack({ ok: true, message: msgPayload });
+      }
+    } catch (err) {
+      console.error('[Socket.IO] send_message error:', err);
+      if (typeof ack === 'function') ack({ ok: false, error: err.message });
+    }
+  });
+
+  // 5. Typing Indicator
+  socket.on('typing', (data) => {
+    const { conversationId, isTyping, accountId, role, name } = data || {};
+    const convId = Number(conversationId);
+    const user = socket.user || (accountId ? {
+      type: role === 'dispatcher' ? 'dispatcher' : (role === 'driver' ? 'driver' : 'admin'),
+      id: String(accountId).trim(),
+      name: name || 'User'
+    } : null);
+
+    if (convId && user) {
+      chatStore.setTypingStatus(convId, user, !!isTyping);
+      socket.to(`conv_${convId}`).emit('user_typing', {
+        conversationId: convId,
+        user,
+        isTyping: !!isTyping,
+      });
+    }
+  });
+
+  // 6. Mark Read
+  socket.on('mark_read', async (data, ack) => {
+    const { conversationId, accountId, role } = data || {};
+    const convId = Number(conversationId);
+    const user = socket.user || (accountId ? {
+      type: role === 'dispatcher' ? 'dispatcher' : (role === 'driver' ? 'driver' : 'admin'),
+      id: String(accountId).trim()
+    } : null);
+
+    if (convId && user) {
+      try {
+        if (await chatStore.isParticipant(convId, user)) {
+          await chatStore.markConversationRead(convId, user);
+          io.to(`conv_${convId}`).emit('messages_read', {
+            conversationId: convId,
+            reader: user,
+            readAt: new Date().toISOString(),
+          });
+        }
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false });
+      }
+    }
+  });
+
+  // 7. Disconnect
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    if (socket.user) {
+      chatStore.setUserPresence(socket.user, false);
+      io.emit('presence_change', { user: socket.user, isOnline: false, lastSeen: new Date().toISOString() });
+    }
+    console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
   });
 });
 
@@ -169,7 +329,10 @@ server.listen(PORT, () => {
     console.log('⚠️  DATABASE_URL is not set — the app will fail to load/save data until your Supabase connection string is in .env (see README.md).');
   } else {
     ensureSchema()
-      .then(() => console.log('Database schema ready.'))
+      .then(() => {
+        console.log('Database schema ready.');
+        consistencyWorker.start();
+      })
       .catch((e) => console.error('⚠️  Failed to reach the database:', e.message));
   }
 });

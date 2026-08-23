@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../features/chat/chat_provider.dart';
 
 class HaulBoxBottomNavigation extends StatelessWidget {
   final int currentIndex;
@@ -15,9 +13,6 @@ class HaulBoxBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = Provider.of<ChatProvider>(context, listen: true);
-    final unreadChatCount = chatProvider.totalUnreadCount;
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -40,15 +35,9 @@ class HaulBoxBottomNavigation extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(0, Icons.inventory_2_outlined, Icons.inventory_2_rounded, 'Loads'),
-              _buildNavItem(1, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'Payments'),
-              _buildCenterCurrentLoadButton(),
-              _buildNavItem(
-                3,
-                Icons.chat_bubble_outline_rounded,
-                Icons.chat_bubble_rounded,
-                'Chat',
-                badgeCount: unreadChatCount,
-              ),
+              _buildNavItem(1, Icons.description_outlined, Icons.description_rounded, 'Documents'),
+              _buildCenterHomeButton(),
+              _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet_rounded, 'Payments'),
               _buildNavItem(4, Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
             ],
           ),
@@ -65,7 +54,7 @@ class HaulBoxBottomNavigation extends StatelessWidget {
     int badgeCount = 0,
   }) {
     final isSelected = currentIndex == index;
-    final color = isSelected ? AppColors.emeraldPrimary : AppColors.textMuted;
+    final color = isSelected ? AppColors.blueSkyPrimary : AppColors.textMuted;
 
     return Expanded(
       child: InkWell(
@@ -101,7 +90,7 @@ class HaulBoxBottomNavigation extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 9,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
@@ -113,9 +102,9 @@ class HaulBoxBottomNavigation extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                 color: color,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           ],
@@ -124,28 +113,29 @@ class HaulBoxBottomNavigation extends StatelessWidget {
     );
   }
 
-  Widget _buildCenterCurrentLoadButton() {
+  Widget _buildCenterHomeButton() {
     final isSelected = currentIndex == 2;
 
     return Expanded(
       child: GestureDetector(
         onTap: () => onTap(2),
+        behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
+                  colors: [AppColors.blueSkyPrimary, Color(0xFF0369A1)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [AppColors.emeraldPrimary, Color(0xFF059669)],
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.emeraldPrimary.withValues(alpha: 0.35),
+                    color: AppColors.blueSkyPrimary.withValues(alpha: 0.35),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -153,7 +143,7 @@ class HaulBoxBottomNavigation extends StatelessWidget {
               ),
               child: const Center(
                 child: Icon(
-                  Icons.local_shipping_rounded,
+                  Icons.home_rounded,
                   color: Colors.white,
                   size: 22,
                 ),
@@ -161,11 +151,11 @@ class HaulBoxBottomNavigation extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'Current Load',
+              'Home',
               style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? AppColors.emeraldPrimary : AppColors.textPrimary,
+                color: isSelected ? AppColors.blueSkyPrimary : AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           ],

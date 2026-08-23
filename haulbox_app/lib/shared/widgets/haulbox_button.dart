@@ -19,7 +19,7 @@ class HaulBoxButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.type = HaulBoxButtonType.primary,
-    this.height = 50,
+    this.height = 56,
   });
 
   @override
@@ -58,16 +58,16 @@ class HaulBoxButton extends StatelessWidget {
           foregroundColor: fg,
           elevation: 0,
           side: border,
-          shape: RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
         ),
         onPressed: isLoading ? null : onPressed,
         child: isLoading
             ? SizedBox(
-                width: 20,
-                height: 20,
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth: 2.5,
                   color: fg,
                 ),
               )
@@ -76,15 +76,15 @@ class HaulBoxButton extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: 18, color: fg),
+                    Icon(icon, size: 20, color: fg),
                     const SizedBox(width: 8),
                   ],
                   Text(
                     text,
                     style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14.5,
-                      letterSpacing: -0.1,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      letterSpacing: 0.2,
                       color: fg,
                     ),
                   ),
