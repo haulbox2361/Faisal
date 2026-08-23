@@ -2063,46 +2063,6 @@
       `).join('');
     }
 
-    function renderRecentLoadsCenter() {
-      const tbody = document.getElementById('dash-recent-loads-tbody');
-      if (!tbody) return;
-
-      const recentLoads = visibleLoads().slice().sort((a,b) => new Date(b.systemDate) - new Date(a.systemDate)).slice(0, 10);
-      
-      if (recentLoads.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="padding:24px;text-align:center;color:#64748b;font-size:13px;">No recent loads found.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = recentLoads.map(load => {
-        const route = formatCityStateLane(load.pickup, load.dropoff);
-        const st = String(load.status || 'Pending RC').toLowerCase();
-        
-        let stClass = 'status-badge-gray';
-        if (st.includes('booked') || st.includes('rc')) stClass = 'status-badge-blue';
-        else if (st.includes('transit') || st.includes('pickup') || st.includes('loaded')) stClass = 'status-badge-orange';
-        else if (st.includes('drop') || st.includes('deliver') || st.includes('completed')) stClass = 'status-badge-green';
-
-        return `
-          <tr style="border-bottom:1px solid #e2e8f0;transition:background 0.1s;cursor:pointer;" onmouseenter="this.style.background='#f8fafc'" onmouseleave="this.style.background=''" onclick="openLoadModal('${escapeAttr(load.id)}')">
-            <td style="padding:12px;color:#0f172a;font-weight:600;">${escapeHtml(load.loadNumber)}</td>
-            <td style="padding:12px;color:#475569;font-weight:500;">${escapeHtml(load.driverName || '—')}</td>
-            <td style="padding:12px;color:#475569;font-weight:500;">${escapeHtml(load.brokerName || '—')}</td>
-            <td style="padding:12px;color:#475569;font-size:12px;">${escapeHtml(load.dispatcherName || '—')}</td>
-            <td style="padding:12px;color:#475569;">${escapeHtml(formatCityState(load.pickup))}</td>
-            <td style="padding:12px;color:#475569;">${escapeHtml(formatCityState(load.dropoff))}</td>
-            <td style="padding:12px;color:#0f172a;font-weight:600;">${load.brokerRate ? '$'+Number(load.brokerRate).toLocaleString() : '—'}</td>
-            <td style="padding:12px;"><span class="${stClass}" style="padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;">${escapeHtml(load.status || 'Pending')}</span></td>
-            <td style="padding:12px;color:#475569;">${escapeHtml(load.eta || '—')}</td>
-            <td style="padding:12px;color:#64748b;font-size:12px;">${load.systemDate ? timeAgo(load.systemDate) : '—'}</td>
-            <td style="padding:12px;text-align:right;">
-              <button class="btn btn-primary" style="padding:6px 12px;font-size:12px;" onclick="event.stopPropagation();openLoadModal('${escapeAttr(load.id)}')">View</button>
-            </td>
-          </tr>
-        `;
-      }).join('');
-    }
-
     function renderDashboard() {
       // 1. Calculate Real Dynamic KPIs
       const allDrivers = visibleDrivers();
@@ -2174,10 +2134,9 @@
         onTrackingDriverChanged(curVal);
       }, 200);
 
-      // Render new Dashboard Extensions
+      // Render Dashboard Operations Panel (Map + Driver Selector + Notifications)
       renderLiveDashboardMap();
       renderDashboardNotifications();
-      renderRecentLoadsCenter();
     }
 
     /* ---- KPI SHORTCUT DIALOGS & ACTION HANDLERS ---- */
@@ -3427,46 +3386,57 @@
       if (!body) return;
 
       const loads = STATE.loads || [];
-      const docTypes = ['BOL', 'POD', 'RC'];
+      // Only BOL and POD undergo document review (RC & photos are auto-approved)
+      const docTypes = ['BOL', 'POD'];
       const rows = [];
 
       loads.forEach(load => {
         const docs = load.docs || load.documents || {};
         docTypes.forEach(docType => {
           const doc = docs[docType];
-          if (!doc || (!doc.name && !doc.fileName)) return;
+          if (!doc || (!doc.name && !doc.fileName && !doc.data)) return;
 
           const docStatus = doc.status || 'Pending Verification';
           const statusNorm = docStatus.toLowerCase();
           let matchesTab = false;
-          if (_docReviewTab === 'pending') matchesTab = statusNorm.includes('pending');
+          if (_docReviewTab === 'pending') matchesTab = statusNorm.includes('pending') || statusNorm.includes('review');
           else if (_docReviewTab === 'approved') matchesTab = statusNorm === 'approved';
           else if (_docReviewTab === 'rejected') matchesTab = statusNorm === 'rejected';
           if (!matchesTab) return;
 
           const uploadedAt = doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString() : '—';
-          const statusColor = statusNorm.includes('pending') ? '#f59e0b' : statusNorm === 'approved' ? '#16a34a' : '#dc2626';
+          const statusColor = (statusNorm.includes('pending') || statusNorm.includes('review')) ? '#f59e0b' : statusNorm === 'approved' ? '#16a34a' : '#dc2626';
           const statusLabel = doc.status || 'Pending Verification';
+          const docDataUrl = doc.data || doc.url || '';
+          const docFileName = doc.name || doc.fileName || `${docType}.pdf`;
 
           let actionHtml = '';
           if (_docReviewTab === 'pending') {
             actionHtml = `
               <div style="display:flex;gap:8px;justify-content:center;">
-                <button class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="reviewDocument('${escapeAttr(load.id)}','${docType}','approve','')">Approve</button>
-                <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="openDocRejectModal('${escapeAttr(load.id)}','${docType}')">Reject</button>
+                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docType}')">View</button>
+                <button class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="event.stopPropagation();reviewDocument('${escapeAttr(load.id)}','${docType}','approve','')">Approve</button>
+                <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="event.stopPropagation();openDocRejectModal('${escapeAttr(load.id)}','${docType}')">Reject</button>
               </div>`;
           } else if (_docReviewTab === 'rejected') {
             actionHtml = `
-              <div style="font-size:11px;color:#dc2626;font-style:italic;max-width:200px;">${escapeAttr(doc.rejectionReason || 'No reason provided')}</div>`;
+              <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
+                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:4px 8px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docType}')">View</button>
+                <div style="font-size:11px;color:#dc2626;font-style:italic;max-width:180px;">${escapeAttr(doc.rejectionReason || 'Flagged by AI check')}</div>
+              </div>`;
           } else {
-            actionHtml = `<span style="color:#16a34a;font-size:13px;">✓ Approved</span>`;
+            actionHtml = `
+              <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
+                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:4px 8px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docType}')">View</button>
+                <span style="color:#16a34a;font-size:13px;font-weight:700;">🟢 Approved</span>
+              </div>`;
           }
 
           rows.push(`
-            <tr style="border-bottom:1px solid #f1f5f9;">
-              <td style="padding:12px;font-weight:700;color:#0f172a;">${escapeAttr(docType)}</td>
+            <tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="viewLoadDocument('${escapeAttr(load.id)}','${docType}')" title="Click to view document">
+              <td style="padding:12px;font-weight:700;color:#0f172a;text-decoration:underline;">${escapeAttr(docType)}</td>
               <td style="padding:12px;color:#475569;">${escapeAttr(load.driverName || '—')}</td>
-              <td style="padding:12px;color:#475569;font-weight:600;">#${escapeAttr(load.loadNumber || load.id)}</td>
+              <td style="padding:12px;color:#0284c7;font-weight:700;" onclick="event.stopPropagation();openLoadModal('${escapeAttr(load.id)}')">#${escapeAttr(load.loadNumber || load.id)}</td>
               <td style="padding:12px;color:#64748b;font-size:12px;">${uploadedAt}</td>
               <td style="padding:12px;"><span style="background:${statusColor}20;color:${statusColor};padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700;">${escapeAttr(statusLabel)}</span></td>
               <td style="padding:12px;">${actionHtml}</td>
@@ -3474,15 +3444,15 @@
         });
       });
 
-      // Update pending badge count
+      // Update pending badge count (BOL and POD only)
       let pendingCount = 0;
       loads.forEach(load => {
         const docs = load.docs || load.documents || {};
-        ['BOL','POD','RC'].forEach(dt => {
+        ['BOL','POD'].forEach(dt => {
           const d = docs[dt];
-          if (d && (d.name || d.fileName)) {
+          if (d && (d.name || d.fileName || d.data)) {
             const st = (d.status || 'Pending').toLowerCase();
-            if (st.includes('pending')) pendingCount++;
+            if (st.includes('pending') || st.includes('review')) pendingCount++;
           }
         });
       });
@@ -4001,6 +3971,21 @@
     const PHOTO_KEYS = ['PhotosPU', 'PhotosDO'];
     const ARRAY_DOC_KEYS = ['PhotosPU', 'PhotosDO', 'Extra'];
     function docCap(key) { return key === 'Extra' ? 6 : 3; }
+    window.viewLoadDocument = function(loadId, key, index) {
+      const l = (STATE.loads || []).find(x => x.id === loadId);
+      if (!l) return;
+      const docs = l.docs || l.documents || {};
+      let file = null;
+      if (['RC', 'BOL', 'POD'].includes(key)) file = docs[key];
+      else if (Array.isArray(docs[key])) file = docs[key][index || 0];
+
+      if (file && (file.data || file.url)) {
+        openDocumentViewer(file.data || file.url, file.name || file.fileName || `${key}`, key);
+      } else {
+        openDocumentViewer(file ? file.url : '', file ? (file.name || file.fileName) : key, key);
+      }
+    };
+
     function renderDocSlots(l) {
       const slots = [
         { key: 'RC', label: 'Rate Confirmation', hint: 'Required — books the load' },
@@ -4018,14 +4003,37 @@
         const has = isArray ? arr.length : l.docs[s.key];
         const cap = docCap(s.key);
         const atCap = isArray && arr.length >= cap;
-        const fileLabel = isArray ? (has ? arr.length + ' of ' + cap + ' file(s)' : '') : (has ? has.name : '');
-        return `<label class="doc-slot ${has ? 'filled' : ''} ${atCap ? 'atcap' : ''}">
-      <input type="file" ${isArray ? 'multiple' : ''} ${isPhoto ? 'accept="image/*"' : ''} ${STATE.role === 'viewonly' || atCap ? 'disabled' : ''} onchange="handleDocUpload('${l.id}','${s.key}', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-      <div class="doc-slot-label">${s.label}</div>
-      <div class="doc-slot-file">${has ? fileLabel : (STATE.role === 'viewonly' ? '—' : (atCap ? 'Limit reached' : 'Click to upload'))}</div>
-      <div class="doc-slot-file" style="opacity:.7;">${atCap ? 'Max ' + cap + ' reached' : s.hint}</div>
-    </label>`;
+        const fileLabel = isArray ? (has ? arr.length + ' of ' + cap + ' file(s)' : '') : (has ? (has.name || has.fileName || 'Uploaded') : '');
+
+        let actionsHtml = '';
+        if (has) {
+          if (!isArray) {
+            actionsHtml = `
+              <div style="display:flex;gap:6px;margin-top:6px;justify-content:center;" onclick="event.stopPropagation()">
+                <button type="button" class="btn btn-sm btn-accent" style="font-size:11px;padding:3px 8px;font-weight:700;" onclick="viewLoadDocument('${l.id}','${s.key}')">View</button>
+                <label style="cursor:pointer;" class="btn btn-sm btn-ghost" style="font-size:11px;padding:3px 8px;">
+                  Replace <input type="file" ${isPhoto ? 'accept="image/*"' : ''} style="display:none;" onchange="handleDocUpload('${l.id}','${s.key}', this)">
+                </label>
+              </div>
+            `;
+          } else {
+            actionsHtml = `
+              <div style="display:flex;gap:4px;margin-top:6px;justify-content:center;flex-wrap:wrap;" onclick="event.stopPropagation()">
+                ${arr.map((item, idx) => `<button type="button" class="btn btn-sm btn-accent" style="font-size:10px;padding:2px 6px;" onclick="viewLoadDocument('${l.id}','${s.key}', ${idx})">#${idx+1}</button>`).join('')}
+                ${!atCap ? `<label style="cursor:pointer;" class="btn btn-sm btn-ghost" style="font-size:10px;padding:2px 6px;">+Add<input type="file" multiple ${isPhoto ? 'accept="image/*"' : ''} style="display:none;" onchange="handleDocUpload('${l.id}','${s.key}', this)"></label>` : ''}
+              </div>
+            `;
+          }
+        }
+
+        return `<div class="doc-slot ${has ? 'filled' : ''} ${atCap ? 'atcap' : ''}" style="cursor:pointer;position:relative;" ${has ? `onclick="viewLoadDocument('${l.id}','${s.key}')"` : ''}>
+          ${!has ? `<input type="file" ${isArray ? 'multiple' : ''} ${isPhoto ? 'accept="image/*"' : ''} ${STATE.role === 'viewonly' || atCap ? 'disabled' : ''} onchange="handleDocUpload('${l.id}','${s.key}', this)" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">` : ''}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          <div class="doc-slot-label">${s.label}</div>
+          <div class="doc-slot-file" style="font-weight:700;color:${has ? '#0284c7' : 'inherit'};">${has ? fileLabel : (STATE.role === 'viewonly' ? '—' : (atCap ? 'Limit reached' : 'Click to upload'))}</div>
+          <div class="doc-slot-file" style="opacity:.7;">${atCap ? 'Max ' + cap + ' reached' : s.hint}</div>
+          ${actionsHtml}
+        </div>`;
       }).join('') + '</div>' +
         `<div style="margin-top:12px;">
      <button class="btn btn-sm" ${anyDocs ? '' : 'disabled'} onclick="downloadPackage('${l.id}')">
@@ -5119,44 +5127,102 @@
       const cols = Object.keys(rows[0]);
       return [cols.join(',')].concat(rows.map(r => cols.map(c => '"' + String(r[c] ?? '').replace(/"/g, '""') + '"').join(','))).join('\n');
     }
-    function exportDriverPayCSV() {
+    function exportDriverPayPDF() {
       if (STATE.role !== 'admin') return toast('Admin only', 'Driver pay exports are Admin only.');
-      const rows = driverPayExportRows(window._driverPayLoads || driverPayFilteredLoads());
-      if (!rows.length) return toast('Nothing to export', 'No settlements match this filter.');
-      downloadBlob(rowsToCSV(rows), 'haulbox-driver-pay.csv', 'text/csv');
-      toast('CSV exported', rows.length + ' settlement row(s)', true);
-    }
-    function exportDriverPayXLSX() {
-      if (STATE.role !== 'admin') return toast('Admin only', 'Driver pay exports are Admin only.');
-      const rows = driverPayExportRows(window._driverPayLoads || driverPayFilteredLoads());
-      if (!rows.length) return toast('Nothing to export', 'No settlements match this filter.');
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Driver Pay');
-      XLSX.writeFile(wb, 'haulbox-driver-pay.xlsx');
-      toast('Excel exported', rows.length + ' settlement row(s)', true);
-    }
-    /* One driver's settlement statement, using the same filters that are on screen. */
-    function exportDriverStatement(driverId) {
-      if (STATE.role !== 'admin') return toast('Admin only', 'Driver pay exports are Admin only.');
-      const all = window._driverPayLoads || driverPayFilteredLoads();
-      const loads = all.filter(l => l.driverId === driverId);
-      if (!loads.length) return toast('Nothing to export', 'No settlements for this driver in the current filter.');
-      const drv = STATE.drivers.find(d => d.id === driverId) || { name: 'Driver' };
-      const rows = driverPayExportRows(loads);
-      const totals = {
-        'Settlement Date': 'TOTAL', 'Load Number': '', 'Driver': drv.name, 'Driver Company': '', 'Truck': '', 'Broker': '',
-        'Pickup': '', 'Drop-Off': '', 'Miles': loads.reduce((s, l) => s + Number(l.miles || 0), 0),
-        'Gross Rate': loads.reduce((s, l) => s + Number(l.brokerRate || 0), 0),
-        'Driver Pay %': '', 'Driver Pay': loads.reduce((s, l) => s + driverPayOf(l), 0),
-        'Deduction': loads.reduce((s, l) => s + Number(l.driverDeduction || 0), 0),
-        'Net Due': loads.reduce((s, l) => s + driverNetOf(l), 0),
-        'Company Margin': loads.reduce((s, l) => s + companyMarginOf(l), 0),
-        'Load Stage': '', 'Settlement': '', 'Paid Date': '', 'Note': '',
-      };
-      rows.push(totals);
-      downloadBlob(rowsToCSV(rows), sanitizeFilename(drv.name + ' - settlement.csv'), 'text/csv');
-      toast('Statement exported', drv.name + ' · ' + loads.length + ' load(s)', true);
+      const loads = window._driverPayLoads || driverPayFilteredLoads();
+      if (!loads.length) return toast('Nothing to export', 'No settlements match this filter.');
+
+      let totalGross = 0;
+      let totalDriverPayment = 0;
+
+      const rowsHtml = loads.map(l => {
+        const dDate = l.deliveryDate || l.pickupDate || l.pickup || '—';
+        const lNum = l.loadNumber || l.id;
+        const lane = [l.pickup, l.dropoff].filter(Boolean).join(' → ') || '—';
+        const gross = Number(l.brokerRate || 0);
+        const driverAmt = Number(driverPayOf(l) || 0);
+
+        totalGross += gross;
+        totalDriverPayment += driverAmt;
+
+        return `
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="padding:10px 14px;font-size:13px;color:#334155;">${escapeHtml(dDate)}</td>
+            <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#0f172a;font-family:monospace;">${escapeHtml(lNum)}</td>
+            <td style="padding:10px 14px;font-size:13px;color:#334155;">${escapeHtml(lane)}</td>
+            <td style="padding:10px 14px;font-size:13px;color:#334155;text-align:right;font-family:monospace;">$${gross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#0f172a;text-align:right;font-family:monospace;">$${driverAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const printHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Driver Payment Settlement PDF</title>
+  <style>
+    @page { size: letter portrait; margin: 15mm; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 24px; }
+    h2 { font-size: 18px; font-weight: 800; margin: 0 0 16px 0; color: #0f172a; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th { text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #475569; border-bottom: 2px solid #cbd5e1; background: #f8fafc; }
+    th.num { text-align: right; }
+    td { padding: 10px 14px; font-size: 13px; }
+    tr.total-row { border-top: 2px solid #0f172a; font-weight: 800; font-size: 14px; background: #f8fafc; }
+    tr.total-row td { padding: 12px 14px; }
+  </style>
+</head>
+<body>
+  <h2>Driver Payment Settlement</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Load Number</th>
+        <th>Lane</th>
+        <th class="num">Total Rate</th>
+        <th class="num">Driver's Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+      <tr class="total-row">
+        <td colspan="3" style="text-align:right;font-weight:800;">TOTAL:</td>
+        <td style="text-align:right;font-family:monospace;">$${totalGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="text-align:right;font-family:monospace;font-weight:900;color:#0284c7;">$${totalDriverPayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>
+    </tbody>
+  </table>
+  <script>
+    window.onload = function() { window.print(); };
+  </script>
+</body>
+</html>
+      `;
+
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(printHtml);
+        win.document.close();
+      } else {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        iframe.contentDocument.write(printHtml);
+        iframe.contentDocument.close();
+        setTimeout(() => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }, 300);
+      }
+      toast('PDF Generated', `${loads.length} load settlement(s) ready for printing/export`, true);
     }
 
     /* ================= BROKERS ================= */

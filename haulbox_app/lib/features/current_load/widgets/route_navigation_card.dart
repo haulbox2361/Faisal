@@ -47,7 +47,7 @@ class RouteNavigationCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (load.miles != null)
+              if (load.miles != null && (load.miles ?? 0) > 0)
                 Text(
                   '${load.miles} Total Miles',
                   style: const TextStyle(

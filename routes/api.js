@@ -807,6 +807,15 @@ router.post('/api/documents/review', async (req, res) => {
     }
 
     await dataStore.saveFullState(state);
+
+    const auditStore = require('../lib/auditStore');
+    await auditStore.record(
+      { type: req.body?.userRole || 'admin', id: req.body?.userId || 'admin', name: req.body?.userName || 'Admin' },
+      'DOCUMENT_STATUS_CHANGED',
+      { type: 'LOAD_DOCUMENT', id: `${load.id}:${docKey}` },
+      { loadNumber: load.loadNumber, docType: docKey, newStatus: doc.status, reason: doc.rejectionReason || null }
+    ).catch(() => {});
+
     res.json({ ok: true, load });
 
   } catch (e) {
@@ -992,38 +1001,7 @@ function sanitizeDriverForDispatcher(driver) {
   return d;
 }
 
-// POST /api/documents/review — Audit-logged document status update
-router.post('/api/documents/review', async (req, res) => {
-  const { loadId, docType, status, reason, userRole, userId, userName } = req.body || {};
-  if (!loadId || !docType || !status) {
-    return res.status(400).json({ ok: false, error: 'Missing required parameters (loadId, docType, status)' });
-  }
 
-  try {
-    const auditStore = require('../lib/auditStore');
-    const state = (await dataStore.loadFullState()) || { loads: [] };
-    const load = (state.loads || []).find(l => String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId));
-
-    if (!load) return res.status(404).json({ ok: false, error: 'Load not found' });
-    load.docs = load.docs || {};
-    load.docs[docType] = load.docs[docType] || {};
-    load.docs[docType].status = status;
-    if (reason) load.docs[docType].rejectionReason = reason;
-
-    await dataStore.saveFullState(state);
-
-    await auditStore.record(
-      { type: userRole || 'dispatcher', id: userId || 'dispatcher', name: userName || 'Dispatcher' },
-      'DOCUMENT_STATUS_CHANGED',
-      { type: 'LOAD_DOCUMENT', id: `${load.id}:${docType}` },
-      { loadNumber: load.loadNumber, docType, newStatus: status, reason: reason || null }
-    );
-
-    res.json({ ok: true, message: `Document ${docType} status updated to ${status}.` });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
 
 // POST /api/drivers/:id/update — Audit-logged driver profile update with credential protection
 router.post('/api/drivers/:id/update', async (req, res) => {

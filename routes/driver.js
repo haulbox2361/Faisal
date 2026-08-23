@@ -1103,14 +1103,51 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   load.timestamps = load.timestamps || {};
   const nowIso = new Date().toISOString();
   const isArray = ['PhotosPU', 'PhotosDO', 'Extra'].includes(key);
+  let docStatus = 'Approved';
+  let rejectionReason = null;
+  let validationIssues = [];
+
+  // Automatic AI/OCR Document Verification for BOL and POD
+  if (key === 'BOL') {
+    load.timestamps.bolUploadedAt = nowIso;
+    const validation = validateBolDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
+    if (validation.overallStatus === 'APPROVED' || (!validation.blurDetected && validation.cornersVisible !== false && validation.signaturePresent !== false && validation.addressMatch !== false && validation.weightMatch !== false)) {
+      docStatus = 'Approved';
+      load.status = 'Loaded';
+      load.driverProgress = 'LOADED';
+    } else {
+      docStatus = 'Pending Verification';
+      rejectionReason = validation.issues && validation.issues.length ? validation.issues.map(i => i.description).join(' ') : 'Flagged for dispatcher review';
+      validationIssues = validation.issues || [];
+    }
+  } else if (key === 'POD') {
+    load.timestamps.podUploadedAt = nowIso;
+    const validation = validatePodDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
+    if (validation.overallStatus === 'APPROVED' || (!validation.blurDetected && validation.cornersVisible !== false && validation.signaturePresent !== false && validation.addressMatch !== false)) {
+      docStatus = 'Approved';
+      load.status = 'POD Uploaded';
+      load.driverProgress = 'POD_UPLOADED';
+      const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
+      if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
+    } else {
+      docStatus = 'Pending Verification';
+      rejectionReason = validation.issues && validation.issues.length ? validation.issues.map(i => i.description).join(' ') : 'Flagged for dispatcher review';
+      validationIssues = validation.issues || [];
+    }
+  } else {
+    // Photos and RC are on-file immediately with no review queue required
+    docStatus = 'Approved';
+  }
+
   const rec = { 
     name: fileName, 
     fileName, 
     data, 
     uploadedAt: nowIso, 
     uploadedBy: driver.name || driver.id,
-    status: 'Pending Verification',
-    rejectionReason: null
+    status: docStatus,
+    rejectionReason: rejectionReason,
+    validationIssues: validationIssues
   };
 
   if (isArray) {
@@ -1124,34 +1161,22 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     load.docs[key] = rec;
   }
 
-  // Automatic Workflow Progress Transitions on Document Upload
-  if (key === 'BOL') {
-    load.timestamps.bolUploadedAt = nowIso;
-    // Driver progress remains AT_PICKUP until Admin approves
-  } else if (key === 'POD') {
-    load.timestamps.podUploadedAt = nowIso;
-    load.driverProgress = 'POD_UPLOADED';
-    load.status = 'POD Uploaded';
-    const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
-    if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
-  }
-
   try {
     await saveFullState(state);
-    await history.record(load.id, `${key}_UPLOADED`, fileName, { type: 'driver', id: driver.id, name: driver.name });
+    await history.record(load.id, `${key}_UPLOADED`, fileName + (docStatus === 'Approved' ? ' (Auto-Approved 🟢)' : ' (Needs Review 🟡)'), { type: 'driver', id: driver.id, name: driver.name });
     
     const notifPayload = {
       type: 'document_uploaded',
-      title: `${driver.name || 'Driver'} uploaded ${key}`,
-      body: `Load #${load.loadNumber || load.id} — ${fileName}` + (key === 'POD' ? ' (Pending Review)' : ' (Pending Review)'),
-      data: { loadId: load.id, key },
+      title: `${driver.name || 'Driver'} uploaded ${key} (${docStatus === 'Approved' ? 'Auto-Approved' : 'Needs Review'})`,
+      body: `Load #${load.loadNumber || load.id} — ${fileName}` + (docStatus === 'Approved' ? ' — AI Verified & Approved' : ` — ${rejectionReason || 'Pending Review'}`),
+      data: { loadId: load.id, key, status: docStatus },
     };
     await notifications.create('admin', 'admin', notifPayload);
     if (load.dispatcherId) {
       await notifications.create('dispatcher', load.dispatcherId, notifPayload);
     }
 
-    res.json({ ok: true, load: shapeLoadForDriver(load) });
+    res.json({ ok: true, load: shapeLoadForDriver(load), validation: { status: docStatus, reason: rejectionReason } });
   } catch (e) {
     console.error('driver upload failed:', e);
     res.status(500).json({ error: 'Upload failed. Try again.' });

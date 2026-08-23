@@ -594,36 +594,7 @@
             </div>
           </div>
 
-          <!-- BOTTOM TABLE: ACTIVE LOADS (9 COLUMNS) -->
-          <div
-            style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);margin-bottom:24px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-              <h2 style="font-size:16px;font-weight:700;margin:0;color:#0f172a;">Active Loads</h2>
-              <a href="#" onclick="switchView('loadboard');return false;"
-                style="font-size:12px;font-weight:600;color:#2563eb;text-decoration:none;">View All Loads</a>
-            </div>
-
-            <div style="overflow-x:auto;">
-              <table class="data" style="width:100%;border-collapse:collapse;font-size:13px;">
-                <thead>
-                  <tr style="border-bottom:1px solid #e2e8f0;text-align:left;color:#64748b;font-weight:600;">
-                    <th style="padding:12px;">Load #</th>
-                    <th style="padding:12px;">Driver</th>
-                    <th style="padding:12px;">Route</th>
-                    <th style="padding:12px;">Status</th>
-                    <th style="padding:12px;">Pickup Appointment</th>
-                    <th style="padding:12px;">Delivery Appointment</th>
-                    <th style="padding:12px;">ETA</th>
-                    <th style="padding:12px;">Miles</th>
-                    <th style="padding:12px;text-align:right;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="dash-active-loads-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- NEW SECTION 1: LIVE OPERATIONS PANEL -->
+          <!-- LIVE OPERATIONS PANEL -->
           <div style="display:flex;gap:24px;margin-bottom:24px;">
             <!-- LEFT CARD: LIVE DRIVER TRACKING (66%) -->
             <div style="flex: 2; background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);display:flex;flex-direction:column;">
@@ -644,33 +615,6 @@
               <div id="dashboard-notifications-feed" style="flex:1;overflow-y:auto;max-height:400px;display:flex;flex-direction:column;gap:12px;padding-right:8px;">
                 <!-- Notifications injected here -->
               </div>
-            </div>
-          </div>
-
-          <!-- NEW SECTION 2: RECENT LOADS CENTER -->
-          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-              <h2 style="font-size:16px;font-weight:700;margin:0;color:#0f172a;">Recent Load Activity</h2>
-            </div>
-            <div style="overflow-x:auto;">
-              <table class="data" style="width:100%;border-collapse:collapse;font-size:13px;">
-                <thead>
-                  <tr style="border-bottom:1px solid #e2e8f0;text-align:left;color:#64748b;font-weight:600;">
-                    <th style="padding:12px;">Load #</th>
-                    <th style="padding:12px;">Driver</th>
-                    <th style="padding:12px;">Broker</th>
-                    <th style="padding:12px;">Dispatcher</th>
-                    <th style="padding:12px;">Pickup</th>
-                    <th style="padding:12px;">Drop Off</th>
-                    <th style="padding:12px;">Amount</th>
-                    <th style="padding:12px;">Current Status</th>
-                    <th style="padding:12px;">ETA</th>
-                    <th style="padding:12px;">Last Updated</th>
-                    <th style="padding:12px;text-align:right;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="dash-recent-loads-tbody"></tbody>
-              </table>
             </div>
           </div>
 
@@ -1089,9 +1033,16 @@
             <div class="section-head">
               <h2>Load-by-Load Settlement</h2>
               <div class="toolbar-right">
-                <button class="btn btn-sm btn-ghost" onclick="exportDriverPayCSV()">Export CSV</button>
-                <button class="btn btn-sm btn-ghost" onclick="exportDriverPayXLSX()">Export Excel</button>
-                <button class="btn btn-sm btn-accent" onclick="markFilteredDriverPaid()">Mark All Filtered Paid</button>
+                <button class="btn btn-sm btn-accent" onclick="exportDriverPayPDF()" style="display:flex;align-items:center;gap:6px;background:#0284c7;color:#ffffff;font-weight:700;">
+                  <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                    <path d="M16 13H8"/>
+                    <path d="M16 17H8"/>
+                  </svg>
+                  Export PDF
+                </button>
+                <button class="btn btn-sm btn-ghost" onclick="markFilteredDriverPaid()">Mark All Filtered Paid</button>
               </div>
             </div>
             <p style="font-size:12px;color:var(--text-faint);margin:-4px 0 10px;" id="dp-loads-summary"></p>
