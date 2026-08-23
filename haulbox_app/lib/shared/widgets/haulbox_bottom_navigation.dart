@@ -54,7 +54,7 @@ class HaulBoxBottomNavigation extends StatelessWidget {
     int badgeCount = 0,
   }) {
     final isSelected = currentIndex == index;
-    final color = isSelected ? AppColors.blueSkyPrimary : AppColors.textMuted;
+    final color = isSelected ? AppColors.emeraldPrimary : AppColors.textMuted;
 
     return Expanded(
       child: InkWell(
@@ -128,14 +128,14 @@ class HaulBoxBottomNavigation extends StatelessWidget {
               height: 38,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [AppColors.blueSkyPrimary, Color(0xFF0369A1)],
+                  colors: [AppColors.emeraldPrimary, AppColors.emeraldDark],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.blueSkyPrimary.withValues(alpha: 0.35),
+                    color: AppColors.emeraldPrimary.withValues(alpha: 0.35),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -153,7 +153,7 @@ class HaulBoxBottomNavigation extends StatelessWidget {
             Text(
               'Home',
               style: TextStyle(
-                color: isSelected ? AppColors.blueSkyPrimary : AppColors.textMuted,
+                color: isSelected ? AppColors.emeraldPrimary : AppColors.textMuted,
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../shared/models/load_model.dart';
 import '../auth/auth_provider.dart';
-import '../loads/loads_provider.dart';
 import '../photo_upload/photo_upload_screen.dart';
-import 'document_detail_screen.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -17,11 +16,12 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final loadsProvider = Provider.of<LoadsProvider>(context);
-    final currentLoad = loadsProvider.currentLoad;
+    final currentLoad = authProvider.currentLoad;
+    final allLoads = authProvider.loads;
+    final pastLoads = allLoads.where((l) => l.status.toUpperCase() == 'DELIVERED' || l.status.toUpperCase() == 'COMPLETED').toList();
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
+      backgroundColor: AppColors.bgLight,
       appBar: AppBar(
         title: const Text(
           'Documents Center',
@@ -69,7 +69,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   title: 'Rate Confirmation (RC)',
                   type: 'RC',
                   docData: currentLoad.docs?['RC'],
-                  loadId: currentLoad.id,
+                  load: currentLoad,
                   icon: Icons.description_outlined,
                   isMandatory: true,
                 ),
@@ -78,7 +78,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   title: 'Bill of Lading (BOL)',
                   type: 'BOL',
                   docData: currentLoad.docs?['BOL'],
-                  loadId: currentLoad.id,
+                  load: currentLoad,
                   icon: Icons.receipt_long_outlined,
                   isMandatory: true,
                 ),
@@ -87,7 +87,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   title: 'Proof of Delivery (POD)',
                   type: 'POD',
                   docData: currentLoad.docs?['POD'],
-                  loadId: currentLoad.id,
+                  load: currentLoad,
                   icon: Icons.assignment_turned_in_outlined,
                   isMandatory: true,
                 ),
@@ -105,14 +105,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 _buildPhotoCategoryCard(
                   title: 'Pickup & Loading Photos',
                   type: 'PU',
-                  loadId: currentLoad.id,
+                  load: currentLoad,
                   icon: Icons.camera_alt_outlined,
                 ),
                 const SizedBox(height: 10),
                 _buildPhotoCategoryCard(
                   title: 'Delivery & Unloading Photos',
                   type: 'DO',
-                  loadId: currentLoad.id,
+                  load: currentLoad,
                   icon: Icons.camera_enhance_outlined,
                 ),
               ] else ...[
@@ -129,7 +129,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              _buildPastLoadsList(loadsProvider),
+              _buildPastLoadsList(pastLoads),
             ],
           ),
         ),
@@ -137,7 +137,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
-  Widget _buildActiveLoadHeader(dynamic load) {
+  Widget _buildActiveLoadHeader(LoadModel load) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -172,7 +172,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Active Load #${load.loadNumber ?? load.id}',
+                  'Active Load #${load.loadNumber}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
@@ -181,7 +181,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${load.pickupCityState ?? 'Origin'} → ${load.dropoffCityState ?? 'Destination'}',
+                  '${load.pickupCityState} → ${load.dropoffCityState}',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textMuted,
@@ -199,7 +199,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     required String title,
     required String type,
     required dynamic docData,
-    required String loadId,
+    required LoadModel load,
     required IconData icon,
     required bool isMandatory,
   }) {
@@ -253,7 +253,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           ),
         ),
         subtitle: Padding(
-          padding: const EdgeInsets.top: 4),
+          padding: const EdgeInsets.only(top: 4),
           child: Row(
             children: [
               Text(
@@ -269,7 +269,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ),
         trailing: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: hasFile ? Colors.grey.shade150 : AppColors.emeraldPrimary,
+            backgroundColor: hasFile ? Colors.grey.shade200 : AppColors.emeraldPrimary,
             foregroundColor: hasFile ? AppColors.textPrimary : Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -281,10 +281,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => PhotoUploadScreen(
-                  loadId: loadId,
-                  docType: type,
-                ),
+                builder: (_) => PhotoUploadScreen(load: load),
               ),
             );
           },
@@ -300,7 +297,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Widget _buildPhotoCategoryCard({
     required String title,
     required String type,
-    required String loadId,
+    required LoadModel load,
     required IconData icon,
   }) {
     return Container(
@@ -314,10 +311,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.blueSkyPrimary.withValues(alpha: 0.1),
+            color: AppColors.statusInfo.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: AppColors.blueSkyPrimary, size: 22),
+          child: Icon(icon, color: AppColors.statusInfo, size: 22),
         ),
         title: Text(
           title,
@@ -332,15 +329,12 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           style: TextStyle(fontSize: 12, color: AppColors.textMuted),
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.add_a_photo_outlined, color: AppColors.blueSkyPrimary),
+          icon: const Icon(Icons.add_a_photo_outlined, color: AppColors.statusInfo),
           onPressed: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => PhotoUploadScreen(
-                  loadId: loadId,
-                  docType: type == 'PU' ? 'PhotosPU' : 'PhotosDO',
-                ),
+                builder: (_) => PhotoUploadScreen(load: load),
               ),
             );
           },
@@ -381,9 +375,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
-  Widget _buildPastLoadsList(LoadsProvider loadsProvider) {
-    final completedLoads = loadsProvider.completedLoads;
-    if (completedLoads.isEmpty) {
+  Widget _buildPastLoadsList(List<LoadModel> pastLoads) {
+    if (pastLoads.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
@@ -402,7 +395,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     }
 
     return Column(
-      children: completedLoads.map((load) {
+      children: pastLoads.map((load) {
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
@@ -418,7 +411,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Load #${load.loadNumber ?? load.id}',
+                      'Load #${load.loadNumber}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -427,7 +420,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${load.pickupCityState ?? 'Origin'} → ${load.dropoffCityState ?? 'Destination'}',
+                      '${load.pickupCityState} → ${load.dropoffCityState}',
                       style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),
                   ],
