@@ -23,6 +23,48 @@ router.use(express.json({ limit: '10mb' }));
 // blob (see loadState()/persist() in public/index.html).
 const STATE_KEY = 'haulline:state';
 
+// GET /api/ocr-ping — diagnostic endpoint to verify server version and Mistral OCR configuration
+// Open access so you can test with a browser: https://haulbox-x5jz.onrender.com/api/ocr-ping
+router.get('/api/ocr-ping', async (req, res) => {
+  const mistralKeyFromEnv = !!(process.env.MISTRAL_API_KEY && process.env.MISTRAL_API_KEY.trim());
+  let mistralKeyFromState = false;
+  let mistralKeyFromKV = false;
+  try {
+    const rawState = await kv.get('haulline:state').catch(() => null);
+    if (rawState) {
+      const stateObj = typeof rawState === 'string' ? JSON.parse(rawState) : rawState;
+      mistralKeyFromState = !!(stateObj?.settings?.aiMistralKey && String(stateObj.settings.aiMistralKey).trim());
+    }
+  } catch (_) {}
+  try {
+    const raw = await kv.get('app_settings').catch(() => null);
+    if (raw) {
+      const s = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      mistralKeyFromKV = !!(s.aiMistralKey && String(s.aiMistralKey).trim());
+    }
+  } catch (_) {}
+
+  const mistralReady = mistralKeyFromEnv || mistralKeyFromState || mistralKeyFromKV;
+  res.json({
+    ok: true,
+    serverVersion: 'ocr-fail-closed-v2',
+    deployedAt: new Date().toISOString(),
+    mistral: {
+      ready: mistralReady,
+      keyFromEnv: mistralKeyFromEnv,
+      keyFromState: mistralKeyFromState,
+      keyFromSettings: mistralKeyFromKV,
+      message: mistralReady
+        ? 'Mistral OCR is configured and ready for live verification.'
+        : 'WARNING: No Mistral API key found. Documents will safely default to PENDING_REVIEW (fail-closed) instead of being OCR-verified.',
+    },
+    failClosedProtection: 'ACTIVE (All fallbacks set to PENDING_REVIEW / RETAKE_REQUIRED)',
+    ocrBehavior: mistralReady ? 'OCR active — real zero-bias document inspection' : 'Safe fallback — uploads queued as PENDING_REVIEW for human review',
+  });
+});
+
+
+
 // Admin-scoped endpoint to dynamically toggle the system data layer (IMP-204)
 router.post('/api/admin/system/data-layer', async (req, res) => {
   const { layer, reason } = req.body || {};
@@ -1103,7 +1145,7 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   load.timestamps = load.timestamps || {};
   const nowIso = new Date().toISOString();
   const isArray = ['PhotosPU', 'PhotosDO', 'Extra'].includes(key);
-  let docStatus = 'Approved';
+  let docStatus = 'Pending Verification';
   let rejectionReason = null;
   let validationIssues = [];
 
@@ -1111,7 +1153,7 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   if (key === 'BOL') {
     load.timestamps.bolUploadedAt = nowIso;
     const validation = validateBolDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
-    if (validation.overallStatus === 'APPROVED' || (!validation.blurDetected && validation.cornersVisible !== false && validation.signaturePresent !== false && validation.addressMatch !== false && validation.weightMatch !== false)) {
+    if (validation.overallStatus === 'APPROVED') {
       docStatus = 'Approved';
       load.status = 'Loaded';
       load.driverProgress = 'LOADED';
@@ -1123,7 +1165,7 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   } else if (key === 'POD') {
     load.timestamps.podUploadedAt = nowIso;
     const validation = validatePodDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
-    if (validation.overallStatus === 'APPROVED' || (!validation.blurDetected && validation.cornersVisible !== false && validation.signaturePresent !== false && validation.addressMatch !== false)) {
+    if (validation.overallStatus === 'APPROVED') {
       docStatus = 'Approved';
       load.status = 'POD Uploaded';
       load.driverProgress = 'POD_UPLOADED';
@@ -1783,7 +1825,8 @@ router.post('/api/driver/verify-document', async (req, res) => {
       driverId: driver.id,
     });
 
-    const status = result.status || result.overallStatus || 'APPROVED';
+    // Fail closed: if result.status is somehow missing, go to PENDING_REVIEW, never APPROVED
+    const status = result.status || result.overallStatus || 'PENDING_REVIEW';
     const nowIso = new Date().toISOString();
 
     // 1. Save document to load in system state

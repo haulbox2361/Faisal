@@ -130,9 +130,12 @@ class DocumentVerificationService {
       );
     } catch (e) {
       debugPrint('Client image quality check error: $e');
-      return const AiVerificationDetails(
-        status: AiDocumentStatus.approved,
-        message: 'Image quality check passed',
+      // Fail closed: any exception in quality check must block submission, not approve
+      return AiVerificationDetails(
+        status: AiDocumentStatus.retakeRequired,
+        message: 'Could not analyze image. Please retake the photo.',
+        reason: 'Image quality check failed unexpectedly. Please try again.',
+        confidence: 0.0,
       );
     }
   }
@@ -198,11 +201,11 @@ class DocumentVerificationService {
         uri,
         headers: headers,
         body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 45));
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        final statusStr = (data['status'] ?? 'APPROVED').toString().toUpperCase();
+        final statusStr = (data['status'] as String? ?? 'PENDING_REVIEW').toUpperCase();
         final ocr = data['ocrData'] as Map<String, dynamic>? ?? {};
         final valRes = data['validationResults'] as Map<String, dynamic>? ?? {};
         final reason = data['reason'] as String?;
