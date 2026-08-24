@@ -1819,9 +1819,8 @@ router.post('/api/driver/verify-document', async (req, res) => {
   }
 });
 
-// GET /api/documents/review-queue
-// Returns all documents waiting for dispatcher review
-router.get('/api/documents/review-queue', async (req, res) => {
+// GET /api/documents/review-queue & /api/dispatcher/review-queue
+router.get(['/api/documents/review-queue', '/api/dispatcher/review-queue'], async (req, res) => {
   try {
     const { getPool, ensureSchema } = require('../lib/db');
     await ensureSchema();
@@ -1842,9 +1841,24 @@ router.get('/api/documents/review-queue', async (req, res) => {
   }
 });
 
-// POST /api/documents/review-action  { queueId, action: 'APPROVE' | 'REJECT', reason, reviewerId, loadId, docType }
-// Dispatcher approvals or rejections from Web Review Center
+// POST /api/dispatcher/review/:id/approve
+router.post('/api/dispatcher/review/:id/approve', async (req, res) => {
+  req.body = { ...req.body, queueId: req.params.id, action: 'APPROVE' };
+  return handleReviewAction(req, res);
+});
+
+// POST /api/dispatcher/review/:id/reject
+router.post('/api/dispatcher/review/:id/reject', async (req, res) => {
+  req.body = { ...req.body, queueId: req.params.id, action: 'REJECT' };
+  return handleReviewAction(req, res);
+});
+
+// POST /api/documents/review-action
 router.post('/api/documents/review-action', async (req, res) => {
+  return handleReviewAction(req, res);
+});
+
+async function handleReviewAction(req, res) {
   const { queueId, action, reason, reviewerId, loadId, docType } = req.body || {};
   if (!action || !['APPROVE', 'REJECT'].includes(action)) {
     return res.status(400).json({ error: 'Invalid action. Must be APPROVE or REJECT.' });
@@ -1901,7 +1915,7 @@ router.post('/api/documents/review-action', async (req, res) => {
     console.error('Failed to update review action:', err);
     res.status(500).json({ error: 'Failed to process review action' });
   }
-});
+}
 
 // GET /api/driver/loads/:id/documents
 // Returns all load documents, lock statuses, version history, and role-based permissions
