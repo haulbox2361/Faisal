@@ -84,6 +84,10 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
         break;
 
       case LoadWorkflowState.goingToPickup:
+        final authPickup = Provider.of<AuthProvider>(context, listen: false);
+        if (authPickup.token != null) {
+          ApiClient.updateLoadProgress(authPickup.token!, load.id, 'AT_PICKUP');
+        }
         setState(() {
           _workflowState = LoadWorkflowState.arrivedPickup;
           _milesRemaining = 0;
@@ -110,6 +114,10 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
       case LoadWorkflowState.bolAccepted:
       case LoadWorkflowState.loaded:
+        final authTransit = Provider.of<AuthProvider>(context, listen: false);
+        if (authTransit.token != null) {
+          ApiClient.updateLoadProgress(authTransit.token!, load.id, 'IN_TRANSIT');
+        }
         setState(() {
           _workflowState = LoadWorkflowState.inTransit;
           _milesRemaining = load.miles != null ? (load.miles! * 0.85).round() : 190;
@@ -124,6 +132,10 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
       case LoadWorkflowState.inTransit:
       case LoadWorkflowState.goingToDelivery:
+        final authDelivery = Provider.of<AuthProvider>(context, listen: false);
+        if (authDelivery.token != null) {
+          ApiClient.updateLoadProgress(authDelivery.token!, load.id, 'AT_DELIVERY');
+        }
         setState(() {
           _workflowState = LoadWorkflowState.arrivedDelivery;
           _milesRemaining = 0;
