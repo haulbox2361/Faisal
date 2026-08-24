@@ -5863,28 +5863,54 @@
       // clearly when Connect is clicked, since Google's own consent screen will error out.
       return true;
     }
-    // Returns the record to read/write this connection on: the dispatcher's own object for a
-    // dispatcher, or the shared settings object for Admin (Admin has no separate "dispatcher"
-    // record of their own).
     function myGoogleAccountHolder() {
       if (STATE.role === 'dispatcher') {
-        return STATE.dispatchers.find(d => d.id === STATE.currentDispatcherId) || null;
+        const d = (STATE.dispatchers || []).find(x => x.id === STATE.currentDispatcherId);
+        if (d) return d;
       }
-      if (STATE.role === 'admin') return STATE.settings;
-      return null; // view-only links don't get a Google connection
+      if (!STATE.settings) STATE.settings = {};
+      return STATE.settings;
     }
+
     function renderMyAccount() {
-      const box = document.getElementById('myaccount-body') || document.getElementById('my-account-box');
-      if (!box) return;
-      const unEl = document.getElementById('myaccount-username');
-      if (unEl) unEl.textContent = STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'You');
       const holder = myGoogleAccountHolder();
-      if (!holder) {
-        box.innerHTML = '<p class="cell-dim" style="font-size:12.5px;">Google account connections are not available in this session.</p>';
-        return;
+      const connected = !!(holder && holder.gmailConnected && holder.driveConnected);
+
+      const emailEl = document.getElementById('my-google-email');
+      if (emailEl) emailEl.value = (holder && holder.googleAccountEmail) || '';
+
+      const gPill = document.getElementById('my-google-pill');
+      if (gPill) {
+        gPill.className = 'status-pill ' + (connected ? 'connected' : 'off');
+        gPill.innerHTML = connected ? 'Connected · Gmail &amp; Drive Active' : 'Not Connected';
       }
-      // Auto-check connection status from backend if not connected locally yet
-      if (!holder.gmailConnected && !holder._checkingStatus) {
+
+      const gActions = document.getElementById('my-google-actions');
+      if (gActions) {
+        gActions.innerHTML = connected
+          ? '<button type="button" class="btn btn-sm btn-ghost" onclick="disconnectMyGoogleAccount()">Disconnect Account</button><button type="button" class="btn btn-sm btn-ghost" onclick="testMyGoogleConnection()">Test Connection</button>'
+          : '<button type="button" class="btn btn-sm btn-accent" style="font-weight:700;padding:8px 18px;" onclick="connectMyGoogleAccount()">⚡ Connect Google Account</button>';
+      }
+
+      const sheetUrlEl = document.getElementById('my-sheet-url');
+      if (sheetUrlEl && !sheetUrlEl.matches(':focus')) {
+        sheetUrlEl.value = (holder && holder.sheetUrl) || '';
+      }
+
+      const sheetTabEl = document.getElementById('my-sheet-tab');
+      if (sheetTabEl && !sheetTabEl.matches(':focus')) {
+        sheetTabEl.value = (holder && holder.sheetTabName) || '';
+      }
+
+      const sheetAutoSyncEl = document.getElementById('my-sheet-autosync');
+      if (sheetAutoSyncEl) {
+        sheetAutoSyncEl.value = (holder && holder.sheetAutoSync === false) ? 'off' : 'on';
+      }
+
+      updateMySheetUI();
+
+      // Check backend status in background if not connected yet
+      if (holder && !holder.gmailConnected && !holder._checkingStatus) {
         holder._checkingStatus = true;
         backendFetch('/auth/status?accountId=' + encodeURIComponent(currentAccountId() || 'admin')).then(st => {
           if (st && st.connected) {
@@ -5896,81 +5922,16 @@
           }
         }).catch(() => { });
       }
+    }
 
-      const connected = !!(holder.gmailConnected && holder.driveConnected);
-      const hasSheet = !!((holder.sheetUrl || '').trim() || (holder.sheetWebhookUrl || '').trim());
-      box.innerHTML = `
-        <!-- Feature 1: Google Account Connection (Gmail & Drive) -->
-        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <svg viewBox="0 0 48 48" width="30" height="30">
-                <path fill="#EA4335" d="M6 8h36v32H6z" opacity="0" />
-                <path fill="#4285F4" d="M45 12l-21 15L3 12v24h42z" />
-                <path fill="#EA4335" d="M3 12l21 15 21-15" />
-              </svg>
-              <div>
-                <div style="font-weight:700;font-size:15px;color:var(--text);">Connect Google Account</div>
-                <div style="font-size:12px;color:var(--text-dim);">Connect your personal Google account to send BOL/POD Reply-All emails from Gmail and save document packages to Google Drive</div>
-              </div>
-            </div>
-            <span class="status-pill ${connected ? 'connected' : 'off'}">${connected ? 'Connected · Gmail &amp; Drive Active' : 'Not Connected'}</span>
-          </div>
-
-          <div class="field" style="margin-bottom:14px;">
-            <label>Connected Google Account Email</label>
-            <input type="email" id="my-google-email" placeholder="Sign in with your Google account" value="${escapeAttr(holder.googleAccountEmail || '')}" readonly style="font-weight:600;">
-          </div>
-
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            ${connected
-              ? '<button type="button" class="btn btn-sm btn-ghost" onclick="disconnectMyGoogleAccount()">Disconnect Account</button><button type="button" class="btn btn-sm btn-ghost" onclick="testMyGoogleConnection()">Test Connection</button>'
-              : '<button type="button" class="btn btn-sm btn-accent" style="font-weight:700;padding:8px 18px;" onclick="connectMyGoogleAccount()">⚡ Connect Google Account</button>'}
-          </div>
-        </div>
-
-        <!-- Feature 2: Connect Google Sheet (Auto-Add Loads) -->
-        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <svg viewBox="0 0 48 48" width="30" height="30">
-                <rect x="6" y="6" width="36" height="36" rx="4" fill="#0F9D58" />
-                <path fill="#ffffff" d="M14 14h20v4H14zm0 8h20v4H14zm0 8h12v4H14z"/>
-              </svg>
-              <div>
-                <div style="font-weight:700;font-size:15px;color:var(--text);">Connect Google Sheet</div>
-                <div style="font-size:12px;color:var(--text-dim);">Paste your Google Sheet link to automatically sync and add every booked load and status update directly to your spreadsheet</div>
-              </div>
-            </div>
-            <span class="status-pill ${hasSheet ? 'connected' : 'off'}">${hasSheet ? 'Live Auto-Sync Active' : 'Not Connected'}</span>
-          </div>
-
-          <div class="field" style="margin-bottom:12px;">
-            <label>Google Sheet Link / URL</label>
-            <input type="text" id="my-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/your-sheet-id/edit" value="${escapeAttr(holder.sheetUrl || '')}" oninput="saveMySheetField('sheetUrl', this.value);" style="font-size:13px;">
-          </div>
-
-          <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-            <div class="field" style="margin-bottom:0;">
-              <label>Sheet Tab Name</label>
-              <input type="text" id="my-sheet-tab" placeholder="Sheet1 (default)" value="${escapeAttr(holder.sheetTabName || '')}" oninput="saveMySheetField('sheetTabName', this.value)">
-            </div>
-            <div class="field" style="margin-bottom:0;">
-              <label>Automatic Load Sync</label>
-              <select id="my-sheet-autosync" onchange="saveMySheetField('sheetAutoSync', this.value === 'on');">
-                <option value="on" ${holder.sheetAutoSync !== false ? 'selected' : ''}>Auto-Add Loads on Booking &amp; Updates</option>
-                <option value="off" ${holder.sheetAutoSync === false ? 'selected' : ''}>Manual Sync Only</option>
-              </select>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <button type="button" class="btn btn-sm btn-accent" style="font-weight:700;padding:8px 18px;" onclick="testSheetSync()">⚡ Connect &amp; Test Sheet Sync</button>
-            <button type="button" class="btn btn-sm btn-ghost" onclick="clearMySheetLink()">Clear Link</button>
-          </div>
-          <div id="my-sheet-status" style="font-size:12px;color:var(--text-faint);margin-top:10px;font-weight:600;"></div>
-        </div>
-      `;
+    function updateMySheetUI() {
+      const holder = myGoogleAccountHolder();
+      const hasSheet = !!((holder && holder.sheetUrl || '').trim() || (holder && holder.sheetWebhookUrl || '').trim());
+      const sPill = document.getElementById('my-sheet-pill');
+      if (sPill) {
+        sPill.className = 'status-pill ' + (hasSheet ? 'connected' : 'off');
+        sPill.textContent = hasSheet ? 'Live Auto-Sync Active' : 'Not Connected';
+      }
     }
     function clearMySheetLink() {
       const holder = myGoogleAccountHolder();

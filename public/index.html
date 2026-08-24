@@ -1340,7 +1340,76 @@
                 <h2 style="text-transform:none;font-size:22px;color:var(--text);font-weight:800;letter-spacing:-0.02em;">My Account</h2>
               </div>
             </div>
-            <div id="myaccount-body"></div>
+            <div id="myaccount-body">
+              <!-- Feature 1: Google Account Connection (Gmail & Drive) -->
+              <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <svg viewBox="0 0 48 48" width="30" height="30">
+                      <path fill="#EA4335" d="M6 8h36v32H6z" opacity="0" />
+                      <path fill="#4285F4" d="M45 12l-21 15L3 12v24h42z" />
+                      <path fill="#EA4335" d="M3 12l21 15 21-15" />
+                    </svg>
+                    <div>
+                      <div style="font-weight:700;font-size:15px;color:var(--text);">Connect Google Account</div>
+                      <div style="font-size:12px;color:var(--text-dim);">Connect your personal Google account to send BOL/POD Reply-All emails from Gmail and save document packages to Google Drive</div>
+                    </div>
+                  </div>
+                  <span class="status-pill off" id="my-google-pill">Not Connected</span>
+                </div>
+
+                <div class="field" style="margin-bottom:14px;">
+                  <label>Connected Google Account Email</label>
+                  <input type="email" id="my-google-email" placeholder="Sign in with your Google account" readonly style="font-weight:600;">
+                </div>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;" id="my-google-actions">
+                  <button type="button" class="btn btn-sm btn-accent" style="font-weight:700;padding:8px 18px;" onclick="connectMyGoogleAccount()">⚡ Connect Google Account</button>
+                </div>
+              </div>
+
+              <!-- Feature 2: Connect Google Sheet (Auto-Add Loads) -->
+              <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <svg viewBox="0 0 48 48" width="30" height="30">
+                      <rect x="6" y="6" width="36" height="36" rx="4" fill="#0F9D58" />
+                      <path fill="#ffffff" d="M14 14h20v4H14zm0 8h20v4H14zm0 8h12v4H14z"/>
+                    </svg>
+                    <div>
+                      <div style="font-weight:700;font-size:15px;color:var(--text);">Connect Google Sheet</div>
+                      <div style="font-size:12px;color:var(--text-dim);">Paste your Google Sheet link to automatically sync and add every booked load and status update directly to your spreadsheet</div>
+                    </div>
+                  </div>
+                  <span class="status-pill off" id="my-sheet-pill">Not Connected</span>
+                </div>
+
+                <div class="field" style="margin-bottom:12px;">
+                  <label>Google Sheet Link / URL</label>
+                  <input type="text" id="my-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/your-sheet-id/edit" oninput="saveMySheetField('sheetUrl', this.value); updateMySheetUI();" style="font-size:13px;">
+                </div>
+
+                <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+                  <div class="field" style="margin-bottom:0;">
+                    <label>Sheet Tab Name</label>
+                    <input type="text" id="my-sheet-tab" placeholder="Sheet1 (default)" oninput="saveMySheetField('sheetTabName', this.value)">
+                  </div>
+                  <div class="field" style="margin-bottom:0;">
+                    <label>Automatic Load Sync</label>
+                    <select id="my-sheet-autosync" onchange="saveMySheetField('sheetAutoSync', this.value === 'on');">
+                      <option value="on">Auto-Add Loads on Booking &amp; Updates</option>
+                      <option value="off">Manual Sync Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-sm btn-accent" style="font-weight:700;padding:8px 18px;" onclick="testSheetSync()">⚡ Connect &amp; Test Sheet Sync</button>
+                  <button type="button" class="btn btn-sm btn-ghost" onclick="clearMySheetLink()">Clear Link</button>
+                </div>
+                <div id="my-sheet-status" style="font-size:12px;color:var(--text-faint);margin-top:10px;font-weight:600;"></div>
+              </div>
+            </div>
           </div>
         </section>
 
