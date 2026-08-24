@@ -5898,64 +5898,88 @@
       }
 
       const connected = !!(holder.gmailConnected && holder.driveConnected);
+      const hasSheet = !!((holder.sheetUrl || '').trim() || (holder.sheetWebhookUrl || '').trim());
       box.innerHTML = `
-        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:18px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <svg viewBox="0 0 48 48" width="24" height="24">
+        <!-- Feature 1: Google Account Connection (Gmail & Drive) -->
+        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <svg viewBox="0 0 48 48" width="30" height="30">
                 <path fill="#EA4335" d="M6 8h36v32H6z" opacity="0" />
                 <path fill="#4285F4" d="M45 12l-21 15L3 12v24h42z" />
                 <path fill="#EA4335" d="M3 12l21 15 21-15" />
               </svg>
               <div>
-                <div style="font-weight:700;font-size:14px;color:var(--text);">Google Account (Gmail &amp; Drive)</div>
-                <div style="font-size:12px;color:var(--text-dim);">Used to Reply-All BOL/POD emails via Gmail and archive load packages to Google Drive</div>
+                <div style="font-weight:700;font-size:15px;color:var(--text);">Connect Google Account</div>
+                <div style="font-size:12px;color:var(--text-dim);">Connect your personal Google account to send BOL/POD Reply-All emails from Gmail and save document packages to Google Drive</div>
               </div>
             </div>
-            <span class="status-pill ${connected ? 'connected' : 'off'}">${connected ? 'Connected' : 'Not Connected'}</span>
+            <span class="status-pill ${connected ? 'connected' : 'off'}">${connected ? 'Connected · Gmail &amp; Drive Active' : 'Not Connected'}</span>
+          </div>
+
+          <div class="field" style="margin-bottom:14px;">
+            <label>Connected Google Account Email</label>
+            <input type="email" id="my-google-email" placeholder="Sign in with your Google account" value="${escapeAttr(holder.googleAccountEmail || '')}" readonly style="font-weight:600;">
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            ${connected
+              ? '<button type="button" class="btn btn-sm btn-ghost" onclick="disconnectMyGoogleAccount()">Disconnect Account</button><button type="button" class="btn btn-sm btn-ghost" onclick="testMyGoogleConnection()">Test Connection</button>'
+              : '<button type="button" class="btn btn-sm btn-accent" style="font-weight:700;padding:8px 18px;" onclick="connectMyGoogleAccount()">⚡ Connect Google Account</button>'}
+          </div>
+        </div>
+
+        <!-- Feature 2: Connect Google Sheet (Auto-Add Loads) -->
+        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <svg viewBox="0 0 48 48" width="30" height="30">
+                <rect x="6" y="6" width="36" height="36" rx="4" fill="#0F9D58" />
+                <path fill="#ffffff" d="M14 14h20v4H14zm0 8h20v4H14zm0 8h12v4H14z"/>
+              </svg>
+              <div>
+                <div style="font-weight:700;font-size:15px;color:var(--text);">Connect Google Sheet</div>
+                <div style="font-size:12px;color:var(--text-dim);">Paste your Google Sheet link to automatically sync and add every booked load and status update directly to your spreadsheet</div>
+              </div>
+            </div>
+            <span class="status-pill ${hasSheet ? 'connected' : 'off'}">${hasSheet ? 'Live Auto-Sync Active' : 'Not Connected'}</span>
           </div>
 
           <div class="field" style="margin-bottom:12px;">
-            <label>Connected Google Email</label>
-            <input type="email" id="my-google-email" placeholder="Sign in with your Google account" value="${escapeAttr(holder.googleAccountEmail || '')}" readonly>
+            <label>Google Sheet Link / URL</label>
+            <input type="text" id="my-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/your-sheet-id/edit" value="${escapeAttr(holder.sheetUrl || '')}" oninput="saveMySheetField('sheetUrl', this.value);" style="font-size:13px;">
           </div>
 
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            ${connected
-              ? '<button type="button" class="btn btn-sm btn-ghost" onclick="disconnectMyGoogleAccount()">Disconnect Google Account</button><button type="button" class="btn btn-sm" onclick="testMyGoogleConnection()">Test Connection</button>'
-              : '<button type="button" class="btn btn-sm btn-accent" style="font-weight:600;" onclick="connectMyGoogleAccount()">⚡ Connect Google Account</button>'}
-          </div>
-        </div>
-
-        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:16px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-            <svg viewBox="0 0 48 48" width="24" height="24">
-              <rect x="6" y="6" width="36" height="36" rx="4" fill="#0F9D58" />
-              <path fill="#ffffff" d="M14 14h20v4H14zm0 8h20v4H14zm0 8h12v4H14z"/>
-            </svg>
-            <div>
-              <div style="font-weight:700;font-size:14px;color:var(--text);">Google Sheet Auto-Sync Link</div>
-              <div style="font-size:12px;color:var(--text-dim);">Automatically write and update every booked load row into your live Google Sheet</div>
-            </div>
-          </div>
-
-          <div class="field" style="margin-bottom:10px;">
-            <label>Google Sheet URL / Link</label>
-            <input type="text" id="my-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/..." value="${escapeAttr(holder.sheetUrl || '')}" oninput="saveMySheetField('sheetUrl', this.value)">
-          </div>
-
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
-            <div class="field" style="flex:1;margin-bottom:0;">
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div class="field" style="margin-bottom:0;">
               <label>Sheet Tab Name</label>
               <input type="text" id="my-sheet-tab" placeholder="Sheet1 (default)" value="${escapeAttr(holder.sheetTabName || '')}" oninput="saveMySheetField('sheetTabName', this.value)">
             </div>
-            <div style="padding-top:18px;">
-              <button type="button" class="btn btn-sm btn-ghost" onclick="testSheetSync()">Test Sheet Sync</button>
+            <div class="field" style="margin-bottom:0;">
+              <label>Automatic Load Sync</label>
+              <select id="my-sheet-autosync" onchange="saveMySheetField('sheetAutoSync', this.value === 'on');">
+                <option value="on" ${holder.sheetAutoSync !== false ? 'selected' : ''}>Auto-Add Loads on Booking &amp; Updates</option>
+                <option value="off" ${holder.sheetAutoSync === false ? 'selected' : ''}>Manual Sync Only</option>
+              </select>
             </div>
           </div>
-          <div id="my-sheet-status" style="font-size:12px;color:var(--text-faint);margin-top:4px;"></div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-accent" style="font-weight:700;padding:8px 18px;" onclick="testSheetSync()">⚡ Connect &amp; Test Sheet Sync</button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="clearMySheetLink()">Clear Link</button>
+          </div>
+          <div id="my-sheet-status" style="font-size:12px;color:var(--text-faint);margin-top:10px;font-weight:600;"></div>
         </div>
       `;
+    }
+    function clearMySheetLink() {
+      const holder = myGoogleAccountHolder();
+      if (!holder) return;
+      holder.sheetUrl = '';
+      holder.sheetWebhookUrl = '';
+      persist();
+      renderMyAccount();
+      toast('Sheet link removed', 'Auto-sync cleared.', true);
     }
     function saveMySheetField(key, val) {
       const holder = myGoogleAccountHolder();
