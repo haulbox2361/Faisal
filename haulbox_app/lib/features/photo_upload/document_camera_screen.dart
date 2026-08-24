@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -50,15 +49,11 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
   bool _isCapturing = false;
   String? _error;
 
-  // Edge-detection overlay state
+  // Edge-detection overlay state — shows alignment guide only
   bool _documentDetected = false;
   Rect? _detectedRect;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-
-  // Simulated edge-detection confidence (real implementation would use MLKit)
-  double _confidence = 0.0;
-  final _random = math.Random();
 
   @override
   void initState() {
@@ -109,34 +104,15 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
     }
   }
 
-  /// In production this would call MLKit Document Scanner or CameraX analysis.
-  /// Here we simulate realistic detection behaviour: confidence builds over ~2s
-  /// as the driver holds the device steady, then locks a guide rect.
+  /// Guide overlay — always shows document alignment frame.
+  /// Actual document validation is done server-side by Mistral OCR after capture.
   void _startEdgeDetection() {
-    Future.doWhile(() async {
-      if (!mounted || _controller == null || !_controller!.value.isInitialized) {
-        return false;
-      }
-
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      if (!mounted) return false;
-
-      setState(() {
-        // Confidence ramps up, with small jitter to feel live
-        final jitter = (_random.nextDouble() - 0.5) * 0.04;
-        _confidence = (_confidence + 0.03 + jitter).clamp(0.0, 1.0);
-        _documentDetected = _confidence >= 0.78;
-
-        if (_documentDetected) {
-          // Stable guide rect once document detected
-          _detectedRect = const Rect.fromLTWH(0.08, 0.12, 0.84, 0.76);
-        } else {
-          _detectedRect = null;
-        }
-      });
-
-      return mounted;
+    if (!mounted) return;
+    setState(() {
+      // Always show the guide frame — driver must manually align and tap capture.
+      // We do NOT simulate "Document Ready" since any image would falsely pass.
+      _documentDetected = false;
+      _detectedRect = const Rect.fromLTWH(0.08, 0.12, 0.84, 0.76);
     });
   }
 
@@ -248,9 +224,9 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
             const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.check_circle_rounded, color: AppColors.emeraldPrimary, size: 18),
+                Icon(Icons.info_outline_rounded, color: AppColors.emeraldPrimary, size: 18),
                 SizedBox(width: 6),
-                Text('Image quality verified. All 4 corners clear.', style: TextStyle(color: AppColors.emeraldPrimary, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                Flexible(child: Text('Tap SUBMIT PHOTO to send for AI OCR verification. Make sure the document is fully visible.', style: TextStyle(color: AppColors.emeraldPrimary, fontSize: 12.5, fontWeight: FontWeight.w600))),
               ],
             ),
           ],
@@ -326,7 +302,7 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
                     detectedRect: _detectedRect,
                     screenSize: Size(constraints.maxWidth, constraints.maxHeight),
                     detected: _documentDetected,
-                    confidence: _confidence,
+                    confidence: 0.0,
                     pulseValue: _pulseAnimation.value,
                   ),
                 );
@@ -372,7 +348,7 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
                         ],
                       ),
                     ),
-                    _DetectionBadge(detected: _documentDetected, confidence: _confidence),
+                    _DetectionBadge(detected: _documentDetected, confidence: 0.0),
                   ],
                 ),
               ),
@@ -445,13 +421,10 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
                         height: 76,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: _documentDetected
-                              ? AppColors.emeraldPrimary
-                              : Colors.white,
+                          color: AppColors.emeraldPrimary,
                           boxShadow: [
                             BoxShadow(
-                              color: (_documentDetected ? AppColors.emeraldPrimary : Colors.white)
-                                  .withValues(alpha: 0.4),
+                              color: AppColors.emeraldPrimary.withValues(alpha: 0.4),
                               blurRadius: 20,
                               spreadRadius: 2,
                             ),
@@ -459,13 +432,7 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
                         ),
                         child: _isCapturing
                             ? const CircularProgressIndicator(color: Colors.black, strokeWidth: 2)
-                            : Icon(
-                                _documentDetected
-                                    ? Icons.check_rounded
-                                    : Icons.camera_alt_rounded,
-                                size: 32,
-                                color: Colors.black,
-                              ),
+                            : const Icon(Icons.camera_alt_rounded, size: 32, color: Colors.black),
                       ),
                     ),
 
@@ -622,8 +589,8 @@ class _DetectionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = detected ? 'Document Ready' : 'Scanning…';
-    final color = detected ? AppColors.emeraldPrimary : Colors.white38;
+    const label = 'Align Document & Capture';
+    const color = AppColors.emeraldPrimary;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -635,8 +602,8 @@ class _DetectionBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            detected ? Icons.check_circle_outline_rounded : Icons.crop_free_rounded,
+          const Icon(
+            Icons.crop_free_rounded,
             size: 14,
             color: color,
           ),
