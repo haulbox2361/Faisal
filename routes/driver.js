@@ -1772,17 +1772,60 @@ router.post('/api/driver/verify-document', async (req, res) => {
 
   try {
     const verifier = require('../lib/aiDocumentVerifier');
+    const { state, driver } = ctx;
+    const load = (state.loads || []).find((l) => String(l.id) === String(effectiveLoadId) || String(l.loadNumber) === String(effectiveLoadId)) || currentActiveLoad(state, driver.id);
+
     const result = await verifier.verifyDocument({
       documentType: documentType.toUpperCase(),
       base64Data: imageBase64,
       mimeType: mimeType || 'image/jpeg',
-      loadData: loadData || { loadNumber: effectiveLoadId, id: effectiveLoadId },
-      driverId: ctx.driver.id,
+      loadData: load || loadData || { loadNumber: effectiveLoadId, id: effectiveLoadId },
+      driverId: driver.id,
     });
 
     const status = result.status || result.overallStatus || 'APPROVED';
+    const nowIso = new Date().toISOString();
 
-    // Emit Real-time WebSocket Events based on 3-tier outcome
+    // 1. Save document to load in system state
+    if (load) {
+      load.docs = load.docs || load.documents || {};
+      load.documents = load.docs;
+      const docKey = documentType.toUpperCase();
+      load.docs[docKey] = {
+        name: `${docKey}_${load.loadNumber || load.id}.jpg`,
+        fileName: `${docKey}_${load.loadNumber || load.id}.jpg`,
+        data: imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`) : null,
+        status: status === 'APPROVED' ? 'Approved' : (status === 'PENDING_REVIEW' ? 'Pending Verification' : 'Rejected'),
+        rejectionReason: status === 'REJECTED' ? result.reason : null,
+        uploadedAt: nowIso,
+        verifiedAt: nowIso,
+        confidence: result.ocrData?.confidence || 0.95,
+      };
+
+      // 2. If Approved, auto-advance load progression
+      if (status === 'APPROVED') {
+        load.timestamps = load.timestamps || {};
+        if (docKey === 'BOL') {
+          load.status = 'Loaded';
+          load.driverProgress = 'LOADED';
+          load.timestamps.loadedAt = nowIso;
+        } else if (docKey === 'POD') {
+          load.status = 'Drop-off';
+          load.driverProgress = 'DELIVERED';
+          load.timestamps.deliveredAt = nowIso;
+        }
+      }
+
+      await saveFullState(state);
+      await history.record(
+        load.id,
+        `${docKey}_${status}`,
+        `Driver uploaded ${docKey}. Result: ${status}. ${result.reason || ''}`,
+        { type: 'driver', id: driver.id, name: driver.name }
+      ).catch(() => {});
+    }
+
+    // 3. Emit Real-time WebSocket Events based on 3-tier outcome
     if (io) {
       if (status === 'APPROVED') {
         const newLoadStatus = documentType.toUpperCase() === 'BOL' ? 'LOADED' : 'DELIVERED';
@@ -1791,7 +1834,7 @@ router.post('/api/driver/verify-document', async (req, res) => {
           documentType: documentType.toUpperCase(),
           newLoadStatus,
           documentId: result.documentId,
-          timestamp: new Date().toISOString(),
+          timestamp: nowIso,
         });
       } else if (status === 'PENDING_REVIEW') {
         io.emit('document:pending_review', {
@@ -1799,7 +1842,7 @@ router.post('/api/driver/verify-document', async (req, res) => {
           documentType: documentType.toUpperCase(),
           reviewTaskId: result.documentId,
           issues: result.issues || [],
-          timestamp: new Date().toISOString(),
+          timestamp: nowIso,
         });
       }
     }
@@ -1811,6 +1854,7 @@ router.post('/api/driver/verify-document', async (req, res) => {
       ocrData: result.ocrData || result.extractedData || {},
       validationResults: result.validationResults || {},
       reason: result.reason || '',
+      load: load ? shapeLoadForDriver(load, driver.id) : null,
       result,
     });
   } catch (err) {

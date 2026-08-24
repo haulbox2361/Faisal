@@ -346,11 +346,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
       if (result.isApproved) {
         // Outcome 1: APPROVED -> Show green modal + Auto-advance load status
-        final newStatus = isBol ? 'LOADED' : 'DELIVERED';
-        if (token != null) {
-          await ApiClient.updateLoadProgress(token, load.id, newStatus);
-          await auth.syncAllData(silent: true);
-        }
+        await auth.syncAllData();
 
         setState(() {
           if (isBol) {
