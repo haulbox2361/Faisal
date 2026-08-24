@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../network/api_client.dart';
 import '../../shared/models/load_model.dart';
-import '../../shared/models/load_state.dart';
 
 enum AiDocumentStatus {
   approved,

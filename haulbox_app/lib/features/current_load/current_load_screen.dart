@@ -1,14 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
+import '../../core/network/api_client.dart';
 import '../../core/services/document_verification_service.dart';
 import '../../core/services/location_permission_service.dart';
 import '../../core/services/location_service.dart';
 import '../../shared/models/load_model.dart';
 import '../../shared/models/load_state.dart';
 import '../auth/auth_provider.dart';
+import '../photo_upload/document_camera_screen.dart';
 import 'widgets/active_trip_hero_card.dart';
 import 'widgets/load_specs_card.dart';
 import 'widgets/route_navigation_card.dart';

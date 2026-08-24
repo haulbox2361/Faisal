@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
+import '../../core/services/document_verification_service.dart';
 
 /// POL-301: Camera with real-time edge-detection overlay for document capture.
 /// Renders a quadrilateral guide overlay that tracks detected document edges
