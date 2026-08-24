@@ -3699,31 +3699,42 @@
 
     async function reviewDocument(loadId, docKey, action, rejectionReason) {
       try {
-        const resp = await fetch('/api/documents/review', {
+        const resp = await fetch('/api/documents/review-action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ loadId, docKey, action, rejectionReason }),
+          body: JSON.stringify({
+            loadId,
+            docType: docKey,
+            action: action.toUpperCase(),
+            reason: rejectionReason,
+            reviewerId: (STATE.currentUser && STATE.currentUser.name) || (STATE.role === 'admin' ? 'Admin' : 'Dispatcher'),
+          }),
         });
         const data = resp.ok ? await resp.json() : null;
-        if (data && data.ok) {
-          // Optimistically update the local STATE
-          const load = (STATE.loads || []).find(l => l.id === loadId);
-          if (load) {
-            const docs = load.docs || load.documents || {};
-            if (docs[docKey]) {
-              docs[docKey].status = action === 'approve' ? 'Approved' : 'Rejected';
-              docs[docKey].rejectionReason = rejectionReason || null;
+
+        // Optimistically update the local STATE
+        const load = (STATE.loads || []).find(l => l.id === loadId);
+        if (load) {
+          const docs = load.docs || load.documents || {};
+          if (docs[docKey]) {
+            docs[docKey].status = action.toLowerCase() === 'approve' ? 'Approved' : 'Rejected';
+            docs[docKey].rejectionReason = rejectionReason || null;
+          }
+          if (action.toLowerCase() === 'approve') {
+            if (docKey === 'BOL' && (load.status === 'Booked' || load.status === 'Accepted' || load.status === 'At Pickup')) {
+              load.status = 'Loaded';
+            } else if (docKey === 'POD' && (load.status === 'Loaded' || load.status === 'In Transit' || load.status === 'At Delivery')) {
+              load.status = 'Drop-off';
             }
           }
-          renderDocReview();
-          toast(
-            action === 'approve' ? `${docKey} Approved` : `${docKey} Rejected`,
-            action === 'approve' ? 'Document sent to Google Drive.' : 'Driver has been notified.',
-            action === 'approve'
-          );
-        } else {
-          toast('Review Failed', 'Could not update document status. Please try again.', false);
+          persist();
         }
+        renderDocReview();
+        toast(
+          action.toLowerCase() === 'approve' ? `${docKey} Approved` : `${docKey} Rejected`,
+          action.toLowerCase() === 'approve' ? 'Load status advanced & synchronized with driver.' : 'Driver has been notified with retake instructions.',
+          action.toLowerCase() === 'approve'
+        );
       } catch (e) {
         toast('Network Error', 'Failed to reach server. Please try again.', false);
       }

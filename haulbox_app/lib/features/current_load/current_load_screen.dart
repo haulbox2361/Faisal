@@ -294,70 +294,169 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
     );
   }
 
-  // 3. AI DOCUMENT VERIFICATION
+  // 3. AI DOCUMENT VERIFICATION (BOL & POD)
   Future<void> _runDocumentAiVerification(LoadModel load, {required bool isBol}) async {
     final docType = isBol ? 'BOL' : 'POD';
 
+    // 1. Launch Camera Capture with Real-Time Quality Check
+    final file = await DocumentCameraScreen.capture(
+      context,
+      slotLabel: isBol ? 'Bill of Lading (BOL)' : 'Proof of Delivery (POD)',
+      loadNumber: load.loadNumber,
+    );
+
+    if (file == null || !mounted) return;
+
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'AI is checking $docType image clarity and signatures...';
+      _statusMessage = 'AI is analyzing $docType with Mistral Vision OCR...';
     });
 
-    final quality = await DocumentVerificationService.checkPhotoQuality();
-    if (!quality.isPass) {
+    try {
+      final bytes = await file.readAsBytes();
+      final base64Image = base64Encode(bytes);
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final token = auth.token;
+
+      final result = isBol
+          ? await DocumentVerificationService.verifyBol(load: load, base64Image: base64Image, authToken: token)
+          : await DocumentVerificationService.verifyPod(load: load, base64Image: base64Image, authToken: token);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = null;
+      });
+
+      if (result.isApproved) {
+        // Outcome 1: APPROVED -> Show green modal + Auto-advance load status
+        final newStatus = isBol ? 'LOADED' : 'DELIVERED';
+        if (token != null) {
+          await ApiClient.updateLoadProgress(token, load.id, newStatus);
+          await auth.syncAllData(silent: true);
+        }
+
+        setState(() {
+          if (isBol) {
+            _workflowState = LoadWorkflowState.loaded;
+          } else {
+            _workflowState = LoadWorkflowState.delivered;
+          }
+        });
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: AppColors.emeraldPrimary, size: 28),
+                  const SizedBox(width: 10),
+                  Text('✓ $docType Approved', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+                ],
+              ),
+              content: Text(
+                'AI OCR verified all details successfully. Load status has been updated to ${isBol ? "Loaded" : "Delivered"}.',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.emeraldPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('CONTINUE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+      } else if (result.isPendingReview) {
+        // Outcome 2: PENDING_REVIEW -> Show yellow modal, keep load in current state
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: const Row(
+                children: [
+                  Icon(Icons.access_time_filled_rounded, color: Color(0xFFF59E0B), size: 28),
+                  SizedBox(width: 10),
+                  Text('Sent to Dispatcher', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+                ],
+              ),
+              content: Text(
+                result.issueDescription ?? 'Your $docType has been sent to Dispatch for review. You may continue working; you will be notified once approved.',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('GOT IT', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        // Outcome 3: REJECTED -> Show red modal + immediate Retake Photo button
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: [
+                  const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 28),
+                  const SizedBox(width: 10),
+                  Text('✕ Retake Required', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+                ],
+              ),
+              content: Text(
+                'Reason: ${result.issueDescription ?? "Document verification failed."}\nPlease capture a clear photo of the signed $docType.',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('CANCEL', style: TextStyle(color: Colors.white60, fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _runDocumentAiVerification(load, isBol: isBol);
+                  },
+                  child: const Text('RETAKE PHOTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
       setState(() {
         _isProcessing = false;
         _statusMessage = null;
       });
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
-            title: Text('Retake $docType Required', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.statusDanger)),
-            content: Text(quality.issueDescription ?? 'Image quality is too blurry. Please retake with flat lighting.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('CANCEL', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w700)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.emeraldPrimary),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _openDocumentUploadSheet(load, isBol: isBol);
-                },
-                child: const Text('RETAKE PHOTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-              ),
-            ],
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Verification error: $e'), backgroundColor: Colors.red),
         );
       }
-      return;
-    }
-
-    final result = isBol
-        ? await DocumentVerificationService.verifyBol(load: load)
-        : await DocumentVerificationService.verifyPod(load: load);
-
-    setState(() {
-      _isProcessing = false;
-      _statusMessage = null;
-      if (isBol) {
-        _workflowState = result.isAccepted ? LoadWorkflowState.bolAccepted : LoadWorkflowState.bolRejected;
-      } else {
-        _workflowState = result.isAccepted ? LoadWorkflowState.podAccepted : LoadWorkflowState.podRejected;
-      }
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.isAccepted ? '✓ $docType Approved & Verified!' : '⚠️ $docType Sent for Dispatcher Review'),
-          backgroundColor: result.isAccepted ? AppColors.emeraldPrimary : AppColors.statusWarning,
-        ),
-      );
     }
   }
 

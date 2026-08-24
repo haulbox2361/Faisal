@@ -156,7 +156,8 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
     try {
       final xFile = await _controller!.takePicture();
       if (!mounted) return;
-      Navigator.of(context).pop(File(xFile.path));
+      final file = File(xFile.path);
+      await _validateAndConfirmPhoto(file);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -169,11 +170,109 @@ class _DocumentCameraScreenState extends State<DocumentCameraScreen>
 
   Future<void> _pickFromGallery() async {
     final picker = ImagePicker();
-    final xFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 92);
+    final xFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
     if (!mounted) return;
     if (xFile != null) {
-      Navigator.of(context).pop(File(xFile.path));
+      final file = File(xFile.path);
+      await _validateAndConfirmPhoto(file);
     }
+  }
+
+  Future<void> _validateAndConfirmPhoto(File file) async {
+    // 1. Client-Side Quality Check
+    final bytes = await file.readAsBytes();
+    final quality = await DocumentVerificationService.checkPhotoQuality(imageFile: file, imageBytes: bytes);
+
+    if (!mounted) return;
+    setState(() => _isCapturing = false);
+
+    if (quality.isRetakeRequired) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+              SizedBox(width: 10),
+              Text('Image Quality Issue', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+            ],
+          ),
+          content: Text(
+            quality.issueDescription ?? 'Image quality is too low or blurry. Please ensure all 4 corners are visible with even lighting.',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.emeraldPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('RETAKE PHOTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 2. Quality Passed -> Image Preview & Confirmation Modal
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        contentPadding: const EdgeInsets.all(16),
+        title: Text(
+          'Preview ${widget.slotLabel}',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                file,
+                height: 260,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppColors.emeraldPrimary, size: 18),
+                SizedBox(width: 6),
+                Text('Image quality verified. All 4 corners clear.', style: TextStyle(color: AppColors.emeraldPrimary, fontSize: 12.5, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('RETAKE', style: TextStyle(color: Colors.white60, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.emeraldPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx); // Close preview modal
+              Navigator.of(context).pop(file); // Return verified file
+            },
+            child: const Text('SUBMIT PHOTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

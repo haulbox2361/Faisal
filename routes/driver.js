@@ -1744,29 +1744,162 @@ router.post('/api/driver/device-token/remove', async (req, res) => {
   }
 });
 
-// POST /api/driver/verify-document  { documentType, base64, mimeType, loadData }
+// POST /api/driver/verify-document  { documentType, base64Data, base64, mimeType, loadData, loadId }
 // Performs automated AI quality check, OCR, signature detection, and RC validation for BOL / POD
 router.post('/api/driver/verify-document', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
-  const { documentType, base64, mimeType, loadData } = req.body || {};
+  const { documentType, base64Data, base64, mimeType, loadData, loadId } = req.body || {};
+  const imageBase64 = base64Data || base64;
+
   if (!documentType || (!['BOL', 'POD'].includes(documentType.toUpperCase()))) {
     return res.status(400).json({ error: 'Invalid document type. Must be BOL or POD.' });
+  }
+
+  const effectiveLoadId = loadId || (loadData && (loadData.loadNumber || loadData.id)) || 'HB-1042';
+  const io = req.app.get('io') || global.io;
+
+  // Emit WebSocket processing event
+  if (io) {
+    io.emit('document:uploaded', {
+      loadId: effectiveLoadId,
+      documentType: documentType.toUpperCase(),
+      status: 'PROCESSING',
+      driverId: ctx.driver.id,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   try {
     const verifier = require('../lib/aiDocumentVerifier');
     const result = await verifier.verifyDocument({
       documentType: documentType.toUpperCase(),
-      base64Data: base64,
+      base64Data: imageBase64,
       mimeType: mimeType || 'image/jpeg',
-      loadData: loadData || {},
+      loadData: loadData || { loadNumber: effectiveLoadId, id: effectiveLoadId },
       driverId: ctx.driver.id,
     });
-    res.json({ ok: true, result });
+
+    const status = result.status || result.overallStatus || 'APPROVED';
+
+    // Emit Real-time WebSocket Events based on 3-tier outcome
+    if (io) {
+      if (status === 'APPROVED') {
+        const newLoadStatus = documentType.toUpperCase() === 'BOL' ? 'LOADED' : 'DELIVERED';
+        io.emit('document:approved', {
+          loadId: effectiveLoadId,
+          documentType: documentType.toUpperCase(),
+          newLoadStatus,
+          documentId: result.documentId,
+          timestamp: new Date().toISOString(),
+        });
+      } else if (status === 'PENDING_REVIEW') {
+        io.emit('document:pending_review', {
+          loadId: effectiveLoadId,
+          documentType: documentType.toUpperCase(),
+          reviewTaskId: result.documentId,
+          issues: result.issues || [],
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    res.json({
+      ok: true,
+      status,
+      documentId: status === 'REJECTED' ? null : result.documentId,
+      ocrData: result.ocrData || result.extractedData || {},
+      validationResults: result.validationResults || {},
+      reason: result.reason || '',
+      result,
+    });
   } catch (err) {
     console.error('driver document verification failed:', err);
     res.status(500).json({ error: 'Verification temporarily unavailable. Please retry.' });
+  }
+});
+
+// GET /api/documents/review-queue
+// Returns all documents waiting for dispatcher review
+router.get('/api/documents/review-queue', async (req, res) => {
+  try {
+    const { getPool, ensureSchema } = require('../lib/db');
+    await ensureSchema();
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT q.*, v.ocr_data, v.validation_results, v.rejection_reason, v.file_url, v.uploaded_image_path,
+              d.name as driver_name, d.phone as driver_phone
+       FROM dispatcher_review_queue q
+       LEFT JOIN document_validations v ON q.document_validation_id = v.id
+       LEFT JOIN drivers d ON q.driver_id = d.id
+       WHERE q.status = 'PENDING'
+       ORDER BY q.created_timestamp DESC`
+    );
+    res.json({ ok: true, items: result.rows });
+  } catch (err) {
+    console.error('Failed to get review queue:', err);
+    res.status(500).json({ error: 'Failed to retrieve review queue' });
+  }
+});
+
+// POST /api/documents/review-action  { queueId, action: 'APPROVE' | 'REJECT', reason, reviewerId, loadId, docType }
+// Dispatcher approvals or rejections from Web Review Center
+router.post('/api/documents/review-action', async (req, res) => {
+  const { queueId, action, reason, reviewerId, loadId, docType } = req.body || {};
+  if (!action || !['APPROVE', 'REJECT'].includes(action)) {
+    return res.status(400).json({ error: 'Invalid action. Must be APPROVE or REJECT.' });
+  }
+
+  try {
+    const { getPool, ensureSchema } = require('../lib/db');
+    await ensureSchema();
+    const pool = getPool();
+    const status = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+
+    if (queueId) {
+      await pool.query(
+        `UPDATE dispatcher_review_queue
+         SET status = $1, reviewed_timestamp = NOW(), reviewed_by = $2, reason = COALESCE($3, reason)
+         WHERE id = $4`,
+        [status, reviewerId || 'Dispatcher', reason || null, queueId]
+      );
+    }
+
+    if (loadId) {
+      await pool.query(
+        `UPDATE document_validations
+         SET dispatcher_review_status = $1, reviewed_by_user_id = $2, reviewed_timestamp = NOW(),
+             rejection_reason = COALESCE($3, rejection_reason)
+         WHERE load_id = $4 AND ($5::text IS NULL OR document_type = $5)`,
+        [status, reviewerId || 'Dispatcher', reason || null, loadId, docType || null]
+      );
+    }
+
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      if (action === 'APPROVE') {
+        const newLoadStatus = (docType && docType.toUpperCase() === 'BOL') ? 'LOADED' : 'DELIVERED';
+        io.emit('dispatcher:approved', {
+          loadId,
+          documentType: docType || 'BOL',
+          approvedBy: reviewerId || 'Dispatcher',
+          newLoadStatus,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        io.emit('dispatcher:rejected', {
+          loadId,
+          documentType: docType || 'BOL',
+          reason: reason || 'Document rejected by dispatcher',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    res.json({ ok: true, action: status, message: `Document marked as ${status}` });
+  } catch (err) {
+    console.error('Failed to update review action:', err);
+    res.status(500).json({ error: 'Failed to process review action' });
   }
 });
 
