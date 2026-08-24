@@ -79,6 +79,7 @@ class TripDocStatusStrip extends StatelessWidget {
                     title: 'Rate Confirmation (RC)',
                     docNumber: 'RC-${load.loadNumber}',
                     status: 'VERIFIED',
+                    docKey: 'RC',
                   ),
                 ),
               ),
@@ -98,6 +99,7 @@ class TripDocStatusStrip extends StatelessWidget {
                             title: 'Bill of Lading (BOL)',
                             docNumber: 'BOL-${load.loadNumber}',
                             status: load.bolStatus ?? 'APPROVED',
+                            docKey: 'BOL',
                           )
                       : onUploadBol,
                 ),
@@ -118,6 +120,7 @@ class TripDocStatusStrip extends StatelessWidget {
                             title: 'Proof of Delivery (POD)',
                             docNumber: 'POD-${load.loadNumber}',
                             status: load.podStatus ?? 'APPROVED',
+                            docKey: 'POD',
                           )
                       : onUploadPod,
                 ),
@@ -185,7 +188,13 @@ class TripDocStatusStrip extends StatelessWidget {
     );
   }
 
-  void _openDocPreview(BuildContext context, {required String title, required String docNumber, required String status}) {
+  void _openDocPreview(
+    BuildContext context, {
+    required String title,
+    required String docNumber,
+    required String status,
+    required String docKey,
+  }) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -196,6 +205,9 @@ class TripDocStatusStrip extends StatelessWidget {
           expirationDate: load.deliveryDate,
           status: status,
           category: 'TRUCK',
+          loadId: load.id,
+          docKey: docKey,
+          load: load,
         ),
       ),
     );

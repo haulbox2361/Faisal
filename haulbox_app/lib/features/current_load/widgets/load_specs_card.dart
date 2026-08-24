@@ -27,10 +27,10 @@ class LoadSpecsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final weightStr = load.weight != null ? '${load.weight} lbs' : '42,000 lbs';
+    final weightStr = load.displayWeightFormatted;
     final commodityStr = load.commodity ?? 'General Freight / Dry Goods';
     final trailerStr = load.trailerType ?? '53ft Dry Van';
-    final rateStr = load.driverPay != null ? '\$${load.driverPay!.toInt()}' : '\$1,850';
+    final rateStr = load.displayRcPrice;
 
     return Container(
       decoration: BoxDecoration(
@@ -69,15 +69,16 @@ class LoadSpecsCard extends StatelessWidget {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.emeraldSoft,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.2)),
                 ),
                 child: Text(
-                  'PAY: $rateStr',
+                  'RC RATE: $rateStr',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w900,
                     color: AppColors.emeraldDark,
                   ),

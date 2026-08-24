@@ -346,4 +346,67 @@ class ApiClient {
       return false;
     }
   }
+
+  // 14. Fetch Document Payload (Base64 / Image / PDF)
+  static Future<Map<String, dynamic>?> fetchDocument(String token, String loadId, String key, {int? index}) async {
+    final uri = Uri.parse('$baseUrl/api/driver/doc');
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'loadId': loadId,
+          'key': key,
+          if (index != null) 'index': index,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('fetchDocument error: $e');
+    }
+    return null;
+  }
+
+  // 15. Update Driver Profile Details & Photo
+  static Future<Map<String, dynamic>?> updateProfile(
+    String token, {
+    String? name,
+    String? phone,
+    String? email,
+    String? address,
+    String? profilePhotoUrl,
+    String? truck,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/driver/profile');
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          if (name != null) 'name': name,
+          if (phone != null) 'phone': phone,
+          if (email != null) 'email': email,
+          if (address != null) 'address': address,
+          if (profilePhotoUrl != null) 'profilePhotoUrl': profilePhotoUrl,
+          if (truck != null) 'truck': truck,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('updateProfile error: $e');
+    }
+    return null;
+  }
 }

@@ -200,22 +200,6 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  void updateProfilePhoto(String photoPath) {
-    if (_driver != null) {
-      _driver = _driver!.copyWith(profilePhotoUrl: photoPath);
-      _persistDriverLocally(_driver!);
-      notifyListeners();
-    }
-  }
-
-  void removeProfilePhoto() {
-    if (_driver != null) {
-      _driver = _driver!.copyWith(clearPhoto: true);
-      _persistDriverLocally(_driver!);
-      notifyListeners();
-    }
-  }
-
   // 7. Login
   Future<bool> login(String driverId, String pin) async {
     _isLoading = true;
@@ -332,6 +316,74 @@ class AuthProvider extends ChangeNotifier {
       _loads[idx] = _loads[idx].copyWith(notes: updated);
       notifyListeners();
     }
+  }
+
+  // 11. Update Driver Profile Details & Photo
+  Future<bool> updateDriverProfile({
+    String? name,
+    String? phone,
+    String? email,
+    String? address,
+    String? profilePhotoUrl,
+    String? truck,
+  }) async {
+    if (_token == null) return false;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final res = await ApiClient.updateProfile(
+        _token!,
+        name: name,
+        phone: phone,
+        email: email,
+        address: address,
+        profilePhotoUrl: profilePhotoUrl,
+        truck: truck,
+      );
+
+      if (res != null && res['ok'] == true) {
+        if (res['driver'] != null) {
+          _driver = DriverModel.fromJson(res['driver']);
+          _persistDriverLocally(_driver!);
+        } else {
+          _driver = _driver?.copyWith(
+            name: name,
+            phone: phone,
+            email: email,
+            address: address,
+            profilePhotoUrl: profilePhotoUrl,
+            truck: truck,
+          );
+        }
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('updateDriverProfile error: $e');
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<void> updateProfilePhoto(String photoBase64OrUrl) async {
+    if (_token != null) {
+      await updateDriverProfile(profilePhotoUrl: photoBase64OrUrl);
+    } else {
+      _driver = _driver?.copyWith(profilePhotoUrl: photoBase64OrUrl);
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeProfilePhoto() async {
+    if (_token != null) {
+      await updateDriverProfile(profilePhotoUrl: '');
+    }
+    _driver = _driver?.copyWith(clearPhoto: true);
+    notifyListeners();
   }
 
   // 11. Logout (Only on explicit driver action)

@@ -178,62 +178,134 @@ class ActiveTripHeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Top Metrics Bar (ETA & Remaining Miles)
+          // 1. Stage & RC Rate Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgSecondary,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.borderLight),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.bgSecondary,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.navigation_rounded, size: 14, color: AppColors.emeraldDark),
+                    const SizedBox(width: 5),
+                    Text(
+                      workflowState.displayTitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.timer_outlined, size: 15, color: AppColors.emeraldDark),
-                        const SizedBox(width: 5),
-                        Text(
-                          'ETA: $etaText',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    riskBadge,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                ],
+                  ],
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: AppColors.emeraldSoft,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.2)),
                 ),
                 child: Text(
-                  '$milesRemaining mi remaining',
+                  'RC: ${load.displayRcPrice}',
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
                     color: AppColors.emeraldDark,
                   ),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+
+          // 2. Metrics Grid (Remaining Miles, ETA, Status)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'REMAINING MILES',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(Icons.straighten_rounded, size: 16, color: AppColors.emeraldDark),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$milesRemaining mi',
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textDark),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(width: 1, height: 32, color: AppColors.borderLight),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ESTIMATED ARRIVAL',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(Icons.schedule_rounded, size: 16, color: AppColors.emeraldDark),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              etaText,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(width: 1, height: 32, color: AppColors.borderLight),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'STATUS',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      riskBadge,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
 
-          // 2. High-Contrast Hero Primary Action Button (56px minimum height)
+          // 3. High-Contrast Hero Primary Action Button (56px minimum height)
           SizedBox(
             width: double.infinity,
             height: 56,

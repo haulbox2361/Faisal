@@ -1,12 +1,19 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
+import '../../core/network/api_client.dart';
+import '../../shared/models/load_model.dart';
 import '../../shared/widgets/haulbox_button.dart';
 import '../../shared/widgets/haulbox_card.dart';
 import '../../shared/widgets/section_header.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../auth/auth_provider.dart';
+import '../photo_upload/photo_upload_screen.dart';
 
-class DocumentDetailScreen extends StatelessWidget {
+class DocumentDetailScreen extends StatefulWidget {
   final String title;
   final String? documentNumber;
   final String? issueDate;
@@ -14,6 +21,10 @@ class DocumentDetailScreen extends StatelessWidget {
   final String status;
   final String category; // 'DRIVER' or 'TRUCK'
   final String? fileUrl;
+  final String? base64Data;
+  final String? loadId;
+  final String? docKey;
+  final LoadModel? load;
 
   const DocumentDetailScreen({
     super.key,
@@ -24,41 +35,121 @@ class DocumentDetailScreen extends StatelessWidget {
     required this.status,
     required this.category,
     this.fileUrl,
+    this.base64Data,
+    this.loadId,
+    this.docKey,
+    this.load,
   });
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
-        title: const Text('Delete Document?', style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.w800)),
-        content: Text('Are you sure you want to remove "$title" from your Document Vault?'),
-        actions: [
-          TextButton(
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-            onPressed: () => Navigator.pop(ctx),
+  @override
+  State<DocumentDetailScreen> createState() => _DocumentDetailScreenState();
+}
+
+class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
+  bool _isLoading = false;
+  String? _loadedBase64;
+  String? _fileName;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadedBase64 = widget.base64Data;
+    if (_loadedBase64 == null && widget.loadId != null && widget.docKey != null) {
+      _fetchDocumentData();
+    }
+  }
+
+  Future<void> _fetchDocumentData() async {
+    final token = Provider.of<AuthProvider>(context, listen: false).token;
+    if (token == null || widget.loadId == null || widget.docKey == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final res = await ApiClient.fetchDocument(token, widget.loadId!, widget.docKey!);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (res != null && res['data'] != null) {
+            _loadedBase64 = res['data'].toString();
+            _fileName = res['name']?.toString();
+          } else {
+            _error = res?['error']?.toString() ?? 'Document file not found on server.';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load document preview: $e';
+        });
+      }
+    }
+  }
+
+  Uint8List? _getDecodedBytes() {
+    if (_loadedBase64 == null || _loadedBase64!.isEmpty) return null;
+    try {
+      final clean = _loadedBase64!.replaceFirst(RegExp(r'data:image\/[a-zA-Z+]+;base64,'), '');
+      return base64Decode(clean);
+    } catch (e) {
+      debugPrint('Base64 decode error: $e');
+      return null;
+    }
+  }
+
+  void _openFullScreenViewer(Uint8List bytes) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text(widget.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusDanger),
-            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('"$title" deleted successfully'),
-                  backgroundColor: AppColors.statusDanger,
+          body: Center(
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 5.0,
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Text('Unable to render document image', style: TextStyle(color: Colors.white70)),
                 ),
-              );
-            },
+              ),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   void _openUploadSheet(BuildContext context) {
+    if (widget.load != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PhotoUploadScreen(load: widget.load!),
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -81,7 +172,7 @@ class DocumentDetailScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Update $title',
+                'Update ${widget.title}',
                 style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark),
               ),
               const SizedBox(height: 16),
@@ -94,35 +185,13 @@ class DocumentDetailScreen extends StatelessWidget {
                   ),
                   child: const Icon(Icons.camera_alt_outlined, color: AppColors.emeraldPrimary),
                 ),
-                title: const Text('Take Photo / Scan Document', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                subtitle: const Text('Use camera to scan paper document', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                title: const Text('Capture Document', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                subtitle: const Text('Take high-resolution photo with camera', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Document scanned and uploaded!'),
-                      backgroundColor: AppColors.emeraldPrimary,
-                    ),
-                  );
-                },
-              ),
-              const Divider(color: AppColors.borderLight, height: 1),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgSecondary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.folder_open_outlined, color: AppColors.textPrimary),
-                ),
-                title: const Text('Choose PDF / Image from Files', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                subtitle: const Text('Upload PDF or gallery file', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('PDF document uploaded successfully!'),
+                      content: Text('Camera ready for document capture'),
                       backgroundColor: AppColors.emeraldPrimary,
                     ),
                   );
@@ -137,63 +206,129 @@ class DocumentDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bytes = _getDecodedBytes();
+    final isApproved = widget.status.toUpperCase().contains('APPROV') || widget.status.toUpperCase().contains('VERIF');
+
     return Scaffold(
       backgroundColor: AppColors.bgLight,
       appBar: AppBar(
-        title: Text(title),
+        title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.statusDanger),
-            tooltip: 'Delete Document',
-            onPressed: () => _confirmDelete(context),
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Document',
+            onPressed: _fetchDocumentData,
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. Visual Preview Box (Clean Bright White)
-          Container(
-            height: 180,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: AppRadius.xlBorder,
-              border: Border.all(color: AppColors.borderLight),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          // 1. High-Res Document Preview Box
+          GestureDetector(
+            onTap: bytes != null ? () => _openFullScreenViewer(bytes) : null,
+            child: Container(
+              height: 240,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AppRadius.xlBorder,
+                border: Border.all(color: AppColors.borderLight),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: AppRadius.xlBorder,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Icon(
-                      Icons.description_outlined,
-                      size: 56,
-                      color: AppColors.emeraldDark.withValues(alpha: 0.8),
+                    if (_isLoading)
+                      const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(color: AppColors.emeraldPrimary),
+                            SizedBox(height: 12),
+                            Text('Loading document file...', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                          ],
+                        ),
+                      )
+                    else if (bytes != null)
+                      InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 3.0,
+                        child: Image.memory(
+                          bytes,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.broken_image_rounded, size: 48, color: Colors.grey),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        color: const Color(0xFFF8FAFC),
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isApproved ? Icons.task_alt_rounded : Icons.description_outlined,
+                              size: 52,
+                              color: isApproved ? AppColors.emeraldPrimary : AppColors.textMuted,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              widget.title,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textDark),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _error ?? (isApproved ? 'Digital verified record on file' : 'No document image uploaded yet'),
+                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Top Status Badge
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: StatusBadge(status: widget.status),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textDark),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 3),
-                    const Text('Verified Digital Compliance Record', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+
+                    // Bottom tap hint
+                    if (bytes != null)
+                      Positioned(
+                        bottom: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text('Tap for Fullscreen Zoom', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: StatusBadge(status: status),
-                ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -207,37 +342,42 @@ class DocumentDetailScreen extends StatelessWidget {
                   title: 'Document Information & Validity',
                   icon: Icons.verified_user_outlined,
                 ),
-                const SizedBox(height: 6),
-                _buildFieldRow('Document Title', title),
-                _buildFieldRow('Document # / ID', documentNumber ?? 'HBX-VERIFIED'),
-                _buildFieldRow('Document Category', category == 'DRIVER' ? 'Driver Compliance' : 'Truck / Equipment'),
-                _buildFieldRow('Issue Date', issueDate ?? 'Jan 15, 2024'),
-                _buildFieldRow('Expiration Date', expirationDate ?? 'No Expiration'),
-                _buildFieldRow('Verification Status', status),
+                const SizedBox(height: 8),
+                _buildFieldRow('Document Type', widget.title),
+                _buildFieldRow('Document # / ID', widget.documentNumber ?? 'HBX-DOC-${widget.loadId ?? "1042"}'),
+                if (widget.loadId != null)
+                  _buildFieldRow('Associated Load', 'Load #${widget.loadId}'),
+                _buildFieldRow('Category', widget.category == 'DRIVER' ? 'Driver Compliance' : 'Freight & Trip'),
+                _buildFieldRow('Issue / Departure Date', widget.issueDate ?? 'Today'),
+                _buildFieldRow('Delivery Date', widget.expirationDate ?? 'Pending Delivery'),
+                _buildFieldRow('Verification Status', widget.status),
+                if (_fileName != null)
+                  _buildFieldRow('File Name', _fileName!),
               ],
             ),
           ),
           const SizedBox(height: 20),
 
           // 3. Action Buttons
-          HaulBoxButton(
-            text: 'VIEW DOCUMENT',
-            icon: Icons.visibility_outlined,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Opening secure document preview...'),
-                  backgroundColor: AppColors.emeraldPrimary,
-                ),
-              );
-            },
-          ),
+          if (bytes != null)
+            HaulBoxButton(
+              text: 'OPEN FULLSCREEN VIEWER',
+              icon: Icons.fullscreen_rounded,
+              onPressed: () => _openFullScreenViewer(bytes),
+            )
+          else
+            HaulBoxButton(
+              text: 'UPLOAD / REPLACE DOCUMENT',
+              icon: Icons.camera_alt_rounded,
+              onPressed: () => _openUploadSheet(context),
+            ),
+
           const SizedBox(height: 10),
           HaulBoxButton(
-            text: 'UPDATE DOCUMENT',
-            icon: Icons.upload_file_outlined,
+            text: bytes != null ? 'RETAKE / REPLACE' : 'REFRESH STATUS',
+            icon: bytes != null ? Icons.upload_file_outlined : Icons.refresh_rounded,
             type: HaulBoxButtonType.secondary,
-            onPressed: () => _openUploadSheet(context),
+            onPressed: bytes != null ? () => _openUploadSheet(context) : _fetchDocumentData,
           ),
         ],
       ),
@@ -251,7 +391,15 @@ class DocumentDetailScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

@@ -295,7 +295,7 @@ class _LoadsScreenState extends State<LoadsScreen> with SingleTickerProviderStat
   }
 
   Widget _buildLoadCard(BuildContext context, LoadModel load) {
-    final rateString = load.driverPay != null ? '\$${load.driverPay!.toInt()}' : '\$1,850';
+    final rateString = load.displayRcPrice;
     // Deadhead estimation: 25-45 miles for demonstration/badge
     final deadheadMiles = (load.miles != null && load.miles! > 100) ? ((load.miles! * 0.08).round() + 15) : 32;
 

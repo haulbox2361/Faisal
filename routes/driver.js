@@ -361,14 +361,19 @@ function shapeLoadForDriver(l, driverId) {
     Extra: arrMeta(docs.Extra),
   };
 
+  // Show driver the full Rate Con (RC) price clearly (not reduced to 80%)
+  const fullRcRate = Number(l.brokerRate || l.rate || l.grossAmount || l.driverPay || 0);
+
   return {
     id: l.id,
     loadNumber: l.loadNumber,
     brokerName: l.brokerName,
     brokerPhone: l.brokerPhone || null,
     brokerEmail: l.brokerEmail || null,
-    grossAmount: Number(l.grossAmount || l.brokerRate || l.rate || 0),
-    driverPay: l.driverPay != null ? Number(l.driverPay) : null,
+    grossAmount: fullRcRate,
+    driverPay: fullRcRate,
+    rate: fullRcRate,
+    brokerRate: fullRcRate,
     status: l.status,
     driverProgress: l.driverProgress || l.driverCheckpoint || 'ASSIGNED',
     driverCheckpoint: l.driverProgress || l.driverCheckpoint || null,
@@ -636,6 +641,7 @@ router.get('/api/driver/sync', async (req, res) => {
       address: driver.address || null,
       company: driver.company || (state.settings && state.settings.companyName) || 'HaulBoX',
       status: isDisabled(driver) ? 'Inactive' : 'Active',
+      profilePhotoUrl: driver.profilePhotoUrl || driver.photo || null,
     },
     companyName: (state.settings && state.settings.companyName) || 'HaulBoX',
     permissions: permissionsFor(driver),
@@ -653,6 +659,50 @@ router.get('/api/driver/sync', async (req, res) => {
       driver_notifications_enabled: state.settings?.driver_notifications_enabled !== false,
     },
   });
+});
+
+// POST /api/driver/profile — Update driver details and profile photo
+router.post('/api/driver/profile', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { driver, state } = ctx;
+  const { name, phone, email, address, profilePhotoUrl, truck } = req.body || {};
+
+  try {
+    const targetDriver = (state.drivers || []).find((d) => d.id === driver.id);
+    if (!targetDriver) return res.status(404).json({ error: 'Driver record not found' });
+
+    if (name && name.trim()) targetDriver.name = name.trim();
+    if (phone !== undefined) targetDriver.phone = phone ? phone.trim() : null;
+    if (email !== undefined) targetDriver.email = email ? email.trim() : null;
+    if (address !== undefined) targetDriver.address = address ? address.trim() : null;
+    if (truck !== undefined) targetDriver.truck = truck ? truck.trim() : targetDriver.truck;
+    if (profilePhotoUrl !== undefined) {
+      targetDriver.profilePhotoUrl = profilePhotoUrl;
+      targetDriver.photo = profilePhotoUrl;
+    }
+
+    await saveFullState(state);
+
+    res.json({
+      ok: true,
+      message: 'Profile updated successfully',
+      driver: {
+        id: targetDriver.id,
+        name: targetDriver.name,
+        truck: targetDriver.truck,
+        phone: targetDriver.phone,
+        email: targetDriver.email,
+        address: targetDriver.address,
+        profilePhotoUrl: targetDriver.profilePhotoUrl || null,
+        company: targetDriver.company || 'HaulBoX',
+        status: isDisabled(targetDriver) ? 'Inactive' : 'Active',
+      },
+    });
+  } catch (e) {
+    console.error('Error updating driver profile:', e);
+    res.status(500).json({ error: 'Failed to save driver profile update' });
+  }
 });
 
 // POST /api/driver/location
@@ -1109,7 +1159,7 @@ router.post('/api/driver/doc', async (req, res) => {
   const { loadId, key, index } = req.body || {};
   const { state, driver } = ctx;
 
-  const load = (state.loads || []).find((l) => l.id === loadId && l.driverId === driver.id);
+  const load = (state.loads || []).find((l) => (l.id === loadId || l.loadNumber === loadId) && l.driverId === driver.id);
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
   const docs = load.docs || load.documents || {};
@@ -1117,8 +1167,32 @@ router.post('/api/driver/doc', async (req, res) => {
   if (['RC', 'BOL', 'POD'].includes(key)) file = docs[key];
   else if (['PhotosPU', 'PhotosDO', 'Extra'].includes(key)) file = (docs[key] || [])[index];
 
-  if (!file || !file.data) return res.status(404).json({ error: 'File not available' });
-  res.json({ ok: true, name: file.name || file.fileName, data: file.data });
+  if (!file || !file.data) {
+    return res.status(404).json({ error: 'File not available on file server' });
+  }
+  res.json({ ok: true, name: file.name || file.fileName || `${key}_Document`, data: file.data, mimeType: file.mimeType || 'image/jpeg', status: file.status || 'Approved' });
+});
+
+// GET /api/driver/doc/:loadId/:key (or Bearer token / ?token=query)
+router.get('/api/driver/doc/:loadId/:key', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { loadId, key } = req.params;
+  const index = req.query.index ? parseInt(req.query.index, 10) : undefined;
+  const { state, driver } = ctx;
+
+  const load = (state.loads || []).find((l) => (l.id === loadId || l.loadNumber === loadId) && l.driverId === driver.id);
+  if (!load) return res.status(404).json({ error: 'Load not found' });
+
+  const docs = load.docs || load.documents || {};
+  let file = null;
+  if (['RC', 'BOL', 'POD'].includes(key)) file = docs[key];
+  else if (['PhotosPU', 'PhotosDO', 'Extra'].includes(key)) file = (docs[key] || [])[index || 0];
+
+  if (!file || !file.data) {
+    return res.status(404).json({ error: 'Document data not available' });
+  }
+  res.json({ ok: true, name: file.name || file.fileName || `${key}_Document`, data: file.data, mimeType: file.mimeType || 'image/jpeg', status: file.status || 'Approved' });
 });
 
 const DRIVER_UPLOAD_CAPS = { BOL: 1, POD: 1, PhotosPU: 6, PhotosDO: 6, Extra: 6 };

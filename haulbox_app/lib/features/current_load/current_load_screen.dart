@@ -473,7 +473,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
   // 4. SETTLEMENT CONFIRMATION MODAL
   void _showSettlementConfirmationModal(LoadModel load) {
-    final payAmount = load.driverPay != null ? '\$${load.driverPay!.toInt()}' : '\$1,850';
+    final payAmount = load.displayRcPrice;
 
     showModalBottomSheet(
       context: context,

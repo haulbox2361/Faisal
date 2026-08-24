@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../shared/models/load_model.dart';
 import '../auth/auth_provider.dart';
 import '../photo_upload/photo_upload_screen.dart';
+import 'document_detail_screen.dart';
 
 class DocumentsScreen extends StatefulWidget {
   const DocumentsScreen({super.key});
@@ -267,28 +268,74 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             ],
           ),
         ),
-        trailing: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: hasFile ? Colors.grey.shade200 : AppColors.emeraldPrimary,
-            foregroundColor: hasFile ? AppColors.textPrimary : Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => PhotoUploadScreen(load: load),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DocumentDetailScreen(
+                title: title,
+                documentNumber: '${type}-${load.loadNumber}',
+                issueDate: load.pickupDate,
+                expirationDate: load.deliveryDate,
+                status: statusLabel,
+                category: 'TRUCK',
+                loadId: load.id,
+                docKey: type,
+                load: load,
               ),
-            );
-          },
-          child: Text(
-            hasFile ? 'Replace' : 'Upload',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
+            ),
+          );
+        },
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasFile)
+              IconButton(
+                icon: const Icon(Icons.visibility_outlined, color: AppColors.emeraldPrimary, size: 20),
+                tooltip: 'View Document',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DocumentDetailScreen(
+                        title: title,
+                        documentNumber: '${type}-${load.loadNumber}',
+                        issueDate: load.pickupDate,
+                        expirationDate: load.deliveryDate,
+                        status: statusLabel,
+                        category: 'TRUCK',
+                        loadId: load.id,
+                        docKey: type,
+                        load: load,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: hasFile ? Colors.grey.shade200 : AppColors.emeraldPrimary,
+                foregroundColor: hasFile ? AppColors.textPrimary : Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PhotoUploadScreen(load: load),
+                  ),
+                );
+              },
+              child: Text(
+                hasFile ? 'Replace' : 'Upload',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
       ),
     );

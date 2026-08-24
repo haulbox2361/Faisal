@@ -55,7 +55,7 @@ class LoadDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    final rateString = load.driverPay != null ? '\$${load.driverPay!.toInt()}' : '\$1,850';
+    final rateString = load.displayRcPrice;
 
     return Scaffold(
       backgroundColor: AppColors.bgLight,
@@ -370,17 +370,17 @@ class LoadDetailScreen extends StatelessWidget {
         children: [
           const SectionHeader(title: 'Load Documents & Compliance', icon: Icons.folder_outlined),
           const SizedBox(height: 8),
-          _buildDocumentTile(context, 'Rate Confirmation (RC)', 'VERIFIED ✓', 'Rate_Confirmation_RC.pdf', Icons.description_outlined),
-          _buildDocumentTile(context, 'Bill of Lading (BOL)', load.bolStatus ?? '✓ APPROVED', 'BOL_HBX20241042.pdf', Icons.assignment_outlined),
-          _buildDocumentTile(context, 'BOL Supporting Pictures', '3 Photos Attached', 'BOL_Photos_Cargo_Seal.zip', Icons.photo_library_outlined),
-          _buildDocumentTile(context, 'Proof of Delivery (POD)', load.podStatus ?? (load.status == 'COMPLETED' ? '✓ APPROVED' : 'PENDING'), 'POD_Signed_Delivery.pdf', Icons.assignment_turned_in_outlined),
-          _buildDocumentTile(context, 'POD Supporting Pictures', '4 Photos Attached', 'POD_Photos_Receiving_Dock.zip', Icons.photo_library_outlined),
+          _buildDocumentTile(context, 'Rate Confirmation (RC)', 'VERIFIED ✓', 'Rate_Confirmation_RC.pdf', Icons.description_outlined, docKey: 'RC'),
+          _buildDocumentTile(context, 'Bill of Lading (BOL)', load.bolStatus ?? '✓ APPROVED', 'BOL_HBX20241042.pdf', Icons.assignment_outlined, docKey: 'BOL'),
+          _buildDocumentTile(context, 'BOL Supporting Pictures', '3 Photos Attached', 'BOL_Photos_Cargo_Seal.zip', Icons.photo_library_outlined, docKey: 'PhotosPU'),
+          _buildDocumentTile(context, 'Proof of Delivery (POD)', load.podStatus ?? (load.status == 'COMPLETED' ? '✓ APPROVED' : 'PENDING'), 'POD_Signed_Delivery.pdf', Icons.assignment_turned_in_outlined, docKey: 'POD'),
+          _buildDocumentTile(context, 'POD Supporting Pictures', '4 Photos Attached', 'POD_Photos_Receiving_Dock.zip', Icons.photo_library_outlined, docKey: 'PhotosDO'),
         ],
       ),
     );
   }
 
-  Widget _buildDocumentTile(BuildContext context, String title, String status, String docNumber, IconData icon) {
+  Widget _buildDocumentTile(BuildContext context, String title, String status, String docNumber, IconData icon, {String? docKey}) {
     return Container(
       margin: const EdgeInsets.only(top: 6),
       padding: const EdgeInsets.all(10),
@@ -401,6 +401,9 @@ class LoadDetailScreen extends StatelessWidget {
                 expirationDate: load.deliveryDate,
                 status: status,
                 category: 'TRUCK',
+                loadId: load.id,
+                docKey: docKey,
+                load: load,
               ),
             ),
           );

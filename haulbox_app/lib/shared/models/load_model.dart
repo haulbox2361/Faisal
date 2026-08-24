@@ -233,5 +233,35 @@ class LoadModel {
   Map<String, dynamic>? get docs => documents;
   String get pickupCityState => pickup.isNotEmpty ? pickup : (pickupAddress ?? 'Origin');
   String get dropoffCityState => dropoff.isNotEmpty ? dropoff : (dropoffAddress ?? 'Destination');
+  
+  /// Full Rate Confirmation (RC) load price shown clearly to driver
   double get fullGrossRate => double.tryParse((grossAmount ?? driverPay ?? 0).toString()) ?? 0.0;
+  double get rcRateAmount {
+    final val = grossAmount ?? driverPay;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val?.toString() ?? '0') ?? 0.0;
+  }
+
+  String get displayRcPrice {
+    final amt = rcRateAmount;
+    if (amt <= 0) return '\$1,850';
+    // Format with commas (e.g. $2,450)
+    final rounded = amt.round();
+    final str = rounded.toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    final formatted = str.replaceAllMapped(reg, (Match m) => '${m[1]},');
+    return '\$$formatted';
+  }
+
+  String get displayWeightFormatted {
+    if (weight == null) return '42,000 lbs';
+    final numVal = int.tryParse(weight.toString().replaceAll(RegExp(r'[^0-9]'), ''));
+    if (numVal != null && numVal > 0) {
+      final str = numVal.toString();
+      final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+      final formatted = str.replaceAllMapped(reg, (Match m) => '${m[1]},');
+      return '$formatted lbs';
+    }
+    return '$weight lbs';
+  }
 }

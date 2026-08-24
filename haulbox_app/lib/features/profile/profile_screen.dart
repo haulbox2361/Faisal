@@ -1,13 +1,16 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../shared/models/driver_document_model.dart';
-import '../../shared/widgets/haulbox_button.dart';
+import '../../shared/models/driver_model.dart';
 import '../../shared/widgets/status_badge.dart';
 import '../auth/auth_provider.dart';
 import '../documents/document_detail_screen.dart';
-import '../../core/theme/theme_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,6 +25,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isTruckDocsExpanded = false;
   bool _isTruckGalleryExpanded = false;
   bool _isUploadingPhoto = false;
+
+  final ImagePicker _picker = ImagePicker();
 
   // 1. Driver Documents List
   final List<DriverDocument> _driverDocs = [
@@ -133,6 +138,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TruckGalleryPhoto(id: 'g-8', slotKey: 'equipment_additional', label: 'Additional Photo', isUploaded: false),
   ];
 
+  // Pick and Upload Profile Photo (Camera or Gallery)
+  Future<void> _pickProfilePhoto(AuthProvider auth, ImageSource source) async {
+    try {
+      final xFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 800,
+      );
+      if (xFile == null) return;
+
+      setState(() => _isUploadingPhoto = true);
+      final bytes = await xFile.readAsBytes();
+      final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+      await auth.updateProfilePhoto(base64String);
+
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✓ Profile picture updated successfully!'),
+            backgroundColor: AppColors.emeraldPrimary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating photo: $e'),
+            backgroundColor: AppColors.statusDanger,
+          ),
+        );
+      }
+    }
+  }
+
   void _openChangeProfilePhotoSheet(AuthProvider auth) {
     showModalBottomSheet(
       context: context,
@@ -161,7 +204,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Select a clear headshot photo for your driver identity.',
+                'Select a headshot photo for your verified driver identity.',
                 style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
               ),
               const SizedBox(height: 20),
@@ -172,13 +215,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: AppColors.emeraldSoft,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.camera_alt_outlined, color: AppColors.emeraldPrimary),
+                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.emeraldPrimary),
                 ),
-                title: const Text('TAKE PHOTO', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark)),
-                subtitle: const Text('Use camera for a quick headshot', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                title: const Text('TAKE PHOTO WITH CAMERA', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark, fontSize: 13.5)),
+                subtitle: const Text('Capture headshot using device camera', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _processProfilePhotoUpload(auth, 'camera_avatar.jpg');
+                  _pickProfilePhoto(auth, ImageSource.camera);
                 },
               ),
               const Divider(color: AppColors.borderLight, height: 1),
@@ -189,16 +232,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: const Color(0xFFE0F2FE),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.photo_library_outlined, color: Color(0xFF0284C7)),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF0284C7)),
                 ),
-                title: const Text('CHOOSE FROM GALLERY', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark)),
-                subtitle: const Text('Pick picture from device photos', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                title: const Text('CHOOSE FROM PHONE GALLERY', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark, fontSize: 13.5)),
+                subtitle: const Text('Select existing photo from library', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _processProfilePhotoUpload(auth, 'gallery_avatar.jpg');
+                  _pickProfilePhoto(auth, ImageSource.gallery);
                 },
               ),
-              if (auth.driver?.profilePhotoUrl != null) ...[
+              if (auth.driver?.profilePhotoUrl != null && auth.driver!.profilePhotoUrl!.isNotEmpty) ...[
                 const Divider(color: AppColors.borderLight, height: 1),
                 ListTile(
                   leading: Container(
@@ -209,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: const Icon(Icons.delete_outline_rounded, color: AppColors.statusDanger),
                   ),
-                  title: const Text('REMOVE PROFILE PHOTO', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.statusDanger)),
+                  title: const Text('REMOVE PROFILE PHOTO', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.statusDanger, fontSize: 13.5)),
                   onTap: () {
                     Navigator.pop(ctx);
                     auth.removeProfilePhoto();
@@ -229,22 +272,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _processProfilePhotoUpload(AuthProvider auth, String photoSource) async {
-    setState(() => _isUploadingPhoto = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+  // Edit Driver Details Dialog
+  void _openEditDriverDetailsModal(BuildContext context, AuthProvider auth) {
+    final driver = auth.driver;
+    final nameCtrl = TextEditingController(text: driver?.name ?? '');
+    final phoneCtrl = TextEditingController(text: driver?.phone ?? '');
+    final emailCtrl = TextEditingController(text: driver?.email ?? '');
+    final addressCtrl = TextEditingController(text: driver?.address ?? '');
+    final truckCtrl = TextEditingController(text: driver?.truck ?? '');
 
-    if (mounted) {
-      auth.updateProfilePhoto(photoSource);
-      setState(() => _isUploadingPhoto = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile photo updated successfully across all screens!'),
-          backgroundColor: AppColors.emeraldPrimary,
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.xlBorder),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_note_rounded, color: AppColors.emeraldPrimary, size: 26),
+            SizedBox(width: 8),
+            Text('Edit Driver Details', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.textDark)),
+          ],
         ),
-      );
-    }
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildEditTextField(nameCtrl, 'Full Legal Name', Icons.person_outline),
+              const SizedBox(height: 10),
+              _buildEditTextField(phoneCtrl, 'Phone Number', Icons.phone_outlined, keyboardType: TextInputType.phone),
+              const SizedBox(height: 10),
+              _buildEditTextField(emailCtrl, 'Email Address', Icons.mail_outline, keyboardType: TextInputType.emailAddress),
+              const SizedBox(height: 10),
+              _buildEditTextField(addressCtrl, 'Physical Address', Icons.home_outlined),
+              const SizedBox(height: 10),
+              _buildEditTextField(truckCtrl, 'Assigned Truck #', Icons.local_shipping_outlined),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCEL', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.emeraldPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await auth.updateDriverProfile(
+                name: nameCtrl.text.trim(),
+                phone: phoneCtrl.text.trim(),
+                email: emailCtrl.text.trim(),
+                address: addressCtrl.text.trim(),
+                truck: truckCtrl.text.trim(),
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ok ? '✓ Driver details updated successfully!' : 'Failed to update details. Check connection.'),
+                    backgroundColor: ok ? AppColors.emeraldPrimary : AppColors.statusDanger,
+                  ),
+                );
+              }
+            },
+            child: const Text('SAVE CHANGES', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
   }
 
+  Widget _buildEditTextField(TextEditingController ctrl, String label, IconData icon, {TextInputType keyboardType = TextInputType.text}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 13.5, color: AppColors.textDark, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 18, color: AppColors.emeraldDark),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.borderLight)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.borderLight)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.emeraldPrimary, width: 1.5)),
+      ),
+    );
+  }
+
+  // Equipment photo action sheet with Camera & Gallery
   void _openPhotoActionSheet(TruckGalleryPhoto photo) {
     showModalBottomSheet(
       context: context,
@@ -258,63 +374,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.borderLight,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.borderLight, borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 16),
-              Text(
-                photo.label,
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark),
-              ),
+              Text('Add ${photo.label} Photo', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark)),
               const SizedBox(height: 16),
               ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.emeraldSoft,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.camera_alt_outlined, color: AppColors.emeraldPrimary),
-                ),
-                title: const Text('TAKE PHOTO', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                subtitle: const Text('Capture using device camera', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                onTap: () {
+                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.emeraldSoft, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.camera_alt_outlined, color: AppColors.emeraldPrimary)),
+                title: const Text('TAKE PHOTO WITH CAMERA', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                onTap: () async {
                   Navigator.pop(ctx);
-                  setState(() => photo.isUploaded = true);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${photo.label} photo captured!'),
-                      backgroundColor: AppColors.emeraldPrimary,
-                    ),
-                  );
+                  final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+                  if (file != null) {
+                    setState(() => photo.isUploaded = true);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${photo.label} photo captured!'), backgroundColor: AppColors.emeraldPrimary),
+                    );
+                  }
                 },
               ),
               const Divider(color: AppColors.borderLight, height: 1),
               ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgSecondary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.photo_library_outlined, color: AppColors.textPrimary),
-                ),
-                title: const Text('CHOOSE FROM GALLERY', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                subtitle: const Text('Pick from device photos', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                onTap: () {
+                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.photo_library_outlined, color: Color(0xFF0284C7))),
+                title: const Text('CHOOSE FROM PHONE GALLERY', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                onTap: () async {
                   Navigator.pop(ctx);
-                  setState(() => photo.isUploaded = true);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${photo.label} photo selected from gallery!'),
-                      backgroundColor: AppColors.emeraldPrimary,
-                    ),
-                  );
+                  final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                  if (file != null) {
+                    setState(() => photo.isUploaded = true);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${photo.label} photo selected from gallery!'), backgroundColor: AppColors.emeraldPrimary),
+                    );
+                  }
                 },
               ),
             ],
@@ -337,34 +427,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const StatusBadge(status: 'VALID', isSmall: true),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.bgSecondary,
-                borderRadius: AppRadius.lgBorder,
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.local_shipping_rounded, size: 54, color: AppColors.emeraldDark.withValues(alpha: 0.8)),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${photo.label} HD Preview',
-                      style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark, fontSize: 13),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text('Synced with Fleet Cloud', style: TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
-                  ],
-                ),
-              ),
+        content: Container(
+          height: 180,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.bgSecondary,
+            borderRadius: AppRadius.lgBorder,
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.local_shipping_rounded, size: 54, color: AppColors.emeraldDark.withValues(alpha: 0.8)),
+                const SizedBox(height: 8),
+                Text('${photo.label} Inspection Record', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark, fontSize: 13)),
+                const SizedBox(height: 2),
+                const Text('Verified in Fleet Cloud', style: TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
+              ],
             ),
-          ],
+          ),
         ),
         actions: [
           TextButton.icon(
@@ -373,12 +455,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               setState(() => photo.isUploaded = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${photo.label} photo removed'),
-                  backgroundColor: AppColors.statusDanger,
-                ),
-              );
             },
           ),
           ElevatedButton.icon(
@@ -434,65 +510,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
-                // 1. PROFILE HEADER (Photo + Camera/Edit Button)
+                // 1. PROFILE HEADER (Photo Avatar with Camera Tap)
                 _buildProfileHeader(driver, authProvider),
                 const SizedBox(height: 14),
 
-              // 2. COMBINED DRIVER & TRUCK DETAILS CARD (ONE SINGLE CARD)
-              _buildCombinedDriverAndTruckCard(driver),
-              const SizedBox(height: 14),
+                // 2. COMBINED DRIVER & TRUCK DETAILS CARD (With Real Edit Action)
+                _buildCombinedDriverAndTruckCard(driver, authProvider),
+                const SizedBox(height: 14),
 
-              // 3. DRIVER DOCUMENTS ACCORDION
-              _buildAccordionSection(
-                icon: Icons.description_outlined,
-                title: 'Driver Documents',
-                count: _driverDocs.length,
-                isExpanded: _isDriverDocsExpanded,
-                onToggle: () => setState(() => _isDriverDocsExpanded = !_isDriverDocsExpanded),
-                child: Column(
-                  children: _driverDocs.map((doc) => _buildDriverDocTile(doc)).toList(),
+                // 3. DRIVER DOCUMENTS ACCORDION
+                _buildAccordionSection(
+                  icon: Icons.description_outlined,
+                  title: 'Driver Documents',
+                  count: _driverDocs.length,
+                  isExpanded: _isDriverDocsExpanded,
+                  onToggle: () => setState(() => _isDriverDocsExpanded = !_isDriverDocsExpanded),
+                  child: Column(
+                    children: _driverDocs.map((doc) => _buildDriverDocTile(doc)).toList(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-              // 4. TRUCK DOCUMENTS ACCORDION
-              _buildAccordionSection(
-                icon: Icons.local_shipping_outlined,
-                title: 'Truck Documents',
-                count: _truckDocs.length,
-                isExpanded: _isTruckDocsExpanded,
-                onToggle: () => setState(() => _isTruckDocsExpanded = !_isTruckDocsExpanded),
-                child: Column(
-                  children: _truckDocs.map((doc) => _buildTruckDocTile(doc)).toList(),
+                // 4. TRUCK DOCUMENTS ACCORDION
+                _buildAccordionSection(
+                  icon: Icons.local_shipping_outlined,
+                  title: 'Truck Documents',
+                  count: _truckDocs.length,
+                  isExpanded: _isTruckDocsExpanded,
+                  onToggle: () => setState(() => _isTruckDocsExpanded = !_isTruckDocsExpanded),
+                  child: Column(
+                    children: _truckDocs.map((doc) => _buildTruckDocTile(doc)).toList(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-              // 5. TRUCK GALLERY ACCORDION
-              _buildAccordionSection(
-                icon: Icons.photo_camera_outlined,
-                title: 'Truck Gallery',
-                count: _galleryPhotos.where((p) => p.isUploaded).length,
-                totalCount: _galleryPhotos.length,
-                isExpanded: _isTruckGalleryExpanded,
-                onToggle: () => setState(() => _isTruckGalleryExpanded = !_isTruckGalleryExpanded),
-                child: _buildTruckGalleryGrid(),
-              ),
-              const SizedBox(height: 14),
-
-              // 6. POL-303: THEME & APPEARANCE SETTINGS CARD
-              _buildThemeSettingsCard(themeProvider),
-              const SizedBox(height: 24),
-
-              // 7. SIGN OUT BUTTON
-              HaulBoxButton(
-                text: 'Sign Out of HaulBoX',
-                icon: Icons.logout_rounded,
-                type: HaulBoxButtonType.danger,
-                onPressed: () => _confirmLogout(context, authProvider),
-              ),
-            ],
-          ),
+                // 5. TRUCK GALLERY ACCORDION
+                _buildAccordionSection(
+                  icon: Icons.photo_camera_outlined,
+                  title: 'Truck Gallery',
+                  count: _galleryPhotos.where((p) => p.isUploaded).length,
+                  totalCount: _galleryPhotos.length,
+                  isExpanded: _isTruckGalleryExpanded,
+                  onToggle: () => setState(() => _isTruckGalleryExpanded = !_isTruckGalleryExpanded),
+                  child: _buildTruckGalleryGrid(),
+                ),
+              ],
+            ),
           ),
 
           // Uploading Profile Photo Overlay
@@ -515,7 +578,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       CircularProgressIndicator(color: AppColors.emeraldPrimary),
                       SizedBox(height: 14),
                       Text(
-                        'Uploading profile photo...',
+                        'Updating profile photo...',
                         style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark, fontSize: 13.5),
                       ),
                     ],
@@ -529,8 +592,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // 1. PROFILE HEADER
-  Widget _buildProfileHeader(dynamic driver, AuthProvider auth) {
-    final hasCustomPhoto = driver?.profilePhotoUrl != null;
+  Widget _buildProfileHeader(DriverModel? driver, AuthProvider auth) {
+    final photoUrl = driver?.profilePhotoUrl;
+    final initials = (driver?.name.isNotEmpty == true)
+        ? driver!.name.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
+        : 'DR';
+
+    Uint8List? decodedBytes;
+    if (photoUrl != null && photoUrl.startsWith('data:image')) {
+      try {
+        decodedBytes = base64Decode(photoUrl.replaceFirst(RegExp(r'data:image\/[a-zA-Z+]+;base64,'), ''));
+      } catch (_) {}
+    }
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -548,15 +621,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          // Driver Photo Avatar with Edit/Camera Button
+          // Driver Photo Avatar with Camera Button
           GestureDetector(
             onTap: () => _openChangeProfilePhotoSheet(auth),
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 68,
+                  height: 68,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
@@ -564,53 +637,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       colors: [AppColors.emeraldPrimary, Color(0xFF059669)],
                     ),
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.4), width: 2),
+                    border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.5), width: 2.5),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.emeraldPrimary.withValues(alpha: 0.2),
-                        blurRadius: 8,
+                        color: AppColors.emeraldPrimary.withValues(alpha: 0.25),
+                        blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: hasCustomPhoto
-                        ? const Icon(Icons.person_rounded, color: Colors.white, size: 36)
-                        : const Text(
-                            'JS',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 24,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
+                  child: ClipOval(
+                    child: decodedBytes != null
+                        ? Image.memory(decodedBytes, width: 68, height: 68, fit: BoxFit.cover)
+                        : (photoUrl != null && photoUrl.startsWith('http')
+                            ? Image.network(photoUrl, width: 68, height: 68, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _buildInitialsAvatar(initials))
+                            : _buildInitialsAvatar(initials)),
                   ),
                 ),
                 Positioned(
                   bottom: -2,
                   right: -2,
                   child: Container(
-                    padding: const EdgeInsets.all(5),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: AppColors.emeraldPrimary,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 1),
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 13),
+                    child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
 
           // Driver Name, Phone, Email
           Expanded(
@@ -622,7 +689,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Flexible(
                       child: Text(
-                        driver?.name ?? 'John D. Smith',
+                        driver?.name ?? 'Assigned Driver',
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
@@ -640,14 +707,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: AppColors.emeraldSoft,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'Active',
-                        style: TextStyle(color: AppColors.emeraldDark, fontSize: 10, fontWeight: FontWeight.w800),
+                      child: Text(
+                        driver?.status ?? 'Active',
+                        style: const TextStyle(color: AppColors.emeraldDark, fontSize: 10, fontWeight: FontWeight.w800),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     const Icon(Icons.phone_outlined, size: 13, color: AppColors.emeraldDark),
@@ -665,7 +732,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 5),
                     Flexible(
                       child: Text(
-                        driver?.email ?? 'john.smith@email.com',
+                        driver?.email ?? 'driver@haulbox.com',
                         style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -680,8 +747,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // 2. COMBINED DRIVER & TRUCK DETAILS CARD (ONE SINGLE CARD)
-  Widget _buildCombinedDriverAndTruckCard(dynamic driver) {
+  Widget _buildInitialsAvatar(String initials) {
+    return Center(
+      child: Text(
+        initials,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 22,
+          letterSpacing: -0.5,
+        ),
+      ),
+    );
+  }
+
+  // 2. COMBINED DRIVER & TRUCK DETAILS CARD (With Edit Modal Trigger)
+  Widget _buildCombinedDriverAndTruckCard(DriverModel? driver, AuthProvider auth) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -699,20 +780,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Main Card Header
-          const Row(
+          // Main Card Header with Edit Button
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'DRIVER & TRUCK',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.emeraldDark,
-                  letterSpacing: 0.8,
+              const Row(
+                children: [
+                  Icon(Icons.badge_outlined, color: AppColors.emeraldDark, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'DRIVER & TRUCK DETAILS',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.emeraldDark,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () => _openEditDriverDetailsModal(context, auth),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.emeraldSoft,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.2)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.edit_outlined, size: 13, color: AppColors.emeraldDark),
+                      SizedBox(width: 4),
+                      Text('EDIT', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.emeraldDark)),
+                    ],
+                  ),
                 ),
               ),
-              Icon(Icons.badge_outlined, color: AppColors.emeraldDark, size: 18),
             ],
           ),
           const SizedBox(height: 14),
@@ -728,12 +834,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          _buildInfoRow('Name', driver?.name ?? 'John D. Smith'),
+          _buildInfoRow('Name', driver?.name ?? 'Assigned Driver'),
           _buildInfoRow('Phone', driver?.phone ?? '(214) 555-0123'),
-          _buildInfoRow('Email', driver?.email ?? 'john.smith@email.com'),
-          _buildInfoRow('CDL', driver?.cdlNumber ?? 'CDL12345678'),
+          _buildInfoRow('Email', driver?.email ?? 'driver@haulbox.com'),
+          _buildInfoRow('CDL Number', driver?.cdlNumber ?? 'CDL12345678'),
           _buildInfoRow('CDL Expires', driver?.cdlExpiration ?? 'Dec 15, 2026'),
-          _buildInfoRow('Address', driver?.address ?? '123 Driver St, Dallas, TX 75201'),
+          _buildInfoRow('Address', driver?.address ?? '123 Logistics Way, Dallas, TX'),
 
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -741,39 +847,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
 
           // TRUCK DETAILS SECTION
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'TRUCK DETAILS',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textSubtle,
-                  letterSpacing: 0.6,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.emeraldSoft,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text('Assigned', style: TextStyle(color: AppColors.emeraldDark, fontSize: 9.5, fontWeight: FontWeight.w800)),
-              ),
-            ],
+          const Text(
+            'TRUCK DETAILS',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSubtle,
+              letterSpacing: 0.6,
+            ),
           ),
           const SizedBox(height: 8),
-          _buildInfoRow('Truck Number', driver?.truck ?? 'Truck # HBX-1042'),
-          _buildInfoRow('VIN', '1HGCM82633A123456'),
-          _buildInfoRow('Make / Model', 'Freightliner Cascadia'),
-          _buildInfoRow('Year', '2022'),
-          _buildInfoRow('Trailer', '53ft Dry Van (#TR-9942)'),
+          _buildInfoRow('Assigned Truck', driver?.truck ?? 'Unit #104'),
+          _buildInfoRow('Company / Carrier', driver?.company ?? 'HaulBoX Logistics'),
+          _buildInfoRow('Status', driver?.status ?? 'Active'),
         ],
       ),
     );
   }
 
+  // Accordion Header Section
   Widget _buildAccordionSection({
     required IconData icon,
     required String title,
@@ -786,11 +878,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: AppRadius.lgBorder,
-        border: Border.all(
-          color: isExpanded ? AppColors.emeraldPrimary.withValues(alpha: 0.5) : AppColors.borderLight,
-          width: 1,
-        ),
+        borderRadius: AppRadius.xlBorder,
+        border: Border.all(color: AppColors.borderLight),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -803,31 +892,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           InkWell(
             onTap: onToggle,
-            borderRadius: AppRadius.lgBorder,
+            borderRadius: isExpanded ? const BorderRadius.vertical(top: Radius.circular(16)) : AppRadius.xlBorder,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isExpanded ? AppColors.emeraldPrimary : AppColors.bgSecondary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 18,
-                      color: isExpanded ? Colors.white : AppColors.emeraldDark,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
+                  Icon(icon, size: 20, color: AppColors.emeraldDark),
+                  const SizedBox(width: 10),
                   Text(
                     title,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textDark,
-                      letterSpacing: -0.2,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -838,7 +915,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      totalCount != null ? '$count/$totalCount' : '$count',
+                      totalCount != null ? '$count/$totalCount' : '$count Docs',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -847,28 +924,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const Spacer(),
-                  AnimatedRotation(
-                    turns: isExpanded ? 0.25 : 0.0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.textSubtle,
-                      size: 22,
-                    ),
+                  Icon(
+                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textMuted,
+                    size: 24,
                   ),
                 ],
               ),
             ),
           ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          if (isExpanded) ...[
+            const Divider(color: AppColors.borderLight, height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: child,
             ),
-            crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 250),
-          ),
+          ],
         ],
       ),
     );
@@ -876,11 +947,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildDriverDocTile(DriverDocument doc) {
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.bgLight,
-        borderRadius: AppRadius.mdBorder,
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
       ),
       child: InkWell(
@@ -904,14 +975,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: doc.status == 'EXPIRING' ? AppColors.statusWarningSoft : AppColors.emeraldSoft,
-                borderRadius: BorderRadius.circular(10),
+                color: AppColors.emeraldSoft,
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                Icons.badge_outlined,
-                size: 18,
-                color: doc.status == 'EXPIRING' ? AppColors.statusWarning : AppColors.emeraldDark,
-              ),
+              child: const Icon(Icons.description_outlined, color: AppColors.emeraldDark, size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -920,12 +987,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     doc.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textDark),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textDark),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Expires: ${doc.expirationDate ?? "Permanent"}',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                    'Exp: ${doc.expirationDate}',
+                    style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -941,11 +1008,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildTruckDocTile(TruckDocument doc) {
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.bgLight,
-        borderRadius: AppRadius.mdBorder,
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
       ),
       child: InkWell(
@@ -969,14 +1036,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.emeraldSoft,
-                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFFE0F2FE),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.verified_outlined,
-                size: 18,
-                color: AppColors.emeraldDark,
-              ),
+              child: const Icon(Icons.local_shipping_outlined, color: Color(0xFF0284C7), size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -985,12 +1048,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     doc.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textDark),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textDark),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Expires: ${doc.expirationDate ?? "Permanent"}',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                    'Exp: ${doc.expirationDate}',
+                    style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -1009,12 +1072,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(vertical: 6),
+          padding: EdgeInsets.symmetric(vertical: 4),
           child: Text(
             '8 Equipment & Trailer Inspection Photo Slots',
             style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w600),
           ),
         ),
+        const SizedBox(height: 8),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1100,6 +1164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 8),
           Flexible(
             child: Text(
               value,
@@ -1109,162 +1174,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildThemeSettingsCard(ThemeProvider themeProvider) {
-    final isDark = themeProvider.isDarkMode;
-    final currentMode = themeProvider.themeModeEnum;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: AppRadius.lgBorder,
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : AppColors.borderLight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.emeraldPrimary.withValues(alpha: 0.15)
-                      : AppColors.emeraldSoft,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                  color: AppColors.emeraldPrimary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'App Theme & Appearance',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : AppColors.textDark,
-                      ),
-                    ),
-                    Text(
-                      isDark ? 'Dark Mode Active' : 'Light Mode Active',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white60 : AppColors.textMuted,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: isDark,
-                activeThumbColor: AppColors.emeraldPrimary,
-                onChanged: (_) => themeProvider.toggleTheme(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          const Text(
-            'THEME PREFERENCE',
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textSubtle,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _buildThemeChip(
-                label: 'Light',
-                icon: Icons.light_mode_outlined,
-                isSelected: currentMode == AppThemeMode.light,
-                onTap: () => themeProvider.setThemeMode(AppThemeMode.light),
-              ),
-              const SizedBox(width: 8),
-              _buildThemeChip(
-                label: 'Dark',
-                icon: Icons.dark_mode_outlined,
-                isSelected: currentMode == AppThemeMode.dark,
-                onTap: () => themeProvider.setThemeMode(AppThemeMode.dark),
-              ),
-              const SizedBox(width: 8),
-              _buildThemeChip(
-                label: 'System',
-                icon: Icons.settings_brightness_outlined,
-                isSelected: currentMode == AppThemeMode.system,
-                onTap: () => themeProvider.setThemeMode(AppThemeMode.system),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThemeChip({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.emeraldPrimary
-                : (isDark ? const Color(0xFF0F172A) : AppColors.bgSecondary),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? AppColors.emeraldPrimary
-                  : (isDark ? const Color(0xFF334155) : AppColors.borderLight),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : AppColors.textDark),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected
-                      ? Colors.white
-                      : (isDark ? Colors.white70 : AppColors.textDark),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
