@@ -596,19 +596,19 @@
             </div>
           </div>
 
-          <!-- LIVE OPERATIONS PANEL (CENTERED HERO TRACKING BOX) -->
-          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);margin-bottom:24px;display:flex;flex-direction:column;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px;">
+          <!-- LIVE OPERATIONS PANEL (3 PARALLEL SIDE-BY-SIDE COLUMNS: DRIVER INFO, MAP, NOTIFICATIONS) -->
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:22px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);margin-bottom:24px;display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
               <div style="display:flex;align-items:center;gap:10px;">
                 <div style="width:36px;height:36px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;">
                   <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polygon points="12 8 8 12 12 16 16 12 12 8" />
+                    <circle cx="12" cy="10" r="3" />
+                    <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
                   </svg>
                 </div>
                 <div>
-                  <h2 style="font-size:17px;font-weight:800;margin:0;color:#0f172a;">Live Fleet Radar & Driver Tracking</h2>
-                  <div style="font-size:12px;color:#64748b;">Real-time GPS telemetry and active load status</div>
+                  <h2 style="font-size:17px;font-weight:800;margin:0;color:#0f172a;">Live Fleet Radar &amp; Operations Center</h2>
+                  <div style="font-size:12px;color:#64748b;">Real-time driver telemetry, route navigation &amp; operational activity</div>
                 </div>
               </div>
 
@@ -623,28 +623,30 @@
               </div>
             </div>
 
-            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <!-- 3 PARALLEL SIDE-BY-SIDE BOXES: 1st DRIVER INFO, 2nd MAPS, 3rd NOTIFICATIONS -->
+            <div style="display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;">
               <!-- 1ST: DRIVER & ACTIVE LOAD INFORMATION PANEL -->
-              <div style="flex:1;min-width:280px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:420px;max-height:450px;overflow-y:auto;" id="driver-tracking-panel">
-                <div style="text-align:center;color:#64748b;font-size:13px;padding-top:60px;">Select a driver from the dropdown above or click a truck on the map.</div>
+              <div style="flex:1;min-width:280px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;min-height:480px;max-height:480px;overflow-y:auto;" id="driver-tracking-panel">
+                <div style="text-align:center;color:#64748b;font-size:13px;padding-top:100px;">Select a driver from the dropdown above or click a truck on the map.</div>
               </div>
 
               <!-- 2ND: LIVE TRIP & RADAR MAP CONTAINER -->
-              <div id="live-driver-map" style="flex:2;min-width:320px;border-radius:14px;background:#f1f5f9;min-height:420px;overflow:hidden;border:1px solid #e2e8f0;"></div>
+              <div id="live-driver-map" style="flex:1.7;min-width:320px;border-radius:14px;background:#f1f5f9;min-height:480px;height:480px;overflow:hidden;border:1px solid #e2e8f0;"></div>
+
+              <!-- 3RD: RECENT NOTIFICATIONS & LIVE ACTIVITY FEED -->
+              <div style="flex:1;min-width:280px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px;display:flex;flex-direction:column;min-height:480px;max-height:480px;overflow:hidden;" id="dashboard-notifications-panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;">
+                  <div style="font-weight:700;font-size:14px;color:#0f172a;display:flex;align-items:center;gap:6px;">
+                    <span>🔔</span> Notifications &amp; Alerts
+                  </div>
+                  <span style="font-size:11px;color:#64748b;font-weight:600;">Live Feed</span>
+                </div>
+                <div id="dashboard-notifications-feed" style="flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-right:2px;">
+                  <!-- Notifications injected here -->
+                </div>
+              </div>
             </div>
           </div>
-
-          <!-- RECENT NOTIFICATIONS & OPERATIONAL ACTIVITY -->
-          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:20px 24px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);margin-bottom:24px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-              <h3 style="font-size:15px;font-weight:700;margin:0;color:#0f172a;">Latest Activity & Alerts</h3>
-              <span style="font-size:12px;color:#64748b;">Live system feed</span>
-            </div>
-            <div id="dashboard-notifications-feed" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;max-height:240px;overflow-y:auto;">
-              <!-- Notifications injected here -->
-            </div>
-          </div>
-
         </section>
 
         <!-- ============ ADD LOAD ============ -->
