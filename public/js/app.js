@@ -1899,6 +1899,109 @@
     /* ================= NEW DASHBOARD EXTENSIONS ================= */
     let dashboardMap = null;
     let driverMarkers = {};
+    let dashboardRouteLayers = [];
+
+    const DASHBOARD_CITY_COORDS = {
+      'dallas, tx': { lat: 32.7767, lng: -96.7970 },
+      'fort worth, tx': { lat: 32.7555, lng: -97.3308 },
+      'houston, tx': { lat: 29.7604, lng: -95.3698 },
+      'san antonio, tx': { lat: 29.4241, lng: -98.4936 },
+      'austin, tx': { lat: 30.2672, lng: -97.7431 },
+      'el paso, tx': { lat: 31.7619, lng: -106.4850 },
+      'chicago, il': { lat: 41.8781, lng: -87.6298 },
+      'atlanta, ga': { lat: 33.7490, lng: -84.3880 },
+      'los angeles, ca': { lat: 34.0522, lng: -118.2437 },
+      'ontario, ca': { lat: 34.0633, lng: -117.6509 },
+      'phoenix, az': { lat: 33.4484, lng: -112.0740 },
+      'denver, co': { lat: 39.7392, lng: -104.9903 },
+      'miami, fl': { lat: 25.7617, lng: -80.1918 },
+      'jacksonville, fl': { lat: 30.3322, lng: -81.6557 },
+      'memphis, tn': { lat: 35.1495, lng: -90.0490 },
+      'nashville, tn': { lat: 36.1627, lng: -86.7816 },
+      'indianapolis, in': { lat: 39.7684, lng: -86.1581 },
+      'columbus, oh': { lat: 39.9612, lng: -82.9988 },
+      'kansas city, mo': { lat: 39.0997, lng: -94.5786 },
+      'st. louis, mo': { lat: 38.6270, lng: -90.1994 },
+      'seattle, wa': { lat: 47.6062, lng: -122.3321 },
+      'portland, or': { lat: 45.5152, lng: -122.6784 },
+      'las vegas, nv': { lat: 36.1699, lng: -115.1398 },
+      'salt lake city, ut': { lat: 40.7608, lng: -111.8910 },
+      'minneapolis, mn': { lat: 44.9778, lng: -93.2650 },
+      'detroit, mi': { lat: 42.3314, lng: -83.0458 },
+      'charlotte, nc': { lat: 35.2271, lng: -80.8431 },
+      'philadelphia, pa': { lat: 39.9526, lng: -75.1652 },
+      'new york, ny': { lat: 40.7128, lng: -74.0060 },
+      'oklahoma city, ok': { lat: 35.4676, lng: -97.5164 },
+      'cleveland, oh': { lat: 41.4993, lng: -81.6944 },
+      'cincinnati, oh': { lat: 39.1031, lng: -84.5120 },
+      'orlando, fl': { lat: 28.5383, lng: -81.3792 },
+      'tampa, fl': { lat: 27.9506, lng: -82.4572 },
+      'pittsburgh, pa': { lat: 40.4406, lng: -79.9959 },
+      'louisville, ky': { lat: 38.2527, lng: -85.7585 },
+      'baltimore, md': { lat: 39.2904, lng: -76.6122 },
+      'milwaukee, wi': { lat: 43.0389, lng: -87.9065 },
+      'albuquerque, nm': { lat: 35.0844, lng: -106.6504 },
+      'tucson, az': { lat: 32.2226, lng: -110.9747 },
+      'fresno, ca': { lat: 36.7468, lng: -119.7726 },
+      'sacramento, ca': { lat: 38.5816, lng: -121.4944 }
+    };
+
+    const DASHBOARD_STATE_COORDS = {
+      AL: { lat: 32.806671, lng: -86.791130 }, AK: { lat: 61.370716, lng: -152.404419 },
+      AZ: { lat: 33.729759, lng: -111.431221 }, AR: { lat: 34.969704, lng: -92.373123 },
+      CA: { lat: 36.116203, lng: -119.681564 }, CO: { lat: 39.059811, lng: -105.311104 },
+      CT: { lat: 41.597782, lng: -72.755371 }, DE: { lat: 39.318523, lng: -75.507141 },
+      FL: { lat: 27.766279, lng: -81.686783 }, GA: { lat: 33.040619, lng: -83.643074 },
+      ID: { lat: 44.240459, lng: -114.478828 }, IL: { lat: 40.349457, lng: -88.986137 },
+      IN: { lat: 39.849426, lng: -86.258278 }, IA: { lat: 42.011539, lng: -93.210526 },
+      KS: { lat: 38.526600, lng: -96.726486 }, KY: { lat: 37.668140, lng: -84.670067 },
+      LA: { lat: 31.169546, lng: -91.867805 }, ME: { lat: 44.693947, lng: -69.381927 },
+      MD: { lat: 39.063946, lng: -76.802101 }, MA: { lat: 42.230171, lng: -71.530106 },
+      MI: { lat: 43.326618, lng: -84.536095 }, MN: { lat: 45.694454, lng: -93.900192 },
+      MS: { lat: 32.741646, lng: -89.678696 }, MO: { lat: 38.456085, lng: -92.288368 },
+      MT: { lat: 46.921925, lng: -110.454353 }, NE: { lat: 41.125370, lng: -98.268082 },
+      NV: { lat: 38.313515, lng: -117.055374 }, NH: { lat: 43.452492, lng: -71.563896 },
+      NJ: { lat: 40.298960, lng: -74.521011 }, NM: { lat: 34.840515, lng: -106.248482 },
+      NY: { lat: 42.165726, lng: -74.948051 }, NC: { lat: 35.630066, lng: -79.806419 },
+      ND: { lat: 47.528912, lng: -99.784012 }, OH: { lat: 40.388783, lng: -82.764915 },
+      OK: { lat: 35.565342, lng: -96.928917 }, OR: { lat: 44.572021, lng: -122.070938 },
+      PA: { lat: 40.590752, lng: -77.209755 }, RI: { lat: 41.680893, lng: -71.511780 },
+      SC: { lat: 33.856892, lng: -80.945007 }, SD: { lat: 44.299782, lng: -99.438828 },
+      TN: { lat: 35.747845, lng: -86.692345 }, TX: { lat: 31.054487, lng: -97.563461 },
+      UT: { lat: 39.320980, lng: -111.093731 }, VT: { lat: 44.045876, lng: -72.710686 },
+      VA: { lat: 37.769337, lng: -78.169968 }, WA: { lat: 47.400902, lng: -121.490494 },
+      WV: { lat: 38.491226, lng: -80.954453 }, WI: { lat: 44.268543, lng: -89.616508 },
+      WY: { lat: 42.755966, lng: -107.302490 }
+    };
+
+    function getDashboardCoordsForLocation(loc, fallback) {
+      if (!loc) return fallback || { lat: 32.7767, lng: -96.7970 };
+      if (typeof loc === 'object' && loc.lat != null && loc.lng != null) {
+        return { lat: Number(loc.lat), lng: Number(loc.lng) };
+      }
+      const str = (typeof loc === 'string' ? loc : [loc.city, loc.state, loc.address].filter(Boolean).join(' ')).toLowerCase().trim();
+      for (const [key, coords] of Object.entries(DASHBOARD_CITY_COORDS)) {
+        if (str.includes(key)) return coords;
+      }
+      const stateMatch = str.match(/\b([a-z]{2})\b/i);
+      if (stateMatch) {
+        const st = stateMatch[1].toUpperCase();
+        if (DASHBOARD_STATE_COORDS[st]) return DASHBOARD_STATE_COORDS[st];
+      }
+      return fallback || { lat: 32.7767, lng: -96.7970 };
+    }
+
+    function clearDashboardMapElements() {
+      if (!dashboardMap) return;
+      dashboardRouteLayers.forEach(l => {
+        try { dashboardMap.removeLayer(l); } catch(e) {}
+      });
+      dashboardRouteLayers = [];
+      Object.keys(driverMarkers).forEach(k => {
+        try { dashboardMap.removeLayer(driverMarkers[k]); } catch(e) {}
+      });
+      driverMarkers = {};
+    }
 
     function initDashboardMap() {
       if (dashboardMap) return;
@@ -1913,36 +2016,148 @@
     }
 
     window.onTrackingDriverChanged = function(driverId) {
+      initDashboardMap();
       const select = document.getElementById('tracking-driver-select');
-      if (select && driverId && select.value !== driverId) {
+      if (select && driverId !== undefined && select.value !== driverId) {
         select.value = driverId;
       }
+
       if (!driverId) {
         const panel = document.getElementById('driver-tracking-panel');
-        if (panel) panel.innerHTML = '<div style="text-align:center;color:#64748b;font-size:13px;padding-top:60px;">Select a driver from the dropdown above or click a truck on the map.</div>';
+        if (panel) {
+          panel.innerHTML = '<div style="text-align:center;color:#64748b;font-size:13px;padding-top:60px;">Select a driver from the dropdown above or click a truck on the map to view trip navigation.</div>';
+        }
+        renderAllDriversFleetRadar();
         return;
       }
+
       showDriverDetails(driverId);
-      if (dashboardMap && driverId) {
-        const d = (STATE.drivers || []).find(x => x.id === driverId);
-        if (d && d.location && d.location.lat && d.location.lng) {
-          dashboardMap.setView([d.location.lat, d.location.lng], 9);
-          if (driverMarkers[d.id]) {
-            driverMarkers[d.id].openPopup();
-          }
-        }
+
+      if (!dashboardMap) return;
+      clearDashboardMapElements();
+
+      const driver = (STATE.drivers || []).find(x => x.id === driverId);
+      if (!driver) return;
+
+      const activeLoad = (STATE.loads || []).find(l => l.driverId === driver.id && l.status !== 'Drop-off' && l.status !== 'Cancelled');
+
+      if (activeLoad) {
+        // Show ONLY this driver's active trip navigation
+        const puCoords = getDashboardCoordsForLocation(activeLoad.pickup, { lat: 32.7767, lng: -96.7970 });
+        const doCoords = getDashboardCoordsForLocation(activeLoad.dropoff, { lat: 39.7684, lng: -86.1581 });
+        const drvCoords = (driver.location && driver.location.lat != null) 
+          ? { lat: Number(driver.location.lat), lng: Number(driver.location.lng) }
+          : { lat: (puCoords.lat + doCoords.lat) / 2 + 0.2, lng: (puCoords.lng + doCoords.lng) / 2 - 0.3 };
+
+        // 1. Origin / Pickup Marker
+        const puIcon = L.divIcon({
+          className: 'custom-trip-icon',
+          html: `<div style="background:#16a34a;color:#ffffff;font-size:11px;font-weight:900;border:2.5px solid #ffffff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(22,163,74,0.45);cursor:pointer;">PU</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+        const puMarker = L.marker([puCoords.lat, puCoords.lng], { icon: puIcon }).addTo(dashboardMap);
+        puMarker.bindPopup(`<b>🟢 Origin / Pickup:</b><br>${escapeHtml(formatCityState(activeLoad.pickup) || 'Pickup Hub')}<br><small style="color:#64748b;">Scheduled: ${escapeHtml(activeLoad.pickupDate || 'Today')}</small>`);
+        dashboardRouteLayers.push(puMarker);
+
+        // 2. Destination / Delivery Marker
+        const doIcon = L.divIcon({
+          className: 'custom-trip-icon',
+          html: `<div style="background:#ef4444;color:#ffffff;font-size:11px;font-weight:900;border:2.5px solid #ffffff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(239,68,68,0.45);cursor:pointer;">DEL</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+        const doMarker = L.marker([doCoords.lat, doCoords.lng], { icon: doIcon }).addTo(dashboardMap);
+        doMarker.bindPopup(`<b>🔴 Delivery Destination:</b><br>${escapeHtml(formatCityState(activeLoad.dropoff) || 'Delivery Location')}<br><small style="color:#64748b;">ETA: ${escapeHtml(activeLoad.eta || 'On Schedule')}</small>`);
+        dashboardRouteLayers.push(doMarker);
+
+        // 3. Driver Live Position Marker
+        const drvIcon = L.divIcon({
+          className: 'custom-trip-icon',
+          html: `<div style="background:#0284c7;color:#ffffff;font-size:16px;border:3px solid #ffffff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(2,132,199,0.7);cursor:pointer;">🚚</div>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18]
+        });
+        const drvMarker = L.marker([drvCoords.lat, drvCoords.lng], { icon: drvIcon }).addTo(dashboardMap);
+        drvMarker.bindPopup(`<b>🚚 ${escapeHtml(driver.name)}</b><br>Truck: ${escapeHtml(driver.truck || 'HL-101')}<br>Speed: ${driver.location && driver.location.speed ? driver.location.speed + ' mph' : '62 mph'}<br>Status: <span style="color:#ea580c;font-weight:700;">${escapeHtml(activeLoad.status || 'In Transit')}</span>`).openPopup();
+        dashboardRouteLayers.push(drvMarker);
+
+        // 4. Trip Route Polylines
+        // Completed route segment (Pickup to Driver)
+        const completedLine = L.polyline([
+          [puCoords.lat, puCoords.lng],
+          [drvCoords.lat, drvCoords.lng]
+        ], { color: '#16a34a', weight: 4, opacity: 0.85 }).addTo(dashboardMap);
+        dashboardRouteLayers.push(completedLine);
+
+        // Remaining route segment (Driver to Destination)
+        const remainingLine = L.polyline([
+          [drvCoords.lat, drvCoords.lng],
+          [doCoords.lat, doCoords.lng]
+        ], { color: '#0284c7', weight: 4, opacity: 0.9, dashArray: '8, 8' }).addTo(dashboardMap);
+        dashboardRouteLayers.push(remainingLine);
+
+        // Frame the entire trip navigation
+        const tripBounds = L.latLngBounds([
+          [puCoords.lat, puCoords.lng],
+          [drvCoords.lat, drvCoords.lng],
+          [doCoords.lat, doCoords.lng]
+        ]);
+        dashboardMap.fitBounds(tripBounds, { padding: [50, 50], maxZoom: 8 });
+      } else {
+        // Driver has no active load (Available)
+        const drvCoords = (driver.location && driver.location.lat != null) 
+          ? { lat: Number(driver.location.lat), lng: Number(driver.location.lng) }
+          : { lat: 32.7767, lng: -96.7970 };
+
+        const drvIcon = L.divIcon({
+          className: 'custom-trip-icon',
+          html: `<div style="background:#16a34a;color:#ffffff;font-size:16px;border:3px solid #ffffff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(22,163,74,0.6);cursor:pointer;">🚚</div>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18]
+        });
+        const drvMarker = L.marker([drvCoords.lat, drvCoords.lng], { icon: drvIcon }).addTo(dashboardMap);
+        drvMarker.bindPopup(`<b>🚚 ${escapeHtml(driver.name)}</b><br>Truck: ${escapeHtml(driver.truck || 'HL-101')}<br><span style="color:#16a34a;font-weight:700;">🟢 Available (Ready for Load)</span><br>Location: ${escapeHtml(driver.location && driver.location.city ? driver.location.city : 'Dallas, TX')}`).openPopup();
+        dashboardRouteLayers.push(drvMarker);
+
+        dashboardMap.setView([drvCoords.lat, drvCoords.lng], 8);
       }
+
+      setTimeout(() => {
+        if (dashboardMap) dashboardMap.invalidateSize();
+      }, 150);
     };
+
+    function renderAllDriversFleetRadar() {
+      if (!dashboardMap) return;
+      clearDashboardMapElements();
+
+      const drivers = visibleDrivers();
+      let bounds = [];
+
+      drivers.forEach(d => {
+        const loc = d.location || { lat: 32.7767 + (Math.random() - 0.5) * 4, lng: -96.7970 + (Math.random() - 0.5) * 6, city: 'Dallas, TX', speed: 62 };
+        if (loc && loc.lat && loc.lng) {
+          const marker = L.marker([loc.lat, loc.lng]).addTo(dashboardMap);
+          marker.bindPopup(`<b>${escapeHtml(d.name)}</b><br>Truck: ${escapeHtml(d.truck || '—')}<br>${escapeHtml(loc.city || '')}<br><a href="javascript:void(0)" onclick="window.onTrackingDriverChanged('${d.id}')" style="color:#0284c7;font-weight:700;">Track Trip Navigation →</a>`);
+          marker.on('click', () => {
+            window.onTrackingDriverChanged(d.id);
+          });
+          driverMarkers[d.id] = marker;
+          bounds.push([loc.lat, loc.lng]);
+        }
+      });
+
+      if (bounds.length > 0) {
+        dashboardMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 8 });
+      }
+    }
 
     function renderLiveDashboardMap() {
       initDashboardMap();
       if (!dashboardMap) return;
 
-      const panel = document.getElementById('driver-tracking-panel');
-      if (!panel) return;
-
       const drivers = visibleDrivers();
-      let bounds = [];
 
       // Populate Driver Choice dropdown in tracking header
       const select = document.getElementById('tracking-driver-select');
@@ -1953,34 +2168,12 @@
         select.innerHTML = optionsHtml;
       }
 
-      drivers.forEach(d => {
-        // If driver has location data or assign default regional location
-        const loc = d.location || { lat: 32.7767 + (Math.random() - 0.5) * 4, lng: -96.7970 + (Math.random() - 0.5) * 6, city: 'Dallas, TX', speed: 62 };
-        if (loc && loc.lat && loc.lng) {
-          if (!driverMarkers[d.id]) {
-            const marker = L.marker([loc.lat, loc.lng]).addTo(dashboardMap);
-            marker.bindPopup(`<b>${escapeHtml(d.name)}</b><br>Truck: ${escapeHtml(d.truck || '—')}<br>${escapeHtml(loc.city || '')}`);
-            marker.on('click', () => {
-              window.onTrackingDriverChanged(d.id);
-            });
-            driverMarkers[d.id] = marker;
-          } else {
-            driverMarkers[d.id].setLatLng([loc.lat, loc.lng]);
-          }
-          bounds.push([loc.lat, loc.lng]);
-        }
-      });
-
-      if (bounds.length > 0) {
-        dashboardMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 8 });
-      }
-
-      // If a driver is already chosen, refresh their telemetry panel
-      const curSelected = select ? select.value : (drivers[0] ? drivers[0].id : null);
+      // If a driver is selected, render their trip navigation; otherwise default to first driver
+      const curSelected = select && select.value ? select.value : (drivers[0] ? drivers[0].id : '');
       if (curSelected) {
         window.onTrackingDriverChanged(curSelected);
       } else {
-        panel.innerHTML = '<div style="text-align:center;color:#64748b;font-size:13px;padding-top:60px;">Select a driver from the dropdown above or click a truck on the map.</div>';
+        renderAllDriversFleetRadar();
       }
     }
 
@@ -4174,15 +4367,12 @@
       (l.docs.PhotosPU || []).forEach(p => files.push(p));
       (l.docs.PhotosDO || []).forEach(p => files.push(p));
       (l.docs.Extra || []).forEach(p => files.push(p));
-      if (!files.length) return toast('No documents yet', 'Upload RC, BOL, POD, or photos first.');
-      const fmt = STATE.settings.zipFormat || '{MM-DD-YYYY} {PickupState}-{DropState} {DriverName}.zip';
       const today = new Date();
       const mmddyyyy = String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0') + '-' + today.getFullYear();
-      let zipName = fmt
-        .replace('{MM-DD-YYYY}', mmddyyyy)
-        .replace('{PickupState}', stateAbbrev(l.pickup))
-        .replace('{DropState}', stateAbbrev(l.dropoff))
-        .replace('{DriverName}', l.driverName);
+      const drvFirst = (l.driverName || 'Driver').trim().split(' ')[0];
+      const puSt = stateAbbrev(l.pickup) || 'XX';
+      const doSt = stateAbbrev(l.dropoff) || 'XX';
+      let zipName = `${mmddyyyy} ${drvFirst} (${puSt}-${doSt}).zip`;
       zipName = sanitizeFilename(zipName);
       const zip = new JSZip();
       files.forEach((f, i) => {
@@ -5162,135 +5352,12 @@
     }
     window.exportDriverPayPDF = function exportDriverPayPDF() {
       if (STATE.role === 'viewonly') return toast('Access Denied', 'View-only users cannot export settlements.');
-      
-      let loads = (window._driverPayLoads && window._driverPayLoads.length) ? window._driverPayLoads : [];
-      if (!loads.length && typeof driverPayFilteredLoads === 'function') {
-        loads = driverPayFilteredLoads();
-      }
-      if (!loads.length) {
-        loads = (STATE.loads || []).filter(l => l.driverId);
-      }
-      if (!loads.length) {
-        loads = STATE.loads || [];
-      }
-      if (!loads.length) return toast('Nothing to export', 'No load settlements available to export.');
+      const sel = (document.getElementById('dp-driver') || {}).value;
+      openPrintInvoiceModal(sel);
+    };
 
-      let totalGross = 0;
-      let totalDriverPayment = 0;
-
-      const rowsHtml = loads.map(l => {
-        const dDate = l.deliveryDate || l.pickupDate || l.pickup || '—';
-        const lNum = l.loadNumber || l.id;
-        const lane = [l.pickup, l.dropoff].filter(Boolean).join(' → ') || '—';
-        const gross = Number(l.brokerRate || 0);
-        const driverAmt = Number(typeof driverPayOf === 'function' ? driverPayOf(l) : (l.driverPay || (gross * 0.88)));
-
-        totalGross += gross;
-        totalDriverPayment += driverAmt;
-
-        return `
-          <tr style="border-bottom:1px solid #e2e8f0;">
-            <td style="padding:10px 14px;font-size:13px;color:#334155;">${escapeHtml(dDate)}</td>
-            <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#0f172a;font-family:monospace;">${escapeHtml(lNum)}</td>
-            <td style="padding:10px 14px;font-size:13px;color:#334155;">${escapeHtml(lane)}</td>
-            <td style="padding:10px 14px;font-size:13px;color:#334155;text-align:right;font-family:monospace;">$${gross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#0f172a;text-align:right;font-family:monospace;">$${driverAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          </tr>
-        `;
-      }).join('');
-
-      const printHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Driver Payment Settlement Report</title>
-  <style>
-    @page { size: letter portrait; margin: 15mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 24px; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 12px; }
-    h2 { font-size: 20px; font-weight: 900; margin: 0; color: #0f172a; letter-spacing: -0.5px; }
-    .sub { font-size: 12px; color: #64748b; margin-top: 4px; }
-    .date { font-size: 12px; font-weight: 700; color: #0f172a; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th { text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 800; text-transform: uppercase; color: #475569; border-bottom: 2px solid #cbd5e1; background: #f8fafc; }
-    th.num { text-align: right; }
-    td { padding: 10px 14px; font-size: 13px; }
-    tr.total-row { border-top: 2px solid #0f172a; font-weight: 800; font-size: 14px; background: #f8fafc; }
-    tr.total-row td { padding: 14px 14px; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <h2>HAULBOX — DRIVER PAYMENT SETTLEMENT</h2>
-      <div class="sub">Generated from Dispatch Command · ${loads.length} Settlement Item(s)</div>
-    </div>
-    <div class="date">Export Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Load Number</th>
-        <th>Lane</th>
-        <th class="num">Total Rate</th>
-        <th class="num">Driver's Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml}
-      <tr class="total-row">
-        <td colspan="3" style="text-align:right;font-weight:900;">TOTAL:</td>
-        <td style="text-align:right;font-family:monospace;">$${totalGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align:right;font-family:monospace;font-weight:900;color:#0284c7;">$${totalDriverPayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      </tr>
-    </tbody>
-  </table>
-  <script>
-    window.onload = function() { window.focus(); window.print(); };
-  </script>
-</body>
-</html>
-      `;
-
-      let popupOpened = false;
-      try {
-        const win = window.open('', '_blank');
-        if (win && !win.closed) {
-          win.document.open();
-          win.document.write(printHtml);
-          win.document.close();
-          popupOpened = true;
-        }
-      } catch (e) {}
-
-      if (!popupOpened) {
-        let frame = document.getElementById('driver-pay-print-frame');
-        if (!frame) {
-          frame = document.createElement('iframe');
-          frame.id = 'driver-pay-print-frame';
-          frame.style.position = 'fixed';
-          frame.style.right = '0';
-          frame.style.bottom = '0';
-          frame.style.width = '0';
-          frame.style.height = '0';
-          frame.style.border = '0';
-          document.body.appendChild(frame);
-        }
-        frame.contentDocument.open();
-        frame.contentDocument.write(printHtml);
-        frame.contentDocument.close();
-        setTimeout(() => {
-          try {
-            frame.contentWindow.focus();
-            frame.contentWindow.print();
-          } catch (err) {
-            console.error('Frame print failed:', err);
-          }
-        }, 350);
-      }
-      toast('PDF Generated', `${loads.length} load settlement(s) compiled for export/printing`, true);
+    window.exportDriverStatement = function exportDriverStatement(driverId) {
+      openPrintInvoiceModal(driverId);
     };
 
     /* ================= BROKERS ================= */
@@ -5462,7 +5529,8 @@
       document.getElementById('s-defaultfee').value = s.defaultFeePct || 10;
       const dpDefault = document.getElementById('s-defaultdriverpay');
       if (dpDefault) dpDefault.value = defaultDriverPayPct();
-      document.getElementById('s-zipformat').value = s.zipFormat || '';
+      const zf = document.getElementById('s-zipformat');
+      if (zf) zf.value = s.zipFormat || '';
       document.getElementById('s-ai-apikey').value = s.aiApiKey || '';
       document.getElementById('s-ai-enabled').value = s.aiExtractEnabled === false ? 'off' : 'on';
       const provider = ['gemini', 'ocrspace', 'mistral'].includes(s.aiProvider) ? s.aiProvider : 'claude';
@@ -5806,11 +5874,13 @@
       return null; // view-only links don't get a Google connection
     }
     function renderMyAccount() {
-      const box = document.getElementById('my-account-box');
+      const box = document.getElementById('myaccount-body') || document.getElementById('my-account-box');
       if (!box) return;
+      const unEl = document.getElementById('myaccount-username');
+      if (unEl) unEl.textContent = STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'You');
       const holder = myGoogleAccountHolder();
       if (!holder) {
-        box.innerHTML = '<p class="cell-dim" style="font-size:12.5px;">Google account connections aren\'t available in this session.</p>';
+        box.innerHTML = '<p class="cell-dim" style="font-size:12.5px;">Google account connections are not available in this session.</p>';
         return;
       }
       // Auto-check connection status from backend if not connected locally yet
@@ -5829,47 +5899,63 @@
 
       const connected = !!(holder.gmailConnected && holder.driveConnected);
       box.innerHTML = `
-    <div class="field" style="margin-bottom:14px;">
-      <label>Google Account Email</label>
-      <input type="email" id="my-google-email" placeholder="Signed in via Google's own popup" value="${escapeAttr(holder.googleAccountEmail || '')}" readonly>
-      <div class="hint">${connected ? 'Connected — disconnect first to switch to a different Google account.' : 'Click Connect below to link your Google Account.'}</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <span class="status-pill ${connected ? 'connected' : 'off'}">${connected ? 'Connected · ' + escapeAttr(holder.googleAccountEmail || '') : 'Not Connected'}</span>
-      ${connected ? '<span class="hint" style="margin:0;">Last checked: ' + fmtDateTime(holder.gmailLastSync || '') + '</span>' : ''}
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-      ${connected
-          ? '<button type="button" class="btn btn-sm btn-ghost" onclick="disconnectMyGoogleAccount()">Disconnect</button><button type="button" class="btn btn-sm" onclick="testMyGoogleConnection()">Test Connection</button>'
-          : '<button type="button" class="btn btn-sm btn-accent" onclick="connectMyGoogleAccount()">Connect Google Account</button>'}
-    </div>
-    <div class="hr"></div>
-    <div class="field" style="margin-bottom:0;">
-      <label>Google Sheet Sync (Option 1: Direct Link)</label>
-      <div class="hint" style="margin-bottom:8px;">Share a Google Sheet with <b>${escapeAttr(holder.googleAccountEmail || 'your account')}</b> as an <b>Editor</b>, paste its link below, and every load you book — plus every status change after — writes or updates a row automatically, matched by Load #.</div>
-      <input type="text" id="my-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/..." value="${escapeAttr(holder.sheetUrl || '')}" oninput="saveMySheetField('sheetUrl', this.value)" style="margin-bottom:8px;">
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="my-sheet-tab" placeholder="Tab name — leave blank for Sheet1" value="${escapeAttr(holder.sheetTabName || '')}" oninput="saveMySheetField('sheetTabName', this.value)" style="flex:1;">
-        <button type="button" class="btn btn-sm btn-ghost" onclick="testSheetSync()">Test Sync</button>
-      </div>
-      <div id="my-sheet-status" style="font-size:11.5px;color:var(--text-faint);margin-top:6px;"></div>
-    </div>
-    <div class="hr"></div>
-    <div class="field" style="margin-bottom:0;">
-      <label>Google Sheet Sync (Option 2: Apps Script Webhook URL - Zero Permission Required)</label>
-      <div class="hint" style="margin-bottom:8px;">Alternatively, if you prefer zero Google sharing setup, create a Google Apps Script Web App on your Google Sheet and paste its Webhook URL below:</div>
-      <input type="text" id="my-sheet-webhook" placeholder="https://script.google.com/macros/s/.../exec" value="${escapeAttr(holder.sheetWebhookUrl || '')}" oninput="saveMySheetField('sheetWebhookUrl', this.value)" style="margin-bottom:8px;">
-      <details style="font-size:11.5px;color:var(--text-dim);cursor:pointer;"><summary>Click to view 3-line Google Apps Script snippet</summary>
-      <pre style="background:var(--bg-card);padding:8px;border-radius:6px;margin-top:6px;font-size:11px;overflow-x:auto;">
-function doPost(e) {
-  var data = JSON.parse(e.postData.contents);
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  sheet.appendRow([data.date, data.loadNumber, data.broker, data.mc, data.driver, data.pickup, data.dropoff, data.puDate, data.doDate, data.rate, data.dispatcher]);
-  return ContentService.createTextOutput(JSON.stringify({result:"success"})).setMimeType(ContentService.MimeType.JSON);
-}</pre>
-      </details>
-    </div>
-  `;
+        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <svg viewBox="0 0 48 48" width="24" height="24">
+                <path fill="#EA4335" d="M6 8h36v32H6z" opacity="0" />
+                <path fill="#4285F4" d="M45 12l-21 15L3 12v24h42z" />
+                <path fill="#EA4335" d="M3 12l21 15 21-15" />
+              </svg>
+              <div>
+                <div style="font-weight:700;font-size:14px;color:var(--text);">Google Account (Gmail &amp; Drive)</div>
+                <div style="font-size:12px;color:var(--text-dim);">Used to Reply-All BOL/POD emails via Gmail and archive load packages to Google Drive</div>
+              </div>
+            </div>
+            <span class="status-pill ${connected ? 'connected' : 'off'}">${connected ? 'Connected' : 'Not Connected'}</span>
+          </div>
+
+          <div class="field" style="margin-bottom:12px;">
+            <label>Connected Google Email</label>
+            <input type="email" id="my-google-email" placeholder="Sign in with your Google account" value="${escapeAttr(holder.googleAccountEmail || '')}" readonly>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${connected
+              ? '<button type="button" class="btn btn-sm btn-ghost" onclick="disconnectMyGoogleAccount()">Disconnect Google Account</button><button type="button" class="btn btn-sm" onclick="testMyGoogleConnection()">Test Connection</button>'
+              : '<button type="button" class="btn btn-sm btn-accent" style="font-weight:600;" onclick="connectMyGoogleAccount()">⚡ Connect Google Account</button>'}
+          </div>
+        </div>
+
+        <div style="background:var(--bg-elev2);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <svg viewBox="0 0 48 48" width="24" height="24">
+              <rect x="6" y="6" width="36" height="36" rx="4" fill="#0F9D58" />
+              <path fill="#ffffff" d="M14 14h20v4H14zm0 8h20v4H14zm0 8h12v4H14z"/>
+            </svg>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:var(--text);">Google Sheet Auto-Sync Link</div>
+              <div style="font-size:12px;color:var(--text-dim);">Automatically write and update every booked load row into your live Google Sheet</div>
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:10px;">
+            <label>Google Sheet URL / Link</label>
+            <input type="text" id="my-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/..." value="${escapeAttr(holder.sheetUrl || '')}" oninput="saveMySheetField('sheetUrl', this.value)">
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+            <div class="field" style="flex:1;margin-bottom:0;">
+              <label>Sheet Tab Name</label>
+              <input type="text" id="my-sheet-tab" placeholder="Sheet1 (default)" value="${escapeAttr(holder.sheetTabName || '')}" oninput="saveMySheetField('sheetTabName', this.value)">
+            </div>
+            <div style="padding-top:18px;">
+              <button type="button" class="btn btn-sm btn-ghost" onclick="testSheetSync()">Test Sheet Sync</button>
+            </div>
+          </div>
+          <div id="my-sheet-status" style="font-size:12px;color:var(--text-faint);margin-top:4px;"></div>
+        </div>
+      `;
     }
     function saveMySheetField(key, val) {
       const holder = myGoogleAccountHolder();
@@ -8282,102 +8368,176 @@ function doPost(e) {
     };
 
     window.openPrintInvoiceModal = function(driverId) {
-      const driver = (STATE.drivers || []).find(d => String(d.id) === String(driverId) || String(d.code) === String(driverId));
-      if (!driver) return toast('Driver Not Found', 'Please select a valid driver to generate statement.');
+      if (STATE.role === 'viewonly') return toast('Access Denied', 'View-only users cannot export settlements.');
 
-      const driverLoads = (STATE.loads || []).filter(l => {
-        const lDrv = String(l.driverId || l.driverCode || (l.driver && l.driver.id) || '').toLowerCase();
-        return lDrv === String(driver.id).toLowerCase() || lDrv === String(driver.code || '').toLowerCase();
-      });
+      let driver = null;
+      if (driverId) {
+        driver = (STATE.drivers || []).find(d => String(d.id) === String(driverId) || String(d.code) === String(driverId));
+      } else {
+        const selVal = (document.getElementById('dp-driver') || {}).value;
+        if (selVal) {
+          driver = (STATE.drivers || []).find(d => String(d.id) === String(selVal) || String(d.code) === String(selVal));
+        }
+      }
 
-      const payPct = Number(driver.payPct || driver.pay_percentage || 88);
+      let loads = [];
+      if (driver) {
+        loads = (STATE.loads || []).filter(l => {
+          const lDrv = String(l.driverId || l.driverCode || (l.driver && l.driver.id) || '').toLowerCase();
+          return lDrv === String(driver.id).toLowerCase() || lDrv === String(driver.code || '').toLowerCase();
+        });
+        if (typeof driverPayFilteredLoads === 'function') {
+          const filtered = driverPayFilteredLoads().filter(l => String(l.driverId) === String(driver.id));
+          if (filtered.length > 0) loads = filtered;
+        }
+      } else {
+        if (window._driverPayLoads && window._driverPayLoads.length) {
+          loads = window._driverPayLoads;
+        } else if (typeof driverPayFilteredLoads === 'function') {
+          loads = driverPayFilteredLoads();
+        } else {
+          loads = (STATE.loads || []).filter(l => l.driverId);
+        }
+      }
+
+      if (!loads.length) {
+        loads = STATE.loads || [];
+      }
+
+      if (!loads.length) return toast('Nothing to export', 'No load settlements available to generate invoice.');
+
+      const companyName = (STATE.settings && STATE.settings.companyName ? STATE.settings.companyName : 'Haulline Freight Co.').trim();
+      const driverName = driver ? driver.name : (loads.length === 1 && loads[0].driverName ? loads[0].driverName : 'All Drivers Summary');
+      const driverCode = driver ? (driver.code || driver.id || '—') : 'Fleet Roster';
+      const truck = driver ? (driver.truck || '—') : 'Multiple Units';
+      const payPct = driver ? Number(driver.payPct || driver.pay_percentage || 88) : 88;
+
+      window._currentInvoiceDriverName = driverName;
+
       let totalGross = 0;
       let totalDriverPay = 0;
+      let totalDeductions = 0;
 
-      const rowsHtml = driverLoads.map(l => {
+      const rowsHtml = loads.map(l => {
         const gross = Number(l.brokerRate || l.rate || l.grossAmount || 0);
-        const drvPay = Number(l.driverPay || (gross * payPct / 100));
+        const ratePct = l.driverPayPct != null ? Number(l.driverPayPct) : (typeof driverPayPctFor === 'function' ? driverPayPctFor(l.driverId) : payPct);
+        const drvAmt = Number(typeof driverPayOf === 'function' ? driverPayOf(l) : (l.driverPay || (gross * ratePct / 100)));
+        const ded = Number(l.driverDeduction || 0);
+        const netAmt = drvAmt - ded;
+        const dDate = l.deliveryDate || l.pickupDate || l.systemDate || l.date || '—';
+        const lNum = l.loadNumber || l.id;
+        const lane = [l.pickup, l.dropoff].filter(Boolean).join(' → ') || '—';
+        const broker = l.brokerName || '—';
+        const st = l.status || 'Delivered';
+
         totalGross += gross;
-        totalDriverPay += drvPay;
-        const dateStr = l.deliveryDate || l.pickupDate || l.date || '—';
+        totalDriverPay += drvAmt;
+        totalDeductions += ded;
+
         return `
-          <tr style="border-bottom:1px solid #e2e8f0;font-size:12.5px;">
-            <td style="padding:10px 8px;font-weight:700;color:#0f172a;">${l.loadNumber || l.id}</td>
-            <td style="padding:10px 8px;color:#64748b;">${dateStr}</td>
-            <td style="padding:10px 8px;color:#334155;">${l.pickup || '—'} → ${l.dropoff || '—'}</td>
-            <td style="padding:10px 8px;font-weight:600;text-align:right;">$${gross.toLocaleString()}</td>
-            <td style="padding:10px 8px;text-align:center;color:#64748b;">${payPct}%</td>
-            <td style="padding:10px 8px;font-weight:700;text-align:right;color:#0284c7;">$${drvPay.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+          <tr style="border-bottom:1px solid #e2e8f0;font-size:12px;">
+            <td style="padding:10px 8px;color:#475569;">${escapeHtml(dDate)}</td>
+            <td style="padding:10px 8px;font-weight:800;color:#0f172a;font-family:monospace;">${escapeHtml(lNum)}</td>
+            <td style="padding:10px 8px;color:#334155;">${escapeHtml(broker)}</td>
+            <td style="padding:10px 8px;color:#334155;font-weight:500;">${escapeHtml(lane)}</td>
+            <td style="padding:10px 8px;color:#64748b;"><span style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;">${escapeHtml(st)}</span></td>
+            <td style="padding:10px 8px;text-align:right;font-family:monospace;color:#334155;">$${gross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td style="padding:10px 8px;text-align:center;color:#64748b;font-weight:600;">${ratePct}%</td>
+            <td style="padding:10px 8px;text-align:right;font-family:monospace;font-weight:700;color:#0f172a;">$${drvAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td style="padding:10px 8px;text-align:right;font-family:monospace;color:#ef4444;">${ded > 0 ? '-$' + ded.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</td>
+            <td style="padding:10px 8px;text-align:right;font-family:monospace;font-weight:800;color:#0284c7;">$${netAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           </tr>
         `;
-      }).join('') || `<tr><td colspan="6" style="padding:24px;text-align:center;color:#94a3b8;">No delivered loads on record for this settlement period.</td></tr>`;
+      }).join('');
 
-      const printableArea = document.getElementById('invoice-printable-area');
-      if (printableArea) {
-        printableArea.innerHTML = `
-          <div id="invoice-doc-body" style="font-family:'Inter',system-ui,sans-serif;color:#0f172a;max-width:700px;margin:0 auto;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f172a;padding-bottom:16px;margin-bottom:20px;">
-              <div>
-                <div style="font-size:24px;font-weight:900;letter-spacing:-0.03em;color:#0f172a;">Haul<span style="color:#0284c7;">BoX</span> Dispatch</div>
-                <div style="font-size:12px;color:#64748b;margin-top:3px;">Driver Settlement Statement &amp; Remittance Advice</div>
-              </div>
-              <div style="text-align:right;">
-                <div style="font-size:12px;font-weight:700;color:#0f172a;">STATEMENT DATE</div>
-                <div style="font-size:12px;color:#475569;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
-              </div>
+      const totalNetDue = totalDriverPay - totalDeductions;
+
+      const invoiceHtml = `
+        <div id="invoice-doc-body" style="font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;color:#0f172a;background:#ffffff;padding:16px;max-width:780px;margin:0 auto;">
+          <!-- 1. TOP: COMPANY NAME & BRANDING -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #0f172a;padding-bottom:16px;margin-bottom:18px;">
+            <div>
+              <div style="font-size:24px;font-weight:900;letter-spacing:-0.03em;color:#0f172a;text-transform:uppercase;">${escapeHtml(companyName)}</div>
+              <div style="font-size:12px;font-weight:600;color:#64748b;margin-top:2px;">Carrier &amp; Freight Dispatch Settlement Remittance</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px;">HaulBoX Operations Dispatch Command Center</div>
             </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:24px;">
-              <div>
-                <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Payee / Driver</div>
-                <div style="font-size:16px;font-weight:800;color:#0f172a;margin-top:2px;">${driver.name || 'Driver'}</div>
-                <div style="font-size:12px;color:#475569;">Driver ID: ${driver.code || driver.id || '—'}</div>
-              </div>
-              <div>
-                <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Equipment &amp; Terms</div>
-                <div style="font-size:13px;font-weight:700;color:#0f172a;margin-top:2px;">Truck: ${driver.truck || '—'} | Trailer: ${driver.trailerType || '—'}</div>
-                <div style="font-size:12px;color:#0284c7;font-weight:600;">Agreed Pay Rate: ${payPct}% of Gross</div>
-              </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Statement Date</div>
+              <div style="font-size:13px;font-weight:800;color:#0f172a;margin-top:2px;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">Invoice #: HBX-PAY-${Date.now().toString().slice(-6)}</div>
             </div>
+          </div>
 
-            <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+          <!-- 2. UNDER IT: DRIVER NAME & DETAILS -->
+          <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;margin-bottom:20px;">
+            <div>
+              <div style="font-size:10.5px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Payee / Driver Name</div>
+              <div style="font-size:18px;font-weight:900;color:#0f172a;margin-top:2px;">${escapeHtml(driverName)}</div>
+              <div style="font-size:12px;color:#475569;margin-top:2px;">Driver ID: <span style="font-weight:700;color:#0f172a;">${escapeHtml(driverCode)}</span></div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Assignment &amp; Terms</div>
+              <div style="font-size:13px;font-weight:700;color:#0f172a;margin-top:2px;">Truck: <span style="color:#0284c7;">${escapeHtml(truck)}</span></div>
+              <div style="font-size:12px;color:#475569;margin-top:2px;">Agreed Settlement Rate: <span style="font-weight:700;color:#16a34a;">${payPct}% of Gross</span></div>
+            </div>
+          </div>
+
+          <!-- 3. UNDER IT: DETAILS OF LOADS TABLE -->
+          <div style="margin-bottom:20px;">
+            <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.3px;">Itemized Load Settlements (${loads.length})</div>
+            <table style="width:100%;border-collapse:collapse;margin-top:4px;">
               <thead>
-                <tr style="border-bottom:2px solid #cbd5e1;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;text-align:left;">
-                  <th style="padding:8px 8px;">Load #</th>
-                  <th style="padding:8px 8px;">Date</th>
-                  <th style="padding:8px 8px;">Lane</th>
-                  <th style="padding:8px 8px;text-align:right;">Gross</th>
-                  <th style="padding:8px 8px;text-align:center;">Pay %</th>
-                  <th style="padding:8px 8px;text-align:right;">Driver Pay</th>
+                <tr style="border-bottom:2px solid #cbd5e1;background:#f8fafc;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;text-align:left;">
+                  <th style="padding:10px 8px;">Date</th>
+                  <th style="padding:10px 8px;">Load #</th>
+                  <th style="padding:10px 8px;">Broker</th>
+                  <th style="padding:10px 8px;">Lane / Route</th>
+                  <th style="padding:10px 8px;">Stage</th>
+                  <th style="padding:10px 8px;text-align:right;">Gross</th>
+                  <th style="padding:10px 8px;text-align:center;">Pay %</th>
+                  <th style="padding:10px 8px;text-align:right;">Driver Pay</th>
+                  <th style="padding:10px 8px;text-align:right;">Deductions</th>
+                  <th style="padding:10px 8px;text-align:right;">Net Due</th>
                 </tr>
               </thead>
               <tbody>
                 ${rowsHtml}
               </tbody>
             </table>
+          </div>
 
-            <div style="display:flex;justify-content:flex-end;margin-bottom:30px;">
-              <div style="width:280px;background:#f8fafc;border:1.5px solid #0f172a;border-radius:10px;padding:16px;">
-                <div style="display:flex;justify-content:space-between;font-size:12.5px;color:#475569;margin-bottom:6px;">
-                  <span>Total Load Gross:</span>
-                  <span style="font-weight:700;color:#0f172a;">$${totalGross.toLocaleString()}</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;font-size:12.5px;color:#475569;margin-bottom:10px;">
-                  <span>Driver Pay Cut:</span>
-                  <span style="font-weight:700;color:#0284c7;">${payPct}%</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;color:#0f172a;border-top:1.5px dashed #cbd5e1;padding-top:10px;">
-                  <span>TOTAL DRIVER PAYMENT:</span>
-                  <span style="color:#16a34a;">$${totalDriverPay.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                </div>
+          <!-- 4. TOTALS & SUMMARY SECTION -->
+          <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
+            <div style="width:320px;background:#f8fafc;border:1.5px solid #0f172a;border-radius:10px;padding:16px;">
+              <div style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:6px;">
+                <span>Total Freight Gross:</span>
+                <span style="font-weight:700;color:#0f172a;font-family:monospace;">$${totalGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:6px;">
+                <span>Total Driver Gross Pay:</span>
+                <span style="font-weight:700;color:#0284c7;font-family:monospace;">$${totalDriverPay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:8px;">
+                <span>Total Deductions:</span>
+                <span style="font-weight:700;color:#ef4444;font-family:monospace;">-${totalDeductions > 0 ? '$' + totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:900;color:#0f172a;border-top:1.5px dashed #cbd5e1;padding-top:10px;">
+                <span>NET PAYMENT DUE:</span>
+                <span style="color:#16a34a;font-family:monospace;">$${totalNetDue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
-
-            <div style="font-size:11px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:12px;">
-              Generated by HaulBoX Logistics Platform • Single Source of Truth
-            </div>
           </div>
-        `;
+
+          <!-- FOOTER -->
+          <div style="font-size:11px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:12px;">
+            Settlement Statement generated by ${escapeHtml(companyName)} via HaulBoX Dispatch System
+          </div>
+        </div>
+      `;
+
+      const printableArea = document.getElementById('invoice-printable-area');
+      if (printableArea) {
+        printableArea.innerHTML = invoiceHtml;
       }
       openModal('modal-print-invoice');
     };
@@ -8386,14 +8546,18 @@ function doPost(e) {
       const content = document.getElementById('invoice-printable-area');
       if (!content) return;
       const printWin = window.open('', '_blank', 'width=800,height=900');
+      if (!printWin) {
+        window.print();
+        return;
+      }
       printWin.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
             <title>HaulBoX Settlement Statement</title>
             <style>
-              @page { size: auto; margin: 15mm; }
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; color: #0f172a; }
+              @page { size: letter portrait; margin: 12mm; }
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 15px; color: #0f172a; }
               table { width: 100%; border-collapse: collapse; }
               th, td { padding: 8px; text-align: left; }
             </style>
@@ -8407,6 +8571,52 @@ function doPost(e) {
         </html>
       `);
       printWin.document.close();
+    };
+
+    window.downloadCurrentInvoicePDF = function() {
+      const element = document.getElementById('invoice-doc-body');
+      if (!element) return;
+      
+      const drvName = window._currentInvoiceDriverName || 'Driver';
+      const cleanName = drvName.replace(/[^a-zA-Z0-9]/g, '_');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const fileName = `Settlement_Invoice_${cleanName}_${dateStr}.pdf`;
+
+      const btn = document.getElementById('btn-download-pdf-invoice');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span style="width:14px;height:14px;display:inline-block;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></span> Downloading...`;
+      }
+
+      if (typeof html2pdf !== 'undefined') {
+        const opt = {
+          margin:       [8, 8, 8, 8],
+          filename:     fileName,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
+          jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save().then(() => {
+          toast('PDF Downloaded', `${fileName} saved to your device.`, true);
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download PDF`;
+          }
+        }).catch(err => {
+          console.error('html2pdf generation error:', err);
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download PDF`;
+          }
+          window.triggerPrintInvoice();
+        });
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download PDF`;
+        }
+        window.triggerPrintInvoice();
+      }
     };
 
     window.openKpiAvailableDrivers = function() {
