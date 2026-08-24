@@ -218,21 +218,28 @@ class DocumentVerificationService {
 
         return AiVerificationDetails(
           status: status,
-          message: reason ?? (status == AiDocumentStatus.approved ? '✓ $documentType Approved' : 'Under Review'),
+          message: reason ?? (status == AiDocumentStatus.approved ? '✓ $documentType Approved' : (status == AiDocumentStatus.pendingReview ? 'Under Review' : 'Retake Required')),
           reason: reason,
-          confidence: (ocr['confidence'] as num?)?.toDouble() ?? 0.95,
+          confidence: (ocr['confidence'] as num?)?.toDouble() ?? 0.85,
           extractedData: ocr,
           validationResults: valRes,
+        );
+      } else {
+        return AiVerificationDetails(
+          status: AiDocumentStatus.rejected,
+          message: 'Document verification failed (${resp.statusCode}). Please retake a clear photo.',
+          reason: 'Server error during verification (${resp.statusCode}). Please ensure the photo is clear and retry.',
+          confidence: 0.0,
         );
       }
     } catch (e) {
       debugPrint('verifyDoc backend error: $e');
+      return AiVerificationDetails(
+        status: AiDocumentStatus.pendingReview,
+        message: 'Could not connect to AI verification server. Document saved for Dispatcher review.',
+        reason: 'Network connection issue. Photo held for Dispatcher review.',
+        confidence: 0.50,
+      );
     }
-
-    // Graceful offline fallback
-    return const AiVerificationDetails(
-      status: AiDocumentStatus.approved,
-      message: '✓ Document saved (queued for online sync)',
-    );
   }
 }
