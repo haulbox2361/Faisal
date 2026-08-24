@@ -6,7 +6,8 @@ import '../../shared/models/load_model.dart';
 import '../../shared/models/payment_model.dart';
 
 class ApiClient {
-  static String baseUrl = kIsWeb ? 'http://localhost:3000' : 'http://10.0.2.2:3000';
+  static const String prodUrl = 'https://haulbox-x5jz.onrender.com';
+  static String baseUrl = kIsWeb ? 'http://localhost:3000' : (kDebugMode ? 'http://10.0.2.2:3000' : prodUrl);
 
   static void setBaseUrl(String url) {
     if (url.endsWith('/')) {
@@ -14,6 +15,13 @@ class ApiClient {
     } else {
       baseUrl = url;
     }
+  }
+
+  static Map<String, String> authHeaders(String? token) {
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
   }
 
   // 1. Driver Sign-In
