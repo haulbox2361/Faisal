@@ -271,6 +271,64 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                           ),
                         ),
                       )
+                    else if (widget.docKey == 'RC' || widget.title.contains('Rate Confirmation') || widget.title.contains('RC'))
+                      Container(
+                        color: const Color(0xFFF8FAFC),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.verified_rounded, size: 20, color: AppColors.emeraldDark),
+                                    SizedBox(width: 6),
+                                    Text('OFFICIAL RATE CONFIRMATION', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.emeraldDark, letterSpacing: 0.5)),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.emeraldSoft,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    widget.load?.displayRcPrice ?? '\$2,450',
+                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.emeraldDark),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 14, color: AppColors.borderLight),
+                            Text(
+                              'Broker: ${widget.load?.brokerName ?? "HaulBoX Logistics"}',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textDark),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Lane: ${widget.load?.pickupCityState ?? "Origin"} → ${widget.load?.dropoffCityState ?? "Destination"}',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Cargo: ${widget.load?.commodity ?? "General Freight"} • ${widget.load?.displayWeightFormatted ?? "42,000 lbs"}',
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                            ),
+                            const SizedBox(height: 6),
+                            const Row(
+                              children: [
+                                Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.emeraldPrimary),
+                                SizedBox(width: 4),
+                                Text('Rate Contract Verified & Dispatched', style: TextStyle(fontSize: 11, color: AppColors.emeraldDark, fontWeight: FontWeight.w700)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      )
                     else
                       Container(
                         color: const Color(0xFFF8FAFC),
