@@ -145,12 +145,15 @@ class DocumentVerificationService {
     required LoadModel load,
     String? base64Image,
     String? authToken,
+    int? stopNumber,
   }) async {
     return _verifyDoc(
       documentType: 'BOL',
       load: load,
       base64Image: base64Image,
       authToken: authToken,
+      stopType: 'PICKUP',
+      stopNumber: stopNumber ?? 1,
     );
   }
 
@@ -159,12 +162,15 @@ class DocumentVerificationService {
     required LoadModel load,
     String? base64Image,
     String? authToken,
+    int? stopNumber,
   }) async {
     return _verifyDoc(
       documentType: 'POD',
       load: load,
       base64Image: base64Image,
       authToken: authToken,
+      stopType: 'DELIVERY',
+      stopNumber: stopNumber ?? 1,
     );
   }
 
@@ -173,6 +179,8 @@ class DocumentVerificationService {
     required LoadModel load,
     String? base64Image,
     String? authToken,
+    String? stopType,
+    int? stopNumber,
   }) async {
     try {
       final uri = Uri.parse('${ApiClient.baseUrl}/api/driver/verify-document');
@@ -185,6 +193,8 @@ class DocumentVerificationService {
         'documentType': documentType,
         'base64Data': base64Image,
         'loadId': load.loadNumber,
+        'stopType': stopType ?? (documentType == 'BOL' ? 'PICKUP' : 'DELIVERY'),
+        'stopNumber': stopNumber ?? 1,
         'loadData': {
           'id': load.id,
           'loadNumber': load.loadNumber,
@@ -194,6 +204,8 @@ class DocumentVerificationService {
           'dropoff': load.dropoff,
           'brokerName': load.brokerName,
           'weight': load.weight ?? 42500,
+          'pickupStops': load.pickupStops.map((e) => e.toJson()).toList(),
+          'deliveryStops': load.deliveryStops.map((e) => e.toJson()).toList(),
         },
       };
 

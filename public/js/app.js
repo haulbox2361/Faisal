@@ -3001,10 +3001,12 @@
         const base64 = dataUrl.split(',')[1];
         const mediaType = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
         const prompt = 'This is a freight broker Rate Confirmation (RC) document. Read it carefully and return ONLY a valid JSON object ' +
-          '(no markdown blocks, no text before or after) with exactly these keys: ' +
+          '(no markdown blocks, no text before or after) with these keys: ' +
           '{"load_number":"","pickup_date":"YYYY-MM-DD or empty","delivery_date":"YYYY-MM-DD or empty",' +
           '"pickup_address":"","pickup_city":"","pickup_state":"2-letter state code","pickup_zip":"5-digit zip code or empty",' +
           '"delivery_address":"","dropoff_city":"","dropoff_state":"2-letter state code","delivery_zip":"5-digit zip code or empty",' +
+          '"pickup_stops":[{"stop_number":1,"facility_name":"","address":"","city":"","state":"","zip":"","scheduled_date":""}],' +
+          '"delivery_stops":[{"stop_number":1,"facility_name":"","address":"","city":"","state":"","zip":"","scheduled_date":""}],' +
           '"miles":number or null,"rate":number or null,"broker_name":"","broker_mc":"","notes":""}.';
 
         console.log('[RC-EXTRACTION] 📄 Starting document extraction for:', file.name, { isPdf, mediaType, size: file.size });
@@ -3082,6 +3084,32 @@
         return '';
       };
 
+      // Multi-stop stops extraction
+      let pickup_stops = Array.isArray(raw.pickup_stops) ? raw.pickup_stops : (Array.isArray(raw.pickups) ? raw.pickups : []);
+      let delivery_stops = Array.isArray(raw.delivery_stops) ? raw.delivery_stops : (Array.isArray(raw.deliveries) ? raw.deliveries : (Array.isArray(raw.drops) ? raw.drops : []));
+
+      pickup_stops = pickup_stops.map((s, i) => ({
+        stop_number: Number(s.stop_number || s.stopNumber || (i + 1)),
+        facility_name: s.facility_name || s.facilityName || s.name || '',
+        address: s.address || s.street || '',
+        city: s.city || '',
+        state: (s.state || '').toUpperCase(),
+        zip: s.zip || s.postal_code || '',
+        scheduled_date: s.scheduled_date || s.scheduledDate || s.date || '',
+        status: 'PENDING',
+      }));
+
+      delivery_stops = delivery_stops.map((s, i) => ({
+        stop_number: Number(s.stop_number || s.stopNumber || (i + 1)),
+        facility_name: s.facility_name || s.facilityName || s.name || '',
+        address: s.address || s.street || '',
+        city: s.city || '',
+        state: (s.state || '').toUpperCase(),
+        zip: s.zip || s.postal_code || '',
+        scheduled_date: s.scheduled_date || s.scheduledDate || s.date || '',
+        status: 'PENDING',
+      }));
+
       return {
         load_number: getVal('load_number', 'loadnumber', 'load_no', 'loadno', 'load', 'load_id', 'loadnum', 'order_number', 'po_number', 'confirmation_number', 'rate_confirm_id'),
         pickup_date: getVal('pickup_date', 'pickupdate', 'ship_date', 'shipdate', 'start_date', 'date_out', 'pickup_time'),
@@ -3094,6 +3122,8 @@
         dropoff_city: getVal('dropoff_city', 'dropoffcity', 'delivery_city', 'deliverycity', 'destination_city', 'consignee_city'),
         dropoff_state: getVal('dropoff_state', 'dropoffstate', 'delivery_state', 'deliverystate', 'destination_state', 'consignee_state'),
         delivery_zip: getVal('delivery_zip', 'deliveryzip', 'dropoff_zip', 'dropoffzip', 'destination_zip', 'consignee_zip'),
+        pickup_stops,
+        delivery_stops,
         miles: getVal('miles', 'total_miles', 'distance', 'trip_miles'),
         rate: getVal('rate', 'gross_rate', 'total_rate', 'total_pay', 'amount', 'flat_rate', 'total', 'agreed_amount', 'linehaul', 'total_amount'),
         broker_name: getVal('broker_name', 'brokername', 'broker', 'company', 'issued_by', 'customer'),
@@ -3167,6 +3197,18 @@
         if (!isNaN(num) && num > 0) setField('f-rate', num, 'Rate', 'rate');
       }
       if (d.notes) { setField('f-notes', String(d.notes).trim(), 'Notes', 'notes'); }
+
+      if ((d.pickup_stops && d.pickup_stops.length > 0) || (d.delivery_stops && d.delivery_stops.length > 0)) {
+        window._pendingExtractedStops = {
+          pickupStops: d.pickup_stops || [],
+          deliveryStops: d.delivery_stops || [],
+        };
+        const pCount = (d.pickup_stops || []).length;
+        const dCount = (d.delivery_stops || []).length;
+        if (pCount > 1 || dCount > 1) {
+          filled.push(`${pCount} Pickups, ${dCount} Deliveries`);
+        }
+      }
 
       validateLoadDates();
       recalcRevenue();
@@ -3559,6 +3601,13 @@
         broker_email: broker ? (broker.email || '') : '',
         email_subject: null,
       };
+
+      if (window._pendingExtractedStops) {
+        load.pickupStops = window._pendingExtractedStops.pickupStops || [];
+        load.deliveryStops = window._pendingExtractedStops.deliveryStops || [];
+        window._pendingExtractedStops = null;
+      }
+
       // Attach the RC file itself so the load opens at Booked, with the RC already on file.
       const rcFile = rcInput.files[0];
       let rcData = null;
@@ -4213,8 +4262,11 @@
       if (!l) return;
       const docs = l.docs || l.documents || {};
       let file = null;
-      if (['RC', 'BOL', 'POD'].includes(key)) file = docs[key];
-      else if (Array.isArray(docs[key])) file = docs[key][index || 0];
+      if (['RC', 'BOL', 'POD'].includes(key) || key.startsWith('BOL_') || key.startsWith('POD_')) {
+        file = docs[key] || (key.startsWith('BOL_') ? docs.BOL : (key.startsWith('POD_') ? docs.POD : null));
+      } else if (Array.isArray(docs[key])) {
+        file = docs[key][index || 0];
+      }
 
       if (file && (file.data || file.url)) {
         openDocumentViewer(file.data || file.url, file.name || file.fileName || `${key}`, key);
@@ -4224,6 +4276,66 @@
     };
 
     function renderDocSlots(l) {
+      const hasMultiPickup = (l.pickupStops && l.pickupStops.length > 1);
+      const hasMultiDelivery = (l.deliveryStops && l.deliveryStops.length > 1);
+      let multiStopSection = '';
+
+      if (hasMultiPickup || hasMultiDelivery) {
+        multiStopSection = `
+          <div style="background:var(--bg-subtle,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:12px;margin-bottom:14px;">
+            <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:8px;">Multi-Stop Document Verification</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;">
+              <div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;">Pickup Stops (${l.pickupStops ? l.pickupStops.length : 1})</div>
+                ${(l.pickupStops || []).map(s => {
+                  const sNum = s.stop_number || s.stopNumber || 1;
+                  const doc = l.docs['BOL_' + sNum] || (sNum === 1 ? l.docs.BOL : null);
+                  const isApproved = s.status === 'BOL_APPROVED' || (doc && doc.status === 'Approved');
+                  const isRejected = s.status === 'BOL_REJECTED' || (doc && doc.status === 'Rejected');
+                  const badgeColor = isApproved ? '#10b981' : (isRejected ? '#ef4444' : '#f59e0b');
+                  const badgeLabel = isApproved ? 'Approved' : (isRejected ? 'Rejected' : 'Pending');
+                  return `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:4px;">
+                      <div>
+                        <div style="font-size:12px;font-weight:600;">Stop ${sNum}: ${escapeAttr(s.city || s.address || 'Pickup')}</div>
+                        <div style="font-size:10px;color:var(--text-faint);">${escapeAttr(s.facility_name || s.facilityName || '')}</div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${badgeColor}15;color:${badgeColor};font-weight:700;">${badgeLabel}</span>
+                        ${doc ? `<button type="button" class="btn btn-sm btn-accent" style="font-size:10px;padding:2px 6px;" onclick="viewLoadDocument('${l.id}','BOL_${sNum}')">View BOL</button>` : ''}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;">Delivery Stops (${l.deliveryStops ? l.deliveryStops.length : 1})</div>
+                ${(l.deliveryStops || []).map(s => {
+                  const sNum = s.stop_number || s.stopNumber || 1;
+                  const doc = l.docs['POD_' + sNum] || (sNum === 1 ? l.docs.POD : null);
+                  const isApproved = s.status === 'POD_APPROVED' || (doc && doc.status === 'Approved');
+                  const isRejected = s.status === 'POD_REJECTED' || (doc && doc.status === 'Rejected');
+                  const badgeColor = isApproved ? '#10b981' : (isRejected ? '#ef4444' : '#f59e0b');
+                  const badgeLabel = isApproved ? 'Approved' : (isRejected ? 'Rejected' : 'Pending');
+                  return `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:4px;">
+                      <div>
+                        <div style="font-size:12px;font-weight:600;">Stop ${sNum}: ${escapeAttr(s.city || s.address || 'Delivery')}</div>
+                        <div style="font-size:10px;color:var(--text-faint);">${escapeAttr(s.facility_name || s.facilityName || '')}</div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${badgeColor}15;color:${badgeColor};font-weight:700;">${badgeLabel}</span>
+                        ${doc ? `<button type="button" class="btn btn-sm btn-accent" style="font-size:10px;padding:2px 6px;" onclick="viewLoadDocument('${l.id}','POD_${sNum}')">View POD</button>` : ''}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
       const slots = [
         { key: 'RC', label: 'Rate Confirmation', hint: 'Required — books the load' },
         { key: 'BOL', label: 'Bill of Lading', hint: 'Moves the load to Loaded — checked against pickup address' },
@@ -4233,7 +4345,7 @@
         { key: 'Extra', label: 'Extra Documents', hint: 'Any other paperwork for this load — lumper receipts, detention, accessorials, etc.' },
       ];
       const anyDocs = l.docs.RC || l.docs.BOL || l.docs.POD || (l.docs.PhotosPU && l.docs.PhotosPU.length) || (l.docs.PhotosDO && l.docs.PhotosDO.length) || (l.docs.Extra && l.docs.Extra.length);
-      return '<div class="doc-grid">' + slots.map(s => {
+      return multiStopSection + '<div class="doc-grid">' + slots.map(s => {
         const isArray = ARRAY_DOC_KEYS.includes(s.key);
         const isPhoto = PHOTO_KEYS.includes(s.key);
         const arr = isArray ? (l.docs[s.key] || []) : null;

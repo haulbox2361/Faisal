@@ -1,3 +1,57 @@
+class StopModel {
+  final int stopNumber;
+  final String facilityName;
+  final String address;
+  final String city;
+  final String state;
+  final String? zip;
+  final String? scheduledDate;
+  final String status; // 'PENDING', 'ARRIVED', 'BOL_APPROVED', 'BOL_REJECTED', 'POD_APPROVED', 'POD_REJECTED'
+  final bool hasDoc;
+  final String docStatus;
+
+  StopModel({
+    required this.stopNumber,
+    required this.facilityName,
+    required this.address,
+    required this.city,
+    required this.state,
+    this.zip,
+    this.scheduledDate,
+    this.status = 'PENDING',
+    this.hasDoc = false,
+    this.docStatus = 'PENDING',
+  });
+
+  factory StopModel.fromJson(Map<String, dynamic> json) {
+    return StopModel(
+      stopNumber: json['stopNumber'] ?? json['stop_number'] ?? 1,
+      facilityName: json['facilityName']?.toString() ?? json['facility_name']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
+      city: json['city']?.toString() ?? '',
+      state: json['state']?.toString() ?? '',
+      zip: json['zip']?.toString(),
+      scheduledDate: json['scheduledDate']?.toString() ?? json['scheduled_date']?.toString(),
+      status: (json['status']?.toString() ?? 'PENDING').toUpperCase(),
+      hasDoc: json['hasDoc'] == true,
+      docStatus: json['docStatus']?.toString() ?? 'PENDING',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'stopNumber': stopNumber,
+    'facilityName': facilityName,
+    'address': address,
+    'city': city,
+    'state': state,
+    'zip': zip,
+    'scheduledDate': scheduledDate,
+    'status': status,
+    'hasDoc': hasDoc,
+    'docStatus': docStatus,
+  };
+}
+
 class LoadModel {
   final String id;
   final String loadNumber;
@@ -34,6 +88,8 @@ class LoadModel {
   final List<String> loadingPhotos;
   final List<String> unloadingPhotos;
   final Map<String, dynamic>? documents;
+  final List<StopModel> pickupStops;
+  final List<StopModel> deliveryStops;
 
   LoadModel({
     required this.id,
@@ -71,13 +127,18 @@ class LoadModel {
     this.loadingPhotos = const [],
     this.unloadingPhotos = const [],
     this.documents,
+    this.pickupStops = const [],
+    this.deliveryStops = const [],
   });
+
+  bool get isMultiStop => pickupStops.length > 1 || deliveryStops.length > 1;
 
   LoadModel copyWith({
     String? id,
     String? loadNumber,
     String? brokerName,
     dynamic driverPay,
+    dynamic grossAmount,
     String? status,
     String? driverProgress,
     String? pickup,
@@ -108,12 +169,15 @@ class LoadModel {
     List<String>? loadingPhotos,
     List<String>? unloadingPhotos,
     Map<String, dynamic>? documents,
+    List<StopModel>? pickupStops,
+    List<StopModel>? deliveryStops,
   }) {
     return LoadModel(
       id: id ?? this.id,
       loadNumber: loadNumber ?? this.loadNumber,
       brokerName: brokerName ?? this.brokerName,
       driverPay: driverPay ?? this.driverPay,
+      grossAmount: grossAmount ?? this.grossAmount,
       status: status ?? this.status,
       driverProgress: driverProgress ?? this.driverProgress,
       pickup: pickup ?? this.pickup,
@@ -144,6 +208,8 @@ class LoadModel {
       loadingPhotos: loadingPhotos ?? this.loadingPhotos,
       unloadingPhotos: unloadingPhotos ?? this.unloadingPhotos,
       documents: documents ?? this.documents,
+      pickupStops: pickupStops ?? this.pickupStops,
+      deliveryStops: deliveryStops ?? this.deliveryStops,
     );
   }
 
@@ -161,6 +227,12 @@ class LoadModel {
         podSt = 'VERIFIED';
       }
     }
+
+    final pStopsRaw = json['pickupStops'] as List? ?? json['pickup_stops'] as List?;
+    final dStopsRaw = json['deliveryStops'] as List? ?? json['delivery_stops'] as List?;
+
+    final pStops = pStopsRaw?.map((e) => StopModel.fromJson(e as Map<String, dynamic>)).toList() ?? [];
+    final dStops = dStopsRaw?.map((e) => StopModel.fromJson(e as Map<String, dynamic>)).toList() ?? [];
 
     return LoadModel(
       id: json['id']?.toString() ?? '',
@@ -198,6 +270,8 @@ class LoadModel {
       loadingPhotos: (json['loadingPhotos'] as List?)?.map((e) => e.toString()).toList() ?? [],
       unloadingPhotos: (json['unloadingPhotos'] as List?)?.map((e) => e.toString()).toList() ?? [],
       documents: docs,
+      pickupStops: pStops,
+      deliveryStops: dStops,
     );
   }
 
@@ -228,6 +302,8 @@ class LoadModel {
     'podStatus': podStatus,
     'paymentStatus': paymentStatus,
     'paymentDate': paymentDate,
+    'pickupStops': pickupStops.map((e) => e.toJson()).toList(),
+    'deliveryStops': deliveryStops.map((e) => e.toJson()).toList(),
   };
 
   Map<String, dynamic>? get docs => documents;

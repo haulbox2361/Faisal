@@ -348,7 +348,7 @@ class ApiClient {
   }
 
   // 14. Fetch Document Payload (Base64 / Image / PDF)
-  static Future<Map<String, dynamic>?> fetchDocument(String token, String loadId, String key, {int? index}) async {
+  static Future<Map<String, dynamic>?> fetchDocument(String token, String loadId, String key, {int? index, int? stopNumber}) async {
     final uri = Uri.parse('$baseUrl/api/driver/doc');
     try {
       final response = await http.post(
@@ -361,6 +361,7 @@ class ApiClient {
           'loadId': loadId,
           'key': key,
           if (index != null) 'index': index,
+          if (stopNumber != null) 'stopNumber': stopNumber,
         }),
       ).timeout(const Duration(seconds: 15));
 

@@ -232,9 +232,10 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
     });
   }
 
-  // 2. CONSOLIDATED DOCUMENT UPLOAD SHEET (BOL & POD)
-  void _openDocumentUploadSheet(LoadModel load, {required bool isBol}) {
-    final docTypeTitle = isBol ? 'Bill of Lading (BOL)' : 'Proof of Delivery (POD)';
+  // 2. DOCUMENT UPLOAD ACTIONS (Camera vs Gallery Pickers)
+  void _openDocumentUploadSheet(LoadModel load, {required bool isBol, int stopNumber = 1}) {
+    final stopLabel = load.isMultiStop ? ' (Stop $stopNumber)' : '';
+    final docTypeTitle = isBol ? 'Bill of Lading (BOL)$stopLabel' : 'Proof of Delivery (POD)$stopLabel';
 
     showModalBottomSheet(
       context: context,
@@ -244,18 +245,11 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.borderLight,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.borderLight, borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 16),
               Text(
                 'Upload $docTypeTitle',
@@ -283,7 +277,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
                 subtitle: const Text('Primary Recommended Camera Action', style: TextStyle(color: AppColors.emeraldPrimary, fontSize: 11.5, fontWeight: FontWeight.w600)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _runDocumentAiVerification(load, isBol: isBol);
+                  _runDocumentAiVerification(load, isBol: isBol, stopNumber: stopNumber);
                 },
               ),
               const Divider(color: AppColors.borderLight, height: 1),
@@ -299,7 +293,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
                 title: Text('Choose $docTypeTitle from Gallery / PDF', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _runDocumentAiVerification(load, isBol: isBol);
+                  _runDocumentAiVerification(load, isBol: isBol, stopNumber: stopNumber);
                 },
               ),
             ],
@@ -310,13 +304,14 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
   }
 
   // 3. AI DOCUMENT VERIFICATION (BOL & POD)
-  Future<void> _runDocumentAiVerification(LoadModel load, {required bool isBol}) async {
+  Future<void> _runDocumentAiVerification(LoadModel load, {required bool isBol, int stopNumber = 1}) async {
     final docType = isBol ? 'BOL' : 'POD';
+    final stopLabel = load.isMultiStop ? ' (Stop $stopNumber)' : '';
 
     // 1. Launch Camera Capture with Real-Time Quality Check
     final file = await DocumentCameraScreen.capture(
       context,
-      slotLabel: isBol ? 'Bill of Lading (BOL)' : 'Proof of Delivery (POD)',
+      slotLabel: isBol ? 'Bill of Lading (BOL)$stopLabel' : 'Proof of Delivery (POD)$stopLabel',
       loadNumber: load.loadNumber,
     );
 
@@ -324,7 +319,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'AI is analyzing $docType with Mistral Vision OCR...';
+      _statusMessage = 'AI is analyzing $docType$stopLabel with Mistral Vision OCR...';
     });
 
     try {
@@ -334,8 +329,8 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       final token = auth.token;
 
       final result = isBol
-          ? await DocumentVerificationService.verifyBol(load: load, base64Image: base64Image, authToken: token)
-          : await DocumentVerificationService.verifyPod(load: load, base64Image: base64Image, authToken: token);
+          ? await DocumentVerificationService.verifyBol(load: load, base64Image: base64Image, authToken: token, stopNumber: stopNumber)
+          : await DocumentVerificationService.verifyPod(load: load, base64Image: base64Image, authToken: token, stopNumber: stopNumber);
 
       if (!mounted) return;
 
@@ -345,14 +340,20 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       });
 
       if (result.isApproved) {
-        // Outcome 1: APPROVED -> Show green modal + Auto-advance load status
+        // Outcome 1: APPROVED -> Sync data
         await auth.syncAllData();
 
         setState(() {
           if (isBol) {
-            _workflowState = LoadWorkflowState.loaded;
+            final allDone = load.pickupStops.isNotEmpty
+                ? load.pickupStops.every((s) => s.stopNumber == stopNumber || s.status == 'BOL_APPROVED')
+                : true;
+            if (allDone) _workflowState = LoadWorkflowState.loaded;
           } else {
-            _workflowState = LoadWorkflowState.delivered;
+            final allDone = load.deliveryStops.isNotEmpty
+                ? load.deliveryStops.every((s) => s.stopNumber == stopNumber || s.status == 'POD_APPROVED')
+                : true;
+            if (allDone) _workflowState = LoadWorkflowState.delivered;
           }
         });
 
@@ -366,11 +367,11 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
                 children: [
                   const Icon(Icons.check_circle_rounded, color: AppColors.emeraldPrimary, size: 28),
                   const SizedBox(width: 10),
-                  Text('✓ $docType Approved', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+                  Text('✓ $docType$stopLabel Approved', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
                 ],
               ),
               content: Text(
-                'AI OCR verified all details successfully. Load status has been updated to ${isBol ? "Loaded" : "Delivered"}.',
+                'AI OCR verified all details for Stop $stopNumber successfully.',
                 style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
               actions: [
@@ -669,6 +670,8 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
               load: load,
               onUploadBol: () => _openDocumentUploadSheet(load, isBol: true),
               onUploadPod: () => _openDocumentUploadSheet(load, isBol: false),
+              onUploadStopBol: (sNum) => _openDocumentUploadSheet(load, isBol: true, stopNumber: sNum),
+              onUploadStopPod: (sNum) => _openDocumentUploadSheet(load, isBol: false, stopNumber: sNum),
             ),
           ],
         ),

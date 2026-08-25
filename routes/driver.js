@@ -364,6 +364,60 @@ function shapeLoadForDriver(l, driverId) {
   // Show driver the full Rate Con (RC) price clearly (not reduced to 80%)
   const fullRcRate = Number(l.brokerRate || l.rate || l.grossAmount || l.driverPay || 0);
 
+  // Format per-stop metadata for driver mobile app
+  const formatStop = (s, idx, type) => {
+    if (!s) return null;
+    const sNum = Number(s.stop_number || s.stopNumber || (idx + 1));
+    const docKey = type === 'PICKUP' ? `BOL_${sNum}` : `POD_${sNum}`;
+    const legacyKey = type === 'PICKUP' ? 'BOL' : 'POD';
+    const stopDoc = docs[docKey] || (sNum === 1 ? docs[legacyKey] : null);
+    return {
+      stopNumber: sNum,
+      facilityName: s.facility_name || s.facilityName || `${type === 'PICKUP' ? 'Shipper Stop' : 'Receiver Stop'} ${sNum}`,
+      address: s.address || s.city || '',
+      city: s.city || (s.address ? s.address.split(',')[0].trim() : ''),
+      state: s.state || (s.address ? (s.address.split(',')[1] || '').trim().slice(0, 2) : ''),
+      zip: s.zip || null,
+      scheduledDate: s.scheduled_date || s.scheduledDate || s.date || null,
+      status: s.status || (stopDoc && stopDoc.status === 'Approved' ? (type === 'PICKUP' ? 'BOL_APPROVED' : 'POD_APPROVED') : 'PENDING'),
+      hasDoc: Boolean(stopDoc && (stopDoc.hasFile || stopDoc.data || stopDoc.fileName)),
+      docStatus: stopDoc?.status || 'PENDING',
+    };
+  };
+
+  const rawPickups = l.pickupStops || l.pickup_stops || [];
+  const rawDeliveries = l.deliveryStops || l.delivery_stops || [];
+
+  const pickupStops = rawPickups.length > 0
+    ? rawPickups.map((s, idx) => formatStop(s, idx, 'PICKUP')).filter(Boolean)
+    : [{
+        stopNumber: 1,
+        facilityName: 'Shipper Facility',
+        address: l.pickupAddress || l.pickup || '',
+        city: l.pickup ? l.pickup.split(',')[0].trim() : '',
+        state: l.pickup ? (l.pickup.split(',')[1] || '').trim().slice(0, 2) : '',
+        zip: null,
+        scheduledDate: l.pickupDate || null,
+        status: (l.status === 'Loaded' || l.status === 'Drop-off' || l.driverProgress === 'LOADED' || l.driverProgress === 'DELIVERED') ? 'BOL_APPROVED' : 'PENDING',
+        hasDoc: Boolean(docs.BOL && (docs.BOL.hasFile || docs.BOL.data || docs.BOL.fileName)),
+        docStatus: docs.BOL?.status || 'PENDING',
+      }];
+
+  const deliveryStops = rawDeliveries.length > 0
+    ? rawDeliveries.map((s, idx) => formatStop(s, idx, 'DELIVERY')).filter(Boolean)
+    : [{
+        stopNumber: 1,
+        facilityName: 'Receiver Receiving Dock',
+        address: l.dropoffAddress || l.dropoff || '',
+        city: l.dropoff ? l.dropoff.split(',')[0].trim() : '',
+        state: l.dropoff ? (l.dropoff.split(',')[1] || '').trim().slice(0, 2) : '',
+        zip: null,
+        scheduledDate: l.deliveryDate || null,
+        status: (l.status === 'Drop-off' || l.driverProgress === 'DELIVERED') ? 'POD_APPROVED' : 'PENDING',
+        hasDoc: Boolean(docs.POD && (docs.POD.hasFile || docs.POD.data || docs.POD.fileName)),
+        docStatus: docs.POD?.status || 'PENDING',
+      }];
+
   return {
     id: l.id,
     loadNumber: l.loadNumber,
@@ -383,6 +437,8 @@ function shapeLoadForDriver(l, driverId) {
     pickupTime: l.pickupTime,
     deliveryDate: l.deliveryDate,
     deliveryTime: l.deliveryTime,
+    pickupStops,
+    deliveryStops,
     miles: l.miles,
     milesRemaining: l.milesRemaining,
     eta: l.eta,
@@ -1152,11 +1208,11 @@ router.post('/api/driver/loads/:id/eta', async (req, res) => {
 // Documents (load-level: RC/BOL/POD/photos)
 // ---------------------------------------------------------------------------
 
-// POST /api/driver/doc  { driverId?, pin?, loadId, key, index? }  (or Bearer token)
+// POST /api/driver/doc  { driverId?, pin?, loadId, key, index?, stopNumber? }  (or Bearer token)
 router.post('/api/driver/doc', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
-  const { loadId, key, index } = req.body || {};
+  const { loadId, key, index, stopNumber } = req.body || {};
   const { state, driver } = ctx;
 
   const load = (state.loads || []).find((l) => (l.id === loadId || l.loadNumber === loadId) && l.driverId === driver.id);
@@ -1164,8 +1220,15 @@ router.post('/api/driver/doc', async (req, res) => {
 
   const docs = load.docs || load.documents || {};
   let file = null;
-  if (['RC', 'BOL', 'POD'].includes(key)) file = docs[key];
-  else if (['PhotosPU', 'PhotosDO', 'Extra'].includes(key)) file = (docs[key] || [])[index];
+  if (['RC', 'BOL', 'POD'].includes(key)) {
+    if (stopNumber && Number(stopNumber) > 1) {
+      file = docs[`${key}_${stopNumber}`] || docs[key];
+    } else {
+      file = docs[key] || (stopNumber ? docs[`${key}_${stopNumber}`] : null);
+    }
+  } else if (['PhotosPU', 'PhotosDO', 'Extra'].includes(key)) {
+    file = (docs[key] || [])[index || 0];
+  }
 
   if (!file || !file.data) {
     return res.status(404).json({ error: 'File not available on file server' });
@@ -1173,12 +1236,13 @@ router.post('/api/driver/doc', async (req, res) => {
   res.json({ ok: true, name: file.name || file.fileName || `${key}_Document`, data: file.data, mimeType: file.mimeType || 'image/jpeg', status: file.status || 'Approved' });
 });
 
-// GET /api/driver/doc/:loadId/:key (or Bearer token / ?token=query)
+// GET /api/driver/doc/:loadId/:key (or Bearer token / ?token=query&stopNumber=1)
 router.get('/api/driver/doc/:loadId/:key', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
   const { loadId, key } = req.params;
   const index = req.query.index ? parseInt(req.query.index, 10) : undefined;
+  const stopNumber = req.query.stopNumber ? parseInt(req.query.stopNumber, 10) : undefined;
   const { state, driver } = ctx;
 
   const load = (state.loads || []).find((l) => (l.id === loadId || l.loadNumber === loadId) && l.driverId === driver.id);
@@ -1186,8 +1250,15 @@ router.get('/api/driver/doc/:loadId/:key', async (req, res) => {
 
   const docs = load.docs || load.documents || {};
   let file = null;
-  if (['RC', 'BOL', 'POD'].includes(key)) file = docs[key];
-  else if (['PhotosPU', 'PhotosDO', 'Extra'].includes(key)) file = (docs[key] || [])[index || 0];
+  if (['RC', 'BOL', 'POD'].includes(key)) {
+    if (stopNumber && Number(stopNumber) > 1) {
+      file = docs[`${key}_${stopNumber}`] || docs[key];
+    } else {
+      file = docs[key] || (stopNumber ? docs[`${key}_${stopNumber}`] : null);
+    }
+  } else if (['PhotosPU', 'PhotosDO', 'Extra'].includes(key)) {
+    file = (docs[key] || [])[index || 0];
+  }
 
   if (!file || !file.data) {
     return res.status(404).json({ error: 'Document data not available' });
@@ -1197,9 +1268,9 @@ router.get('/api/driver/doc/:loadId/:key', async (req, res) => {
 
 const DRIVER_UPLOAD_CAPS = { BOL: 1, POD: 1, PhotosPU: 6, PhotosDO: 6, Extra: 6 };
 
-// POST /api/driver/upload-doc  { driverId?, pin?, loadId, key, fileName, mimeType, data }  (or Bearer token)
+// POST /api/driver/upload-doc  { driverId?, pin?, loadId, key, fileName, mimeType, data, stopType, stopNumber }  (or Bearer token)
 router.post('/api/driver/upload-doc', async (req, res) => {
-  const { key, fileName, data } = req.body || {};
+  const { key, fileName, data, stopType, stopNumber } = req.body || {};
   if (!Object.prototype.hasOwnProperty.call(DRIVER_UPLOAD_CAPS, key)) {
     return res.status(400).json({ error: 'Drivers cannot upload that document type.' });
   }
@@ -1215,10 +1286,21 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   const load = (state.loads || []).find((l) => l.id === loadId && l.driverId === driver.id);
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
+  // Security check: reject cross-stop type uploads
+  const effStopType = (stopType || (key === 'BOL' ? 'PICKUP' : 'DELIVERY')).toUpperCase();
+  if (key === 'BOL' && effStopType === 'DELIVERY') {
+    return res.status(400).json({ error: 'Cannot upload BOL for a delivery stop' });
+  }
+  if (key === 'POD' && effStopType === 'PICKUP') {
+    return res.status(400).json({ error: 'Cannot upload POD for a pickup stop' });
+  }
+
   load.docs = load.docs || {};
   load.timestamps = load.timestamps || {};
   const nowIso = new Date().toISOString();
   const isArray = ['PhotosPU', 'PhotosDO', 'Extra'].includes(key);
+  const effStopNum = stopNumber != null ? Number(stopNumber) : 1;
+  const docKey = effStopNum > 1 ? `${key}_${effStopNum}` : key;
   let docStatus = 'Pending Verification';
   let rejectionReason = null;
   let validationIssues = [];
@@ -1229,8 +1311,18 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     const validation = validateBolDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
     if (validation.overallStatus === 'APPROVED') {
       docStatus = 'Approved';
-      load.status = 'Loaded';
-      load.driverProgress = 'LOADED';
+      // Only advance if all pickups approved
+      if (load.pickupStops) {
+        const pStop = load.pickupStops.find(s => (s.stop_number || s.stopNumber) === effStopNum);
+        if (pStop) pStop.status = 'BOL_APPROVED';
+        if (load.pickupStops.every(s => s.status === 'BOL_APPROVED')) {
+          load.status = 'Loaded';
+          load.driverProgress = 'LOADED';
+        }
+      } else {
+        load.status = 'Loaded';
+        load.driverProgress = 'LOADED';
+      }
     } else {
       docStatus = 'Pending Verification';
       rejectionReason = validation.issues && validation.issues.length ? validation.issues.map(i => i.description).join(' ') : 'Flagged for dispatcher review';
@@ -1241,10 +1333,21 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     const validation = validatePodDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
     if (validation.overallStatus === 'APPROVED') {
       docStatus = 'Approved';
-      load.status = 'POD Uploaded';
-      load.driverProgress = 'POD_UPLOADED';
-      const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
-      if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
+      if (load.deliveryStops) {
+        const dStop = load.deliveryStops.find(s => (s.stop_number || s.stopNumber) === effStopNum);
+        if (dStop) dStop.status = 'POD_APPROVED';
+        if (load.deliveryStops.every(s => s.status === 'POD_APPROVED')) {
+          load.status = 'POD Uploaded';
+          load.driverProgress = 'POD_UPLOADED';
+          const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
+          if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
+        }
+      } else {
+        load.status = 'POD Uploaded';
+        load.driverProgress = 'POD_UPLOADED';
+        const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
+        if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
+      }
     } else {
       docStatus = 'Pending Verification';
       rejectionReason = validation.issues && validation.issues.length ? validation.issues.map(i => i.description).join(' ') : 'Flagged for dispatcher review';
@@ -1263,7 +1366,9 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     uploadedBy: driver.name || driver.id,
     status: docStatus,
     rejectionReason: rejectionReason,
-    validationIssues: validationIssues
+    validationIssues: validationIssues,
+    stopType: effStopType,
+    stopNumber: effStopNum,
   };
 
   if (isArray) {
@@ -1274,7 +1379,8 @@ router.post('/api/driver/upload-doc', async (req, res) => {
     }
     arr.push(rec);
   } else {
-    load.docs[key] = rec;
+    load.docs[docKey] = rec;
+    if (effStopNum === 1) load.docs[key] = rec;
   }
 
   try {
@@ -1285,14 +1391,14 @@ router.post('/api/driver/upload-doc', async (req, res) => {
       type: 'document_uploaded',
       title: `${driver.name || 'Driver'} uploaded ${key} (${docStatus === 'Approved' ? 'Auto-Approved' : 'Needs Review'})`,
       body: `Load #${load.loadNumber || load.id} — ${fileName}` + (docStatus === 'Approved' ? ' — AI Verified & Approved' : ` — ${rejectionReason || 'Pending Review'}`),
-      data: { loadId: load.id, key, status: docStatus },
+      data: { loadId: load.id, key, status: docStatus, stopType: effStopType, stopNumber: effStopNum },
     };
     await notifications.create('admin', 'admin', notifPayload);
     if (load.dispatcherId) {
       await notifications.create('dispatcher', load.dispatcherId, notifPayload);
     }
 
-    res.json({ ok: true, load: shapeLoadForDriver(load), validation: { status: docStatus, reason: rejectionReason } });
+    res.json({ ok: true, load: shapeLoadForDriver(load, driver.id), validation: { status: docStatus, reason: rejectionReason } });
   } catch (e) {
     console.error('driver upload failed:', e);
     res.status(500).json({ error: 'Upload failed. Try again.' });
@@ -1827,45 +1933,12 @@ router.post('/api/driver/chats/:id/messages', async (req, res) => {
   }
 });
 
-// POST /api/driver/device-token  { token, platform }
-// Registers native Android FCM push notification token for the authenticated driver
-router.post('/api/driver/device-token', async (req, res) => {
-  const ctx = await requireDriver(req, res);
-  if (!ctx) return;
-  const { token, platform } = req.body || {};
-  if (!token) return res.status(400).json({ error: 'Missing device token' });
-
-  try {
-    const ok = await fcm.registerDeviceToken(ctx.driver.id, token, platform || 'android');
-    res.json({ ok, message: 'Device token registered successfully' });
-  } catch (e) {
-    console.error('driver device token register failed:', e);
-    res.status(500).json({ error: 'Failed to register device token' });
-  }
-});
-
-// POST /api/driver/device-token/remove  { token }
-// Removes device token on driver logout
-router.post('/api/driver/device-token/remove', async (req, res) => {
-  const ctx = await requireDriver(req, res);
-  if (!ctx) return;
-  const { token } = req.body || {};
-
-  try {
-    const ok = await fcm.removeDeviceToken(ctx.driver.id, token);
-    res.json({ ok, message: 'Device token removed successfully' });
-  } catch (e) {
-    console.error('driver device token remove failed:', e);
-    res.status(500).json({ error: 'Failed to remove device token' });
-  }
-});
-
-// POST /api/driver/verify-document  { documentType, base64Data, base64, mimeType, loadData, loadId }
+// POST /api/driver/verify-document  { documentType, base64Data, base64, mimeType, loadData, loadId, stopType, stopNumber }
 // Performs automated AI quality check, OCR, signature detection, and RC validation for BOL / POD
 router.post('/api/driver/verify-document', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
-  const { documentType, base64Data, base64, mimeType, loadData, loadId } = req.body || {};
+  const { documentType, base64Data, base64, mimeType, loadData, loadId, stopType, stopNumber } = req.body || {};
   const imageBase64 = base64Data || base64;
 
   if (!documentType || (!['BOL', 'POD'].includes(documentType.toUpperCase()))) {
@@ -1874,12 +1947,47 @@ router.post('/api/driver/verify-document', async (req, res) => {
 
   const effectiveLoadId = loadId || (loadData && (loadData.loadNumber || loadData.id)) || 'HB-1042';
   const io = req.app.get('io') || global.io;
+  const { state, driver } = ctx;
+
+  const load = (state.loads || []).find((l) => String(l.id) === String(effectiveLoadId) || String(l.loadNumber) === String(effectiveLoadId)) || currentActiveLoad(state, driver.id);
+  if (!load) return res.status(404).json({ error: 'Load not found' });
+
+  // Security check: driver authorization
+  if (load.driverId && String(load.driverId) !== String(driver.id)) {
+    return res.status(403).json({ error: 'Unauthorized: load not assigned to this driver' });
+  }
+
+  // Security check: reject stopType mismatches
+  const effStopType = (stopType || (documentType.toUpperCase() === 'BOL' ? 'PICKUP' : 'DELIVERY')).toUpperCase();
+  if (documentType.toUpperCase() === 'BOL' && effStopType === 'DELIVERY') {
+    return res.status(400).json({ error: 'Cannot upload BOL for a delivery stop' });
+  }
+  if (documentType.toUpperCase() === 'POD' && effStopType === 'PICKUP') {
+    return res.status(400).json({ error: 'Cannot upload POD for a pickup stop' });
+  }
+
+  const effStopNum = stopNumber != null ? Number(stopNumber) : 1;
+  if (isNaN(effStopNum) || effStopNum < 1) {
+    return res.status(400).json({ error: 'Invalid stop number. Must be >= 1.' });
+  }
+
+  // Explicit stop existence & identity check independent of address OCR
+  const pStops = Array.isArray(load.pickupStops) ? load.pickupStops : [];
+  const dStops = Array.isArray(load.deliveryStops) ? load.deliveryStops : [];
+  if (effStopType === 'PICKUP' && pStops.length > 0 && effStopNum > pStops.length) {
+    return res.status(400).json({ error: `Invalid pickup stop number ${effStopNum}. Load only has ${pStops.length} pickup stop(s).` });
+  }
+  if (effStopType === 'DELIVERY' && dStops.length > 0 && effStopNum > dStops.length) {
+    return res.status(400).json({ error: `Invalid delivery stop number ${effStopNum}. Load only has ${dStops.length} delivery stop(s).` });
+  }
 
   // Emit WebSocket processing event
   if (io) {
     io.emit('document:uploaded', {
       loadId: effectiveLoadId,
       documentType: documentType.toUpperCase(),
+      stopType: effStopType,
+      stopNumber: effStopNum,
       status: 'PROCESSING',
       driverId: ctx.driver.id,
       timestamp: new Date().toISOString(),
@@ -1888,8 +1996,7 @@ router.post('/api/driver/verify-document', async (req, res) => {
 
   try {
     const verifier = require('../lib/aiDocumentVerifier');
-    const { state, driver } = ctx;
-    const load = (state.loads || []).find((l) => String(l.id) === String(effectiveLoadId) || String(l.loadNumber) === String(effectiveLoadId)) || currentActiveLoad(state, driver.id);
+    const db = require('../lib/db');
 
     const result = await verifier.verifyDocument({
       documentType: documentType.toUpperCase(),
@@ -1897,58 +2004,90 @@ router.post('/api/driver/verify-document', async (req, res) => {
       mimeType: mimeType || 'image/jpeg',
       loadData: load || loadData || { loadNumber: effectiveLoadId, id: effectiveLoadId },
       driverId: driver.id,
+      stopType: effStopType,
+      stopNumber: effStopNum,
     });
 
-    // Fail closed: if result.status is somehow missing, go to PENDING_REVIEW, never APPROVED
+    // Fail closed: if result.status is missing, go to PENDING_REVIEW, never APPROVED
     const status = result.status || result.overallStatus || 'PENDING_REVIEW';
     const nowIso = new Date().toISOString();
+    const docKey = documentType.toUpperCase();
+    const storageKey = effStopNum > 1 ? `${docKey}_${effStopNum}` : docKey;
 
     // 1. Save document to load in system state
-    if (load) {
-      load.docs = load.docs || load.documents || {};
-      load.documents = load.docs;
-      const docKey = documentType.toUpperCase();
-      load.docs[docKey] = {
-        name: `${docKey}_${load.loadNumber || load.id}.jpg`,
-        fileName: `${docKey}_${load.loadNumber || load.id}.jpg`,
-        data: imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`) : null,
-        status: status === 'APPROVED' ? 'Approved' : (status === 'PENDING_REVIEW' ? 'Pending Verification' : 'Rejected'),
-        rejectionReason: status === 'REJECTED' ? result.reason : null,
-        uploadedAt: nowIso,
-        verifiedAt: nowIso,
-        confidence: result.ocrData?.confidence || 0.95,
-      };
+    load.docs = load.docs || load.documents || {};
+    load.documents = load.docs;
+    
+    const docRecord = {
+      name: `${docKey}_Stop${effStopNum}_${load.loadNumber || load.id}.jpg`,
+      fileName: `${docKey}_Stop${effStopNum}_${load.loadNumber || load.id}.jpg`,
+      data: imageBase64 ? (imageBase64.startsWith('data:') ? imageBase64 : `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`) : null,
+      status: status === 'APPROVED' ? 'Approved' : (status === 'PENDING_REVIEW' ? 'Pending Verification' : 'Rejected'),
+      rejectionReason: status === 'REJECTED' ? result.reason : null,
+      uploadedAt: nowIso,
+      verifiedAt: nowIso,
+      confidence: result.ocrData?.confidence || 0.95,
+      stopType: effStopType,
+      stopNumber: effStopNum,
+    };
 
-      // 2. If Approved, auto-advance load progression
-      if (status === 'APPROVED') {
-        load.timestamps = load.timestamps || {};
-        if (docKey === 'BOL') {
-          load.status = 'Loaded';
-          load.driverProgress = 'LOADED';
-          load.timestamps.loadedAt = nowIso;
-        } else if (docKey === 'POD') {
-          load.status = 'Drop-off';
-          load.driverProgress = 'DELIVERED';
-          load.timestamps.deliveredAt = nowIso;
-        }
+    load.docs[storageKey] = docRecord;
+    if (effStopNum === 1) load.docs[docKey] = docRecord;
+
+    // 2. Update Stop Status in Load State & PostgreSQL
+    const stopStatus = status === 'APPROVED' ? (effStopType === 'PICKUP' ? 'BOL_APPROVED' : 'POD_APPROVED') : (status === 'REJECTED' ? (effStopType === 'PICKUP' ? 'BOL_REJECTED' : 'POD_REJECTED') : 'PENDING');
+
+    if (effStopType === 'PICKUP' && load.pickupStops) {
+      const pStop = load.pickupStops.find(s => (s.stop_number || s.stopNumber) === effStopNum);
+      if (pStop) pStop.status = stopStatus;
+    } else if (effStopType === 'DELIVERY' && load.deliveryStops) {
+      const dStop = load.deliveryStops.find(s => (s.stop_number || s.stopNumber) === effStopNum);
+      if (dStop) dStop.status = stopStatus;
+    }
+    await db.updateStopStatus(load.id, effStopType, effStopNum, stopStatus).catch(() => {});
+
+    // 3. Multi-Stop Advancement Logic:
+    // Only advance to LOADED once ALL pickup stops have an approved BOL
+    // Only advance to DELIVERED once ALL delivery stops have an approved POD
+    load.timestamps = load.timestamps || {};
+
+    if (effStopType === 'PICKUP') {
+      const pStops = load.pickupStops && load.pickupStops.length > 0 ? load.pickupStops : [{ stopNumber: 1, status: stopStatus }];
+      const allPickupsApproved = pStops.every(s => s.status === 'BOL_APPROVED' || (Number(s.stop_number || s.stopNumber) === effStopNum && status === 'APPROVED'));
+      if (allPickupsApproved) {
+        load.status = 'Loaded';
+        load.driverProgress = 'LOADED';
+        load.timestamps.loadedAt = nowIso;
       }
-
-      await saveFullState(state);
-      await history.record(
-        load.id,
-        `${docKey}_${status}`,
-        `Driver uploaded ${docKey}. Result: ${status}. ${result.reason || ''}`,
-        { type: 'driver', id: driver.id, name: driver.name }
-      ).catch(() => {});
+    } else if (effStopType === 'DELIVERY') {
+      const dStops = load.deliveryStops && load.deliveryStops.length > 0 ? load.deliveryStops : [{ stopNumber: 1, status: stopStatus }];
+      const allDeliveriesApproved = dStops.every(s => s.status === 'POD_APPROVED' || (Number(s.stop_number || s.stopNumber) === effStopNum && status === 'APPROVED'));
+      if (allDeliveriesApproved) {
+        load.status = 'Drop-off';
+        load.driverProgress = 'DELIVERED';
+        load.timestamps.deliveredAt = nowIso;
+        const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
+        if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
+      }
     }
 
-    // 3. Emit Real-time WebSocket Events based on 3-tier outcome
+    await saveFullState(state);
+    await history.record(
+      load.id,
+      `${docKey}_Stop${effStopNum}_${status}`,
+      `Driver uploaded ${docKey} for Stop ${effStopNum} (${effStopType}). Result: ${status}. ${result.reason || ''}`,
+      { type: 'driver', id: driver.id, name: driver.name }
+    ).catch(() => {});
+
+    // 4. Emit Real-time WebSocket Events based on outcome
     if (io) {
       if (status === 'APPROVED') {
-        const newLoadStatus = documentType.toUpperCase() === 'BOL' ? 'LOADED' : 'DELIVERED';
+        const newLoadStatus = load.status;
         io.emit('document:approved', {
           loadId: effectiveLoadId,
           documentType: documentType.toUpperCase(),
+          stopType: effStopType,
+          stopNumber: effStopNum,
           newLoadStatus,
           documentId: result.documentId,
           timestamp: nowIso,
@@ -1957,8 +2096,18 @@ router.post('/api/driver/verify-document', async (req, res) => {
         io.emit('document:pending_review', {
           loadId: effectiveLoadId,
           documentType: documentType.toUpperCase(),
+          stopType: effStopType,
+          stopNumber: effStopNum,
           reviewTaskId: result.documentId,
-          issues: result.issues || [],
+          timestamp: nowIso,
+        });
+      } else {
+        io.emit('document:rejected', {
+          loadId: effectiveLoadId,
+          documentType: documentType.toUpperCase(),
+          stopType: effStopType,
+          stopNumber: effStopNum,
+          reason: result.reason,
           timestamp: nowIso,
         });
       }
@@ -1967,10 +2116,12 @@ router.post('/api/driver/verify-document', async (req, res) => {
     res.json({
       ok: true,
       status,
-      documentId: status === 'REJECTED' ? null : result.documentId,
-      ocrData: result.ocrData || result.extractedData || {},
+      overallStatus: status,
+      stopType: effStopType,
+      stopNumber: effStopNum,
+      documentId: result.documentId,
+      confidence: result.ocrData?.confidence || 0.95,
       validationResults: result.validationResults || {},
-      reason: result.reason || '',
       load: load ? shapeLoadForDriver(load, driver.id) : null,
       result,
     });
@@ -2048,6 +2199,62 @@ async function handleReviewAction(req, res) {
          WHERE load_id = $4 AND ($5::text IS NULL OR document_type = $5)`,
         [status, reviewerId || 'Dispatcher', reason || null, loadId, docType || null]
       );
+
+      // Sync load state in KV/system state
+      try {
+        const state = await loadFullState().catch(() => null);
+        if (state && state.loads) {
+          const load = state.loads.find(l => String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId));
+          if (load) {
+            load.docs = load.docs || {};
+            const stopNum = req.body?.stopNumber ? Number(req.body.stopNumber) : 1;
+            const docKey = (docType || 'BOL').toUpperCase();
+            const storageKey = stopNum > 1 ? `${docKey}_${stopNum}` : docKey;
+            
+            if (load.docs[storageKey]) {
+              load.docs[storageKey].status = action === 'APPROVE' ? 'Approved' : 'Rejected';
+              if (action === 'REJECT') load.docs[storageKey].rejectionReason = reason;
+            }
+            if (stopNum === 1 && load.docs[docKey]) {
+              load.docs[docKey].status = action === 'APPROVE' ? 'Approved' : 'Rejected';
+              if (action === 'REJECT') load.docs[docKey].rejectionReason = reason;
+            }
+
+            // Update stop status
+            const effStopType = (req.body?.stopType || (docKey === 'BOL' ? 'PICKUP' : 'DELIVERY')).toUpperCase();
+            const stopStatus = action === 'APPROVE' ? (effStopType === 'PICKUP' ? 'BOL_APPROVED' : 'POD_APPROVED') : (effStopType === 'PICKUP' ? 'BOL_REJECTED' : 'POD_REJECTED');
+
+            if (effStopType === 'PICKUP' && load.pickupStops) {
+              const pStop = load.pickupStops.find(s => (s.stop_number || s.stopNumber) === stopNum);
+              if (pStop) pStop.status = stopStatus;
+            } else if (effStopType === 'DELIVERY' && load.deliveryStops) {
+              const dStop = load.deliveryStops.find(s => (s.stop_number || s.stopNumber) === stopNum);
+              if (dStop) dStop.status = stopStatus;
+            }
+
+            const { updateStopStatus } = require('../lib/db');
+            await updateStopStatus(load.id, effStopType, stopNum, stopStatus).catch(() => {});
+
+            // Multi-stop advancement
+            if (effStopType === 'PICKUP') {
+              const pStops = load.pickupStops && load.pickupStops.length > 0 ? load.pickupStops : [{ stopNumber: 1, status: stopStatus }];
+              if (pStops.every(s => s.status === 'BOL_APPROVED')) {
+                load.status = 'Loaded';
+                load.driverProgress = 'LOADED';
+              }
+            } else if (effStopType === 'DELIVERY') {
+              const dStops = load.deliveryStops && load.deliveryStops.length > 0 ? load.deliveryStops : [{ stopNumber: 1, status: stopStatus }];
+              if (dStops.every(s => s.status === 'POD_APPROVED')) {
+                load.status = 'Drop-off';
+                load.driverProgress = 'DELIVERED';
+                if (!['Payment Not Requested', 'Payment Requested', 'Payment Received'].includes(load.payment)) load.payment = 'Payment Not Requested';
+              }
+            }
+
+            await saveFullState(state);
+          }
+        }
+      } catch (_) {}
     }
 
     const io = req.app.get('io') || global.io;
@@ -2298,102 +2505,6 @@ router.get('/api/driver/loads/:id/tracking', async (req, res) => {
   } catch (err) {
     console.error('Failed to calculate load tracking:', err);
     res.status(500).json({ error: 'Failed to calculate tracking.' });
-  }
-});
-
-// POST /api/driver/verify-document
-// AI Document Validation for BOL and POD uploads
-router.post('/api/driver/verify-document', async (req, res) => {
-  const ctx = await requireDriver(req, res);
-  if (!ctx) return;
-
-  const { documentType = 'BOL', loadId, loadData = {}, imageMeta = {}, base64 = '', fileUrl = '' } = req.body;
-  const docTypeUpper = String(documentType).toUpperCase();
-
-  if (base64) {
-    const valCheck = security.validateBase64Payload(base64, 15 * 1024 * 1024);
-    if (!valCheck.ok) {
-      return res.status(400).json({ error: valCheck.error });
-    }
-  }
-
-  try {
-    let validationResult;
-    if (docTypeUpper === 'BOL') {
-      validationResult = validateBolDocument({ loadData, imageMeta, base64 });
-    } else if (docTypeUpper === 'POD') {
-      validationResult = validatePodDocument({ loadData, imageMeta, base64 });
-    } else {
-      return res.status(400).json({ error: `Unsupported documentType: ${documentType}` });
-    }
-
-    // Persist validation audit log in PostgreSQL
-    const savedRecord = await saveDocumentValidation({
-
-      loadId: loadId || loadData.loadNumber || 'UNKNOWN',
-      driverId: ctx.driver.id,
-      documentType: docTypeUpper,
-      fileUrl,
-      overallStatus: validationResult.overallStatus,
-      confidence: validationResult.confidence,
-      clarityPass: validationResult.clarityPass,
-      blurDetected: validationResult.blurDetected,
-      shadowDetected: validationResult.shadowDetected,
-      cornersVisible: validationResult.cornersVisible,
-      addressMatch: validationResult.addressMatch,
-      weightMatch: validationResult.weightMatch,
-      signaturePresent: validationResult.signaturePresent,
-      dateVisible: validationResult.dateVisible,
-      rejectionReason: validationResult.rejectionReason,
-      issues: validationResult.issues,
-      extractedData: validationResult.extractedData,
-    });
-
-    // Dispatch notifications based on document outcome
-    if (validationResult.overallStatus === 'RETAKE_REQUIRED') {
-      await notificationService.notifyDriverDocCorrectionRequired(
-        ctx.driver.id,
-        { loadNumber: loadData.loadNumber || loadId, id: loadId },
-        docTypeUpper,
-        validationResult.rejectionReason
-      );
-    } else if (validationResult.overallStatus === 'APPROVED') {
-      if (docTypeUpper === 'BOL') {
-        await notificationService.notifyDispatcherBolUploaded(ctx.driver.dispatcherId || 'admin', { loadNumber: loadData.loadNumber || loadId, id: loadId }, ctx.driver);
-      } else if (docTypeUpper === 'POD') {
-        await notificationService.notifyDispatcherPodUploaded(ctx.driver.dispatcherId || 'admin', { loadNumber: loadData.loadNumber || loadId, id: loadId }, ctx.driver);
-      }
-    } else if (validationResult.overallStatus === 'DISPATCHER_REVIEW') {
-      await notificationService.notifyAdminFailedUpload(
-        { loadNumber: loadData.loadNumber || loadId, id: loadId },
-        ctx.driver,
-        docTypeUpper,
-        validationResult.rejectionReason
-      );
-    }
-
-    // Record audit log for document verification event
-    await audit.record(
-      { type: 'driver', id: ctx.driver.id, name: ctx.driver.name },
-      'DOCUMENT_VERIFICATION_EVALUATED',
-      { type: 'DOCUMENT', id: `${loadId || loadData.loadNumber}:${docTypeUpper}` },
-      {
-        loadNumber: loadData.loadNumber || loadId,
-        docType: docTypeUpper,
-        status: validationResult.overallStatus,
-        confidence: validationResult.confidence,
-        rejectionReason: validationResult.rejectionReason || null
-      }
-    );
-
-    res.json({
-      ok: true,
-      result: validationResult,
-      validationId: savedRecord.id,
-    });
-  } catch (err) {
-    console.error('Failed to verify document:', err);
-    res.status(500).json({ error: err.message || 'Failed to verify document.' });
   }
 });
 

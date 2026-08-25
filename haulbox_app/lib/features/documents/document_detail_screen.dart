@@ -70,7 +70,15 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     });
 
     try {
-      final res = await ApiClient.fetchDocument(token, widget.loadId!, widget.docKey!);
+      int? stopNum;
+      String cleanKey = widget.docKey!;
+      if (cleanKey.contains('_')) {
+        final parts = cleanKey.split('_');
+        cleanKey = parts[0];
+        stopNum = int.tryParse(parts[1]);
+      }
+
+      final res = await ApiClient.fetchDocument(token, widget.loadId!, cleanKey, stopNumber: stopNum);
       if (mounted) {
         setState(() {
           _isLoading = false;

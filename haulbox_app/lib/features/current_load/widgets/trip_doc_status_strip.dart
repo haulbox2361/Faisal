@@ -8,16 +8,27 @@ class TripDocStatusStrip extends StatelessWidget {
   final LoadModel load;
   final VoidCallback onUploadBol;
   final VoidCallback onUploadPod;
+  final void Function(int stopNumber)? onUploadStopBol;
+  final void Function(int stopNumber)? onUploadStopPod;
 
   const TripDocStatusStrip({
     super.key,
     required this.load,
     required this.onUploadBol,
     required this.onUploadPod,
+    this.onUploadStopBol,
+    this.onUploadStopPod,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (load.isMultiStop) {
+      return _buildMultiStopStrip(context);
+    }
+    return _buildSingleStopStrip(context);
+  }
+
+  Widget _buildSingleStopStrip(BuildContext context) {
     final isBolUploaded = load.bolStatus != null && load.bolStatus != 'PENDING';
     final isPodUploaded = load.podStatus != null && load.podStatus != 'PENDING';
 
@@ -126,6 +137,148 @@ class TripDocStatusStrip extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMultiStopStrip(BuildContext context) {
+    final totalStops = load.pickupStops.length + load.deliveryStops.length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: AppRadius.xlBorder,
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.folder_shared_outlined, size: 18, color: AppColors.emeraldDark),
+                  SizedBox(width: 8),
+                  Text(
+                    'MULTI-STOP TRIP PAPERS',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.emeraldDark,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '${totalStops + 1} Required',
+                style: const TextStyle(fontSize: 11.5, color: AppColors.textSubtle, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Horizontal scrollable pills for all multi-stop documents
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // 1. Rate Con
+                SizedBox(
+                  width: 105,
+                  child: _buildDocPill(
+                    context: context,
+                    title: 'Rate Con',
+                    status: 'VERIFIED',
+                    icon: Icons.description_outlined,
+                    isComplete: true,
+                    onTap: () => _openDocPreview(
+                      context,
+                      title: 'Rate Confirmation (RC)',
+                      docNumber: 'RC-${load.loadNumber}',
+                      status: 'VERIFIED',
+                      docKey: 'RC',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // 2. Pickups
+                ...load.pickupStops.map((s) {
+                  final isDone = s.status == 'BOL_APPROVED';
+                  final docKey = s.stopNumber > 1 ? 'BOL_${s.stopNumber}' : 'BOL';
+                  return Container(
+                    width: 115,
+                    margin: const EdgeInsets.only(right: 8),
+                    child: _buildDocPill(
+                      context: context,
+                      title: 'Pickup ${s.stopNumber} BOL',
+                      status: isDone ? 'VERIFIED' : (s.status == 'BOL_REJECTED' ? 'REJECTED' : 'REQUIRED'),
+                      icon: Icons.assignment_outlined,
+                      isComplete: isDone,
+                      onTap: isDone
+                          ? () => _openDocPreview(
+                                context,
+                                title: 'Pickup ${s.stopNumber} BOL (${s.city})',
+                                docNumber: 'BOL-${load.loadNumber}-S${s.stopNumber}',
+                                status: 'APPROVED',
+                                docKey: docKey,
+                              )
+                          : () {
+                              if (onUploadStopBol != null) {
+                                onUploadStopBol!(s.stopNumber);
+                              } else {
+                                onUploadBol();
+                              }
+                            },
+                    ),
+                  );
+                }),
+
+                // 3. Deliveries
+                ...load.deliveryStops.map((s) {
+                  final isDone = s.status == 'POD_APPROVED' || load.status == 'COMPLETED';
+                  final docKey = s.stopNumber > 1 ? 'POD_${s.stopNumber}' : 'POD';
+                  return Container(
+                    width: 115,
+                    margin: const EdgeInsets.only(right: 8),
+                    child: _buildDocPill(
+                      context: context,
+                      title: 'Delivery ${s.stopNumber} POD',
+                      status: isDone ? 'VERIFIED' : (s.status == 'POD_REJECTED' ? 'REJECTED' : 'REQUIRED'),
+                      icon: Icons.assignment_turned_in_outlined,
+                      isComplete: isDone,
+                      onTap: isDone
+                          ? () => _openDocPreview(
+                                context,
+                                title: 'Delivery ${s.stopNumber} POD (${s.city})',
+                                docNumber: 'POD-${load.loadNumber}-S${s.stopNumber}',
+                                status: 'APPROVED',
+                                docKey: docKey,
+                              )
+                          : () {
+                              if (onUploadStopPod != null) {
+                                onUploadStopPod!(s.stopNumber);
+                              } else {
+                                onUploadPod();
+                              }
+                            },
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ],
       ),
