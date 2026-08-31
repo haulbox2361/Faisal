@@ -2255,48 +2255,27 @@
 
       feed.innerHTML = sorted.slice(0, 15).map(e => {
         const id = e.id || '';
-        let title = e.title || e.text || e.name || e.heading || e.subject || '';
-        let sub = e.sub || e.body || e.description || e.details || e.subtitle || e.message || '';
+        let title = (e.title || e.text || e.name || e.heading || e.subject || '').trim();
+        let sub = (e.sub || e.body || e.description || e.details || e.subtitle || (e.message && e.message !== title ? e.message : '') || '').trim();
         const timeVal = e.at || e.time || e.createdAt || e.created_at || e.timestamp || '';
-        
-        // Contextual icon and badge background
-        let icon = e.icon;
-        let bg = e.bg;
-        const combined = (title + ' ' + sub).toLowerCase();
+        const targetId = (e.meta && e.meta.targetId) || e.loadId || '';
 
-        if (!icon) {
-          if (combined.includes('approved') || combined.includes('completed') || combined.includes('verified')) {
-            icon = '✅'; bg = '#dcfce7';
-          } else if (combined.includes('rejected') || combined.includes('deleted') || combined.includes('disputed')) {
-            icon = '❌'; bg = '#fee2e2';
-          } else if (combined.includes('upload') || combined.includes('bol') || combined.includes('pod') || combined.includes('doc')) {
-            icon = '📄'; bg = '#dbeafe';
-          } else if (combined.includes('booked') || combined.includes('new load') || combined.includes('assigned')) {
-            icon = '📝'; bg = '#fef3c7';
-          } else if (combined.includes('transit') || combined.includes('pickup') || combined.includes('delivery')) {
-            icon = '🚚'; bg = '#ffedd5';
-          } else if (combined.includes('paid') || combined.includes('payment') || combined.includes('settlement')) {
-            icon = '💰'; bg = '#f3e8ff';
-          } else {
-            icon = '🔔'; bg = '#f1f5f9';
-          }
-        }
-        if (!bg) bg = '#f1f5f9';
-
-        // Robust fallback for title if not set
+        // If title is missing or generic, intelligently deduce from metadata or state
         if (!title) {
           if (sub) {
-            title = 'Activity Alert';
-          } else if (e.meta && e.meta.targetId) {
-            title = `Load Update — #${e.meta.targetId}`;
+            title = 'Load Notification';
+          } else if (targetId) {
+            title = `Load #${targetId} Updated`;
+          } else if (e.type) {
+            title = String(e.type).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
           } else {
-            title = 'Notification';
+            title = 'Activity Alert';
           }
         }
 
-        // Robust fallback for subtitle if not set but load metadata is available
-        if (!sub && e.meta && e.meta.targetId) {
-          const matchedLoad = (STATE.loads || []).find(l => String(l.id) === String(e.meta.targetId) || String(l.loadNumber) === String(e.meta.targetId));
+        // If subtitle is missing, pull details from matching load in state
+        if (!sub && targetId) {
+          const matchedLoad = (STATE.loads || []).find(l => String(l.id) === String(targetId) || String(l.loadNumber) === String(targetId));
           if (matchedLoad) {
             const brokerPart = matchedLoad.brokerName ? matchedLoad.brokerName + ' · ' : '';
             const lanePart = typeof formatCityStateLane === 'function' ? formatCityStateLane(matchedLoad.pickup, matchedLoad.dropoff) : `${matchedLoad.pickup || ''} → ${matchedLoad.dropoff || ''}`;
@@ -2304,23 +2283,18 @@
           }
         }
 
-        const clickAction = id ? `onNotificationClicked('${escapeAttr(id)}')` : (e.action || ((e.meta && e.meta.targetId) ? `openLoadModal('${escapeAttr(e.meta.targetId)}')` : ''));
+        const clickAction = id ? `onNotificationClicked('${escapeAttr(id)}')` : (e.action || (targetId ? `openLoadModal('${escapeAttr(targetId)}')` : ''));
 
         return `
-        <div onclick="${clickAction}" style="display:flex;gap:12px;padding:12px 14px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;align-items:flex-start;cursor:pointer;transition:all 0.15s ease;box-shadow:0 1px 3px rgba(0,0,0,0.03);" onmouseenter="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1'" onmouseleave="this.style.background='#ffffff';this.style.borderColor='#e2e8f0'">
-          <div style="width:34px;height:34px;border-radius:8px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:2px;">
-            ${icon}
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;color:#0f172a;line-height:1.35;word-break:break-word;">${escapeAttr(title)}</div>
-            ${sub ? `<div style="font-size:11.5px;color:#64748b;margin-top:3px;line-height:1.35;word-break:break-word;">${escapeAttr(sub)}</div>` : ''}
-            <div style="font-size:10.5px;color:#94a3b8;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
-              <span>${timeVal ? timeAgoShort(timeVal) : 'just now'}</span>
-              <span style="color:#2563eb;font-weight:600;font-size:11.5px;display:inline-flex;align-items:center;gap:3px;">Open →</span>
-            </div>
+        <div onclick="${clickAction}" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;cursor:pointer;transition:all 0.15s ease;box-shadow:0 1px 3px rgba(0,0,0,0.02);" onmouseenter="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1'" onmouseleave="this.style.background='#ffffff';this.style.borderColor='#e2e8f0'">
+          <div style="font-weight:700;font-size:13px;color:#0f172a;line-height:1.4;word-break:break-word;">${escapeAttr(title)}</div>
+          ${sub ? `<div style="font-size:12px;color:#475569;margin-top:3px;line-height:1.4;word-break:break-word;">${escapeAttr(sub)}</div>` : ''}
+          <div style="font-size:11px;color:#64748b;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span>${timeVal ? timeAgoShort(timeVal) : 'just now'}</span>
+            <span style="color:#2563eb;font-weight:600;font-size:11.5px;display:inline-flex;align-items:center;gap:3px;">Open →</span>
           </div>
         </div>
-      `;
+        `;
       }).join('');
     }
 

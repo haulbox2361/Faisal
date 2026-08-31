@@ -639,7 +639,10 @@
                   <div style="font-weight:700;font-size:14px;color:#0f172a;display:flex;align-items:center;gap:6px;">
                     <span>🔔</span> Notifications &amp; Alerts
                   </div>
-                  <span style="font-size:11px;color:#64748b;font-weight:600;">Live Feed</span>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:11px;color:#64748b;font-weight:600;">Live Feed</span>
+                    <button type="button" style="background:none;border:none;color:#2563eb;font-size:11px;font-weight:700;cursor:pointer;padding:0;letter-spacing:0.3px;" onclick="clearNotifications()" title="Clear all notifications">CLEAR ALL</button>
+                  </div>
                 </div>
                 <div id="dashboard-notifications-feed" style="flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-right:2px;">
                   <!-- Notifications injected here -->
