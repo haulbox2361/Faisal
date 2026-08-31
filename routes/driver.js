@@ -790,6 +790,19 @@ router.post('/api/driver/location', async (req, res) => {
 
     const tracking = currentLoad ? calculateLoadTracking(currentLoad, loc) : null;
 
+    // ── Broadcast live GPS update over Socket.IO to all connected dispatchers ──
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('driver_location_update', {
+        driverId: ctx.driver.id,
+        driverName: ctx.driver.name,
+        driverTruck: ctx.driver.truck || ctx.driver.truckId || null,
+        loadId: loadId || (currentLoad ? currentLoad.id : null),
+        location: loc,
+        tracking,
+      });
+    }
+
     res.json({ ok: true, location: loc, tracking });
   } catch (e) {
     console.error('driver location update failed:', e);

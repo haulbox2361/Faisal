@@ -342,7 +342,7 @@ class LoadModel {
 
   String get displayRcPrice {
     final amt = rcRateAmount;
-    if (amt <= 0) return '\$1,850';
+    if (amt <= 0) return 'N/A';
     // Format with commas (e.g. $2,450)
     final rounded = amt.round();
     final str = rounded.toString();

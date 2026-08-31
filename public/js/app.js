@@ -2040,6 +2040,95 @@
       driverMarkers = {};
     }
 
+    // ── Real-time GPS Map Update (called from Socket.IO driver_location_update event) ──
+    window.updateDriverMapMarker = function(data) {
+      if (!data || !data.location) return;
+      const loc = data.location;
+      const lat = Number(loc.latitude || loc.lat);
+      const lng = Number(loc.longitude || loc.lng);
+      if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+
+      const driverId = String(data.driverId || '');
+      const driverName = data.driverName || 'Driver';
+      const speed = loc.speed != null ? Math.round(Number(loc.speed)) : null;
+      const tracking = data.tracking;
+
+      // 1. Update STATE.drivers location so re-renders use fresh coords
+      if (STATE.drivers && driverId) {
+        const drv = STATE.drivers.find(d => String(d.id) === driverId);
+        if (drv) {
+          drv.location = drv.location || {};
+          drv.location.lat = lat;
+          drv.location.lng = lng;
+          drv.location.speed = speed;
+          drv.location.lastUpdated = new Date().toISOString();
+        }
+      }
+
+      // 2. Move existing marker or create a new one on the live fleet map
+      if (dashboardMap && typeof L !== 'undefined') {
+        const truckIcon = L.divIcon({
+          className: 'custom-trip-icon',
+          html: `<div style="background:#0284c7;color:#ffffff;font-size:16px;border:3px solid #ffffff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(2,132,199,0.7);cursor:pointer;transition:all 0.3s ease;">🚚</div>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18]
+        });
+
+        if (driverMarkers[driverId]) {
+          // Smoothly animate marker to new position
+          driverMarkers[driverId].setLatLng([lat, lng]);
+          driverMarkers[driverId].setPopupContent(
+            `<b>🚚 ${escapeHtml(driverName)}</b><br>` +
+            (speed != null ? `Speed: <b>${speed} mph</b><br>` : '') +
+            (tracking ? `Miles to Delivery: <b>${(tracking.milesToDelivery || 0).toFixed(1)}</b><br>ETA: <b>${tracking.etaDeliveryText || tracking.etaText || 'On Time'}</b><br>` : '') +
+            `<small style="color:#64748b;">Live GPS • Updated just now</small>`
+          );
+        } else {
+          const marker = L.marker([lat, lng], { icon: truckIcon }).addTo(dashboardMap);
+          marker.bindPopup(
+            `<b>🚚 ${escapeHtml(driverName)}</b><br>` +
+            (speed != null ? `Speed: <b>${speed} mph</b><br>` : '') +
+            (tracking ? `ETA: <b>${tracking.etaDeliveryText || tracking.etaText || 'On Time'}</b><br>` : '') +
+            `<small style="color:#64748b;">Live GPS</small>`
+          );
+          marker.on('click', () => {
+            if (driverId) window.onTrackingDriverChanged && window.onTrackingDriverChanged(driverId);
+          });
+          driverMarkers[driverId] = marker;
+        }
+      }
+
+      // 3. Update the driver tracking info panel if this driver is currently selected
+      const select = document.getElementById('tracking-driver-select');
+      if (select && String(select.value) === driverId) {
+        // Update speed display
+        const speedEl = document.getElementById('driver-live-speed');
+        if (speedEl && speed != null) speedEl.textContent = speed + ' mph';
+
+        // Update ETA / miles remaining display
+        if (tracking) {
+          const etaEl = document.getElementById('driver-live-eta');
+          if (etaEl) etaEl.textContent = tracking.etaDeliveryText || tracking.etaText || '—';
+          const milesEl = document.getElementById('driver-live-miles');
+          if (milesEl) milesEl.textContent = (tracking.milesToDelivery != null ? tracking.milesToDelivery.toFixed(1) : '—') + ' mi';
+          const riskEl = document.getElementById('driver-live-risk');
+          if (riskEl && tracking.risk) riskEl.textContent = tracking.risk.badge || '🟢 On Time';
+        }
+
+        // Pulse the live indicator badge
+        const liveEl = document.querySelector('.live-gps-indicator');
+        if (liveEl) {
+          liveEl.style.background = '#10b981';
+          liveEl.textContent = '● LIVE';
+          setTimeout(() => { liveEl.style.background = ''; }, 1200);
+        }
+      }
+
+      // 4. Update timestamp in tracking box header
+      const tsEl = document.getElementById('gps-last-update-time');
+      if (tsEl) tsEl.textContent = 'Updated: ' + new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+
     function initDashboardMap() {
       if (dashboardMap) return;
       const container = document.getElementById('live-driver-map');

@@ -55,7 +55,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   void initState() {
     super.initState();
     _loadedBase64 = widget.base64Data;
-    if (_loadedBase64 == null && widget.loadId != null && widget.docKey != null) {
+    // RC documents are always digital (generated from load data) — no binary file to fetch
+    final isRc = widget.docKey == 'RC' || (widget.title.contains('Rate Confirmation'));
+    if (!isRc && _loadedBase64 == null && widget.loadId != null && widget.docKey != null) {
       _fetchDocumentData();
     }
   }
@@ -620,10 +622,15 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                   icon: Icons.verified_user_outlined,
                 ),
                 const SizedBox(height: 8),
+                // Show the agreed load rate prominently for RC docs
+                if (isRcDoc && widget.load != null)
+                  _buildRateHighlightRow('✅ Agreed Load Rate', widget.load!.displayRcPrice),
                 _buildFieldRow('Document Type', widget.title),
                 _buildFieldRow('Document # / ID', widget.documentNumber ?? 'HBX-DOC-${widget.loadId ?? "1042"}'),
                 if (widget.loadId != null)
                   _buildFieldRow('Associated Load', 'Load #${widget.loadId}'),
+                if (isRcDoc && widget.load != null)
+                  _buildFieldRow('Brokerage / Carrier', widget.load!.brokerName),
                 _buildFieldRow('Category', widget.category == 'DRIVER' ? 'Driver Compliance' : 'Freight & Trip'),
                 _buildFieldRow('Issue / Departure Date', widget.issueDate ?? 'Today'),
                 _buildFieldRow('Delivery Date', widget.expirationDate ?? 'Pending Delivery'),
@@ -681,6 +688,39 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRateHighlightRow(String label, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF064E3B),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF047857),
             ),
           ),
         ],

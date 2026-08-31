@@ -19,6 +19,7 @@ class AuthProvider extends ChangeNotifier {
   int _unreadChats = 0;
 
   Timer? _autoSyncTimer;
+  Timer? _socketDebounceTimer;
   StreamSubscription? _docApprovedSub;
   StreamSubscription? _docRejectedSub;
   StreamSubscription? _loadUpdatedSub;
@@ -30,10 +31,19 @@ class AuthProvider extends ChangeNotifier {
   @override
   void dispose() {
     _autoSyncTimer?.cancel();
+    _socketDebounceTimer?.cancel();
     _docApprovedSub?.cancel();
     _docRejectedSub?.cancel();
     _loadUpdatedSub?.cancel();
     super.dispose();
+  }
+
+  /// Debounced sync — waits 1.5s before firing to avoid rapid repeated syncs
+  void _debouncedSync() {
+    _socketDebounceTimer?.cancel();
+    _socketDebounceTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (isAuthenticated) syncAllData(silent: true);
+    });
   }
 
   void _initSocketListeners() {
@@ -45,18 +55,18 @@ class AuthProvider extends ChangeNotifier {
       SocketService().connect(driverId: _driver!.id, driverName: _driver!.name);
 
       _docApprovedSub = SocketService().docApprovedStream.listen((data) {
-        debugPrint('[AuthProvider] Real-time document:approved received -> syncing data');
-        syncAllData(silent: true);
+        debugPrint('[AuthProvider] Real-time document:approved received -> debounced sync');
+        _debouncedSync();
       });
 
       _docRejectedSub = SocketService().docRejectedStream.listen((data) {
-        debugPrint('[AuthProvider] Real-time document:rejected received -> syncing data');
-        syncAllData(silent: true);
+        debugPrint('[AuthProvider] Real-time document:rejected received -> debounced sync');
+        _debouncedSync();
       });
 
       _loadUpdatedSub = SocketService().loadUpdatedStream.listen((data) {
-        debugPrint('[AuthProvider] Real-time load:updated received -> syncing data');
-        syncAllData(silent: true);
+        debugPrint('[AuthProvider] Real-time load:updated received -> debounced sync');
+        _debouncedSync();
       });
     }
   }
@@ -106,10 +116,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 2. Start Automatic Background Polling (Every 10 seconds)
+  // 2. Start Automatic Background Polling (Every 30 seconds — socket handles real-time updates)
   void _startAutoSync() {
     _autoSyncTimer?.cancel();
-    _autoSyncTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _autoSyncTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (isAuthenticated) {
         syncAllData(silent: true);
       }

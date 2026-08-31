@@ -613,13 +613,16 @@
               </div>
 
               <!-- DRIVER CHOICE / SELECTION DROPDOWN -->
-              <div style="display:flex;align-items:center;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <label for="tracking-driver-select" style="font-size:13px;font-weight:700;color:#334155;white-space:nowrap;">Choose Driver to Track:</label>
                 <select id="tracking-driver-select" onchange="onTrackingDriverChanged(this.value)"
                   style="min-width:220px;background:#f8fafc;border:1.5px solid #cbd5e1;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a;cursor:pointer;outline:none;transition:border-color 0.15s;"
                   onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
                   <option value="">-- Choose Driver to Track --</option>
                 </select>
+                <!-- Live GPS pulse indicator -->
+                <span class="live-gps-indicator" style="display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;border:1px solid #86efac;transition:background 0.4s;">● LIVE GPS</span>
+                <span id="gps-last-update-time" style="font-size:11px;color:#94a3b8;"></span>
               </div>
             </div>
 
@@ -2633,6 +2636,6 @@
   <div id="toast-wrap"></div>
 
   <!-- HaulBoX Core Application Script -->
-  <script src="js/app.js?v=2.3.0"></script>
+  <script src="js/app.js?v=2.4.0"></script>
 </body>
 </html>
