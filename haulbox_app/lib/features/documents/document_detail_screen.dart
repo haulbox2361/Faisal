@@ -103,7 +103,11 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
   Uint8List? _getDecodedBytes() {
     if (_loadedBase64 == null || _loadedBase64!.isEmpty) return null;
     try {
-      final clean = _loadedBase64!.replaceFirst(RegExp(r'data:image\/[a-zA-Z+]+;base64,'), '');
+      String clean = _loadedBase64!.trim();
+      if (clean.contains(',')) {
+        clean = clean.split(',').last;
+      }
+      clean = clean.replaceAll(RegExp(r'\s+'), '');
       return base64Decode(clean);
     } catch (e) {
       debugPrint('Base64 decode error: $e');
@@ -140,6 +144,37 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                   child: Text('Unable to render document image', style: TextStyle(color: Colors.white70)),
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openFullscreenRcViewer() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => Scaffold(
+          backgroundColor: const Color(0xFF1E293B),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF0F172A),
+            foregroundColor: Colors.white,
+            title: const Text('Official Rate Confirmation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+          body: InteractiveViewer(
+            minScale: 0.8,
+            maxScale: 3.5,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              child: _buildRateConfirmationDocumentSheet(isFullscreen: true),
             ),
           ),
         ),
@@ -212,10 +247,215 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     );
   }
 
+  Widget _buildRateConfirmationDocumentSheet({bool isFullscreen = false}) {
+    final load = widget.load;
+    final loadNum = load?.loadNumber ?? widget.loadId ?? 'HB-1042';
+    final broker = load?.brokerName ?? 'HaulBoX Logistics';
+    final rate = load?.displayRcPrice ?? '\$2,450.00';
+    final pDate = load?.pickupDate ?? widget.issueDate ?? 'Today';
+    final pTime = load?.pickupTime ?? '08:00 AM';
+    final dDate = load?.deliveryDate ?? widget.expirationDate ?? 'Pending';
+    final dTime = load?.deliveryTime ?? '04:00 PM';
+    final pAddr = load?.pickupAddress ?? load?.pickup ?? 'Dallas, TX';
+    final dAddr = load?.dropoffAddress ?? load?.dropoff ?? 'Houston, TX';
+    final commodity = load?.commodity ?? 'General Freight';
+    final weight = load?.displayWeightFormatted ?? '42,500 lbs';
+    final miles = load?.miles?.toString() ?? '245';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(isFullscreen ? 20 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Header Banner
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    broker.toUpperCase(),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: 0.5),
+                  ),
+                  const Text(
+                    'RATE CONFIRMATION & LOAD AGREEMENT',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF059669), letterSpacing: 0.8),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF10B981)),
+                ),
+                child: Text(
+                  'LOAD #$loadNum',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF047857)),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20, thickness: 1.5, color: Color(0xFFE2E8F0)),
+
+          // 2. Financial Summary Block
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('TOTAL AGREED RATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                    Text(rate, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('COMMODITY / WEIGHT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                    Text('$commodity • $weight', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF334155))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 3. Shipper / Pickup Dock Block
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFF3B82F6), borderRadius: BorderRadius.circular(4)),
+                      child: const Text('PICKUP #1', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('$pDate @ $pTime', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(pAddr, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                if (load?.pickupContact != null)
+                  Text('Contact: ${load!.pickupContact} ${load.pickupPhone ?? ""}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 4. Receiver / Delivery Dock Block
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFF10B981), borderRadius: BorderRadius.circular(4)),
+                      child: const Text('DELIVERY #1', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('$dDate @ $dTime', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1E293B))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(dAddr, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                if (load?.dropoffContact != null)
+                  Text('Contact: ${load!.dropoffContact} ${load.dropoffPhone ?? ""}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 5. Special Instructions & Carrier Terms
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFD97706)),
+                    SizedBox(width: 6),
+                    Text('SPECIAL INSTRUCTIONS & LOAD TERMS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFB45309))),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  load?.notes?.isNotEmpty == true ? load!.notes! : 'Driver must verify piece count and note damages on BOL before signing. Detention starts 2 hrs after arrival with stamped BOL.',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF78350F), height: 1.3),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 6. Verification Seal & Signature
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.verified_rounded, size: 18, color: Color(0xFF059669)),
+                  SizedBox(width: 6),
+                  Text('DIGITALLY SIGNED & DISPATCHED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+                ],
+              ),
+              Text('$miles Total Miles', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bytes = _getDecodedBytes();
     final isApproved = widget.status.toUpperCase().contains('APPROV') || widget.status.toUpperCase().contains('VERIF');
+    final isRcDoc = widget.docKey == 'RC' || widget.title.contains('Rate Confirmation') || widget.title.contains('RC');
 
     return Scaffold(
       backgroundColor: AppColors.bgLight,
@@ -232,171 +472,142 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. High-Res Document Preview Box
-          GestureDetector(
-            onTap: bytes != null ? () => _openFullScreenViewer(bytes) : null,
-            child: Container(
-              height: 240,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: AppRadius.xlBorder,
-                border: Border.all(color: AppColors.borderLight),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 12,
-                    offset: const Offset(0, 3),
+          // 1. High-Res Document Preview Box or Full RC Document Sheet
+          if (isRcDoc && bytes == null)
+            GestureDetector(
+              onTap: _openFullscreenRcViewer,
+              child: Stack(
+                children: [
+                  _buildRateConfirmationDocumentSheet(isFullscreen: false),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.zoom_in_rounded, size: 13, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text('Tap to Zoom', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: AppRadius.xlBorder,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    if (_isLoading)
-                      const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(color: AppColors.emeraldPrimary),
-                            SizedBox(height: 12),
-                            Text('Loading document file...', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                          ],
-                        ),
-                      )
-                    else if (bytes != null)
-                      InteractiveViewer(
-                        minScale: 1.0,
-                        maxScale: 3.0,
-                        child: Image.memory(
-                          bytes,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.broken_image_rounded, size: 48, color: Colors.grey),
-                          ),
-                        ),
-                      )
-                    else if (widget.docKey == 'RC' || widget.title.contains('Rate Confirmation') || widget.title.contains('RC'))
-                      Container(
-                        color: const Color(0xFFF8FAFC),
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(Icons.verified_rounded, size: 20, color: AppColors.emeraldDark),
-                                    SizedBox(width: 6),
-                                    Text('OFFICIAL RATE CONFIRMATION', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.emeraldDark, letterSpacing: 0.5)),
-                                  ],
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.emeraldSoft,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: AppColors.emeraldPrimary.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Text(
-                                    widget.load?.displayRcPrice ?? '\$2,450',
-                                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.emeraldDark),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 14, color: AppColors.borderLight),
-                            Text(
-                              'Broker: ${widget.load?.brokerName ?? "HaulBoX Logistics"}',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textDark),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Lane: ${widget.load?.pickupCityState ?? "Origin"} → ${widget.load?.dropoffCityState ?? "Destination"}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Cargo: ${widget.load?.commodity ?? "General Freight"} • ${widget.load?.displayWeightFormatted ?? "42,000 lbs"}',
-                              style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-                            ),
-                            const SizedBox(height: 6),
-                            const Row(
-                              children: [
-                                Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.emeraldPrimary),
-                                SizedBox(width: 4),
-                                Text('Rate Contract Verified & Dispatched', style: TextStyle(fontSize: 11, color: AppColors.emeraldDark, fontWeight: FontWeight.w700)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      Container(
-                        color: const Color(0xFFF8FAFC),
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              isApproved ? Icons.task_alt_rounded : Icons.description_outlined,
-                              size: 52,
-                              color: isApproved ? AppColors.emeraldPrimary : AppColors.textMuted,
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              widget.title,
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textDark),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _error ?? (isApproved ? 'Digital verified record on file' : 'No document image uploaded yet'),
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Top Status Badge
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: StatusBadge(status: widget.status),
+            )
+          else
+            GestureDetector(
+              onTap: bytes != null ? () => _openFullScreenViewer(bytes) : null,
+              child: Container(
+                height: 240,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppRadius.xlBorder,
+                  border: Border.all(color: AppColors.borderLight),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
                     ),
-
-                    // Bottom tap hint
-                    if (bytes != null)
-                      Positioned(
-                        bottom: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: AppRadius.xlBorder,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      if (_isLoading)
+                        const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
-                              SizedBox(width: 4),
-                              Text('Tap for Fullscreen Zoom', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              CircularProgressIndicator(color: AppColors.emeraldPrimary),
+                              SizedBox(height: 12),
+                              Text('Loading document file...', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                            ],
+                          ),
+                        )
+                      else if (bytes != null)
+                        InteractiveViewer(
+                          minScale: 1.0,
+                          maxScale: 3.0,
+                          child: Image.memory(
+                            bytes,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.broken_image_rounded, size: 48, color: Colors.grey),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          color: const Color(0xFFF8FAFC),
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isApproved ? Icons.task_alt_rounded : Icons.description_outlined,
+                                size: 52,
+                                color: isApproved ? AppColors.emeraldPrimary : AppColors.textMuted,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                widget.title,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textDark),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _error ?? (isApproved ? 'Digital verified record on file' : 'No document image uploaded yet'),
+                                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
                             ],
                           ),
                         ),
+
+                      // Top Status Badge
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: StatusBadge(status: widget.status),
                       ),
-                  ],
+
+                      // Bottom tap hint
+                      if (bytes != null)
+                        Positioned(
+                          bottom: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text('Tap for Fullscreen Zoom', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 16),
 
           // 2. Metadata Specs Card
@@ -430,6 +641,12 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
               text: 'OPEN FULLSCREEN VIEWER',
               icon: Icons.fullscreen_rounded,
               onPressed: () => _openFullScreenViewer(bytes),
+            )
+          else if (isRcDoc)
+            HaulBoxButton(
+              text: 'OPEN FULLSCREEN RC DOCUMENT',
+              icon: Icons.fullscreen_rounded,
+              onPressed: _openFullscreenRcViewer,
             )
           else
             HaulBoxButton(

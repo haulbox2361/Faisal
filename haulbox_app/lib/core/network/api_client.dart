@@ -172,6 +172,31 @@ class ApiClient {
     return [];
   }
 
+  // 5.5 Accept Load
+  static Future<bool> acceptLoad(
+      String token, String loadId, {String? eta, String? notes}) async {
+    final uri = Uri.parse('$baseUrl/api/driver/loads/$loadId/accept');
+    try {
+      final payload = <String, dynamic>{};
+      if (eta != null) payload['eta'] = eta;
+      if (notes != null) payload['notes'] = notes;
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 12));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('acceptLoad error: $e');
+      return false;
+    }
+  }
+
   // 6. Update Load Progress Checkpoint
   static Future<bool> updateLoadProgress(
       String token, String loadId, String progress,

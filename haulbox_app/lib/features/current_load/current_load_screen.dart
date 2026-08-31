@@ -163,15 +163,22 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
   Future<void> _handlePrimaryWorkflowAction(LoadModel load) async {
     switch (_workflowState) {
       case LoadWorkflowState.assigned:
+        final authAssign = Provider.of<AuthProvider>(context, listen: false);
+        if (authAssign.token != null) {
+          await ApiClient.acceptLoad(authAssign.token!, load.id, eta: load.pickupTime);
+          await authAssign.syncAllData(silent: true);
+        }
         setState(() {
           _workflowState = LoadWorkflowState.startTrip;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Load Accepted! Ready to begin trip.'),
-            backgroundColor: AppColors.emeraldPrimary,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Load Accepted! Ready to begin trip.'),
+              backgroundColor: AppColors.emeraldPrimary,
+            ),
+          );
+        }
         break;
 
       case LoadWorkflowState.accepted:
@@ -182,18 +189,21 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       case LoadWorkflowState.goingToPickup:
         final authPickup = Provider.of<AuthProvider>(context, listen: false);
         if (authPickup.token != null) {
-          ApiClient.updateLoadProgress(authPickup.token!, load.id, 'AT_PICKUP');
+          await ApiClient.updateLoadProgress(authPickup.token!, load.id, 'AT_PICKUP');
+          await authPickup.syncAllData(silent: true);
         }
         setState(() {
           _workflowState = LoadWorkflowState.arrivedPickup;
           _milesRemaining = 0;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Arrived at Shipper Pickup Dock. Please obtain BOL.'),
-            backgroundColor: AppColors.emeraldPrimary,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Arrived at Shipper Pickup Dock. Please obtain BOL.'),
+              backgroundColor: AppColors.emeraldPrimary,
+            ),
+          );
+        }
         break;
 
       case LoadWorkflowState.arrivedPickup:
@@ -311,6 +321,9 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
     if (!mounted) return;
     final token = Provider.of<AuthProvider>(context, listen: false).token ?? '';
+    if (token.isNotEmpty) {
+      ApiClient.updateLoadProgress(token, load.id, 'GOING_TO_PICKUP');
+    }
     LocationService().startTripTracking(loadId: load.id, token: token);
 
     _locationSub?.cancel();

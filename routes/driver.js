@@ -1048,15 +1048,16 @@ router.post('/api/driver/loads/:id/accept', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
   const { etaDate, etaTime, eta, notes } = req.body || {};
-  const etaStr = String(eta || (etaDate ? `${etaDate} ${etaTime || ''}` : '')).trim();
-  if (!etaStr) return res.status(400).json({ error: 'Pickup ETA (Date & Time) is required to accept this load.' });
-
   const { state, driver } = ctx;
-  const load = (state.loads || []).find((l) => l.id === req.params.id && l.driverId === driver.id);
+  const load = (state.loads || []).find((l) => (String(l.id) === String(req.params.id) || String(l.loadNumber) === String(req.params.id)) && (String(l.driverId) === String(driver.id) || !l.driverId));
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
+  const etaStr = String(eta || (etaDate ? `${etaDate} ${etaTime || ''}` : '') || load.pickupTime || '02h 00m').trim();
   const nowIso = new Date().toISOString();
   load.driverProgress = 'ACCEPTED';
+  if (load.status === 'Assigned' || load.status === 'Pending RC') {
+    load.status = 'Booked';
+  }
   load.pickupEta = etaStr;
   load.eta = etaStr;
   load.driverManualEta = etaStr;
@@ -1081,6 +1082,10 @@ router.post('/api/driver/loads/:id/accept', async (req, res) => {
       await notifications.create('dispatcher', load.dispatcherId, notifPayload);
     }
 
+    try {
+      req.app.get('io')?.emit('load:updated', { loadId: load.id, status: load.status, driverProgress: load.driverProgress, timestamp: nowIso });
+    } catch (_) {}
+
     res.json({ ok: true, load: shapeLoadForDriver(load) });
   } catch (e) {
     console.error('driver load accept failed:', e);
@@ -1098,59 +1103,41 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
   const checkpoint = String(status || '').trim().toUpperCase();
 
   const { state, driver } = ctx;
-  const load = (state.loads || []).find((l) => l.id === req.params.id && l.driverId === driver.id);
+  const load = (state.loads || []).find((l) => (String(l.id) === String(req.params.id) || String(l.loadNumber) === String(req.params.id)) && (String(l.driverId) === String(driver.id) || !l.driverId));
   if (!load) return res.status(404).json({ error: 'Load not found' });
-
-  const STATUS_SEQUENCE = [
-    'ASSIGNED',
-    'ACCEPTED',
-    'AT_PICKUP',
-    'LOADED',
-    'IN_TRANSIT',
-    'AT_DELIVERY',
-    'DELIVERED',
-    'POD_UPLOADED',
-    'PAID',
-    'PAID_CONFIRMED'
-  ];
-
-  const currentProgress = String(load.driverProgress || 'ASSIGNED').trim().toUpperCase();
-  const currentIdx = STATUS_SEQUENCE.indexOf(currentProgress);
-  const nextIdx = STATUS_SEQUENCE.indexOf(checkpoint);
-
-  if (currentIdx === -1 || nextIdx === -1) {
-    return res.status(400).json({ error: 'Invalid load status sequence.' });
-  }
-
-  if (nextIdx !== currentIdx + 1) {
-    return res.status(400).json({ error: `Cannot skip stages. Next status must be ${STATUS_SEQUENCE[currentIdx + 1]}. Current status is ${currentProgress}.` });
-  }
-
-  // Enforce driver-disallowed manual transitions (which are handled automatically)
-  if (checkpoint === 'LOADED') {
-    return res.status(400).json({ error: 'BOL document approval is required. The status updates automatically on approval.' });
-  }
-  if (checkpoint === 'POD_UPLOADED') {
-    return res.status(400).json({ error: 'POD upload is required. The status updates automatically on upload.' });
-  }
-  if (['PAID', 'PAID_CONFIRMED'].includes(checkpoint)) {
-    return res.status(400).json({ error: 'Payment status is updated by the dispatcher.' });
-  }
 
   const nowIso = new Date().toISOString();
   load.timestamps = load.timestamps || {};
   load.driverProgress = checkpoint;
 
-  if (checkpoint === 'EN_ROUTE_PU') load.timestamps.enRoutePuAt = nowIso;
-  else if (checkpoint === 'AT_PICKUP') load.timestamps.arrivedPuAt = nowIso;
-  else if (checkpoint === 'LOADED') { load.timestamps.loadedAt = nowIso; load.status = 'Loaded'; }
-  else if (checkpoint === 'IN_TRANSIT') { load.timestamps.inTransitAt = nowIso; load.status = 'In Transit'; }
-  else if (checkpoint === 'AT_DELIVERY') load.timestamps.arrivedDoAt = nowIso;
-  else if (checkpoint === 'POD_UPLOADED') load.timestamps.podUploadedAt = nowIso;
-  else if (checkpoint === 'DELIVERED') { load.timestamps.deliveredAt = nowIso; load.status = 'Delivered'; }
+  if (checkpoint === 'EN_ROUTE_PU' || checkpoint === 'GOING_TO_PICKUP') {
+    load.timestamps.enRoutePuAt = nowIso;
+  } else if (checkpoint === 'AT_PICKUP') {
+    load.timestamps.arrivedPuAt = nowIso;
+    if (load.status === 'Booked' || load.status === 'Accepted') load.status = 'At Pickup';
+  } else if (checkpoint === 'LOADED') {
+    load.timestamps.loadedAt = nowIso;
+    load.status = 'Loaded';
+  } else if (checkpoint === 'IN_TRANSIT' || checkpoint === 'GOING_TO_DELIVERY') {
+    load.timestamps.inTransitAt = nowIso;
+    load.status = 'In Transit';
+  } else if (checkpoint === 'AT_DELIVERY') {
+    load.timestamps.arrivedDoAt = nowIso;
+    load.status = 'At Delivery';
+  } else if (checkpoint === 'POD_UPLOADED') {
+    load.timestamps.podUploadedAt = nowIso;
+  } else if (checkpoint === 'DELIVERED' || checkpoint === 'DROP-OFF') {
+    load.timestamps.deliveredAt = nowIso;
+    load.status = 'Delivered';
+  }
 
   try {
     await saveFullState(state);
+
+    try {
+      req.app.get('io')?.emit('load:updated', { loadId: load.id, status: load.status, driverProgress: load.driverProgress, timestamp: nowIso });
+    } catch (_) {}
+
     res.json({ ok: true, load: shapeLoadForDriver(load) });
 
     // Background notifications & history logging (non-blocking for ultra-fast response)
@@ -1168,12 +1155,12 @@ router.post('/api/driver/loads/:id/status', async (req, res) => {
           await notifications.create('dispatcher', load.dispatcherId, notifPayload);
         }
       } catch(bgErr) {
-        console.warn('Background notification error:', bgErr.message);
+        console.error('status notification err:', bgErr);
       }
     })();
   } catch (e) {
-    console.error('driver status update failed:', e);
-    res.status(500).json({ error: 'Failed to update status' });
+    console.error('driver load status update failed:', e);
+    res.status(500).json({ error: 'Failed to update load status' });
   }
 });
 
@@ -1182,25 +1169,43 @@ router.post('/api/driver/loads/:id/eta', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
   const { eta } = req.body || {};
-  if (!eta) return res.status(400).json({ error: 'Missing ETA string' });
+  const etaStr = String(eta || '').trim();
+  if (!etaStr) return res.status(400).json({ error: 'ETA is required' });
 
   const { state, driver } = ctx;
-  const load = (state.loads || []).find((l) => l.id === req.params.id && l.driverId === driver.id);
+  const load = (state.loads || []).find((l) => (String(l.id) === String(req.params.id) || String(l.loadNumber) === String(req.params.id)) && (String(l.driverId) === String(driver.id) || !l.driverId));
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
-  load.eta = eta;
-  load.pickupEta = eta;
-  load.driverManualEta = eta;
-  load.etaUpdatedAt = new Date().toISOString();
-  load.etaUpdatedBy = driver.name || 'Driver';
+  const nowIso = new Date().toISOString();
+  load.driverManualEta = etaStr;
+  load.eta = etaStr;
+  load.timestamps = load.timestamps || {};
+  load.timestamps.etaSubmittedAt = nowIso;
 
   try {
     await saveFullState(state);
-    await history.record(load.id, 'ETA_UPDATED', `Driver updated ETA to: ${eta}`, { type: 'driver', id: driver.id, name: driver.name });
-    res.json({ ok: true, load: shapeLoadForDriver(load) });
+    res.json({ ok: true, eta: etaStr });
+
+    (async () => {
+      try {
+        await history.record(load.id, 'ETA_UPDATED', `Driver updated ETA to ${etaStr}`, { type: 'driver', id: driver.id, name: driver.name });
+        const notifPayload = {
+          type: 'load_status_changed',
+          title: `ETA Updated — ${load.loadNumber || load.id}`,
+          body: `${driver.name || 'Driver'} updated ETA to ${etaStr}`,
+          data: { loadId: load.id, eta: etaStr },
+        };
+        await notifications.create('admin', 'admin', notifPayload);
+        if (load.dispatcherId) {
+          await notifications.create('dispatcher', load.dispatcherId, notifPayload);
+        }
+      } catch (bgErr) {
+        console.error('eta notification err:', bgErr);
+      }
+    })();
   } catch (e) {
     console.error('driver eta update failed:', e);
-    res.status(500).json({ error: 'Failed to save ETA' });
+    res.status(500).json({ error: 'Failed to update ETA' });
   }
 });
 
@@ -1215,7 +1220,7 @@ router.post('/api/driver/doc', async (req, res) => {
   const { loadId, key, index, stopNumber } = req.body || {};
   const { state, driver } = ctx;
 
-  const load = (state.loads || []).find((l) => (l.id === loadId || l.loadNumber === loadId) && l.driverId === driver.id);
+  const load = (state.loads || []).find((l) => (String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId)) && (String(l.driverId) === String(driver.id) || !l.driverId));
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
   const docs = load.docs || load.documents || {};
@@ -1230,10 +1235,30 @@ router.post('/api/driver/doc', async (req, res) => {
     file = (docs[key] || [])[index || 0];
   }
 
-  if (!file || !file.data) {
-    return res.status(404).json({ error: 'File not available on file server' });
+  if (file && (file.data || file.url)) {
+    return res.json({
+      ok: true,
+      name: file.name || file.fileName || `${key}_Document`,
+      data: file.data || file.url,
+      mimeType: file.mimeType || 'image/jpeg',
+      status: file.status || 'Approved',
+      load: shapeLoadForDriver(load),
+    });
   }
-  res.json({ ok: true, name: file.name || file.fileName || `${key}_Document`, data: file.data, mimeType: file.mimeType || 'image/jpeg', status: file.status || 'Approved' });
+
+  // If RC document has no binary file attached, return structured rate confirmation data
+  if (key === 'RC') {
+    return res.json({
+      ok: true,
+      name: `Rate_Confirmation_${load.loadNumber || load.id}.pdf`,
+      isDigital: true,
+      data: null,
+      status: 'Approved',
+      load: shapeLoadForDriver(load),
+    });
+  }
+
+  return res.status(404).json({ error: 'File not available on file server', load: shapeLoadForDriver(load) });
 });
 
 // GET /api/driver/doc/:loadId/:key (or Bearer token / ?token=query&stopNumber=1)
@@ -1245,7 +1270,7 @@ router.get('/api/driver/doc/:loadId/:key', async (req, res) => {
   const stopNumber = req.query.stopNumber ? parseInt(req.query.stopNumber, 10) : undefined;
   const { state, driver } = ctx;
 
-  const load = (state.loads || []).find((l) => (l.id === loadId || l.loadNumber === loadId) && l.driverId === driver.id);
+  const load = (state.loads || []).find((l) => (String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId)) && (String(l.driverId) === String(driver.id) || !l.driverId));
   if (!load) return res.status(404).json({ error: 'Load not found' });
 
   const docs = load.docs || load.documents || {};
@@ -1260,10 +1285,29 @@ router.get('/api/driver/doc/:loadId/:key', async (req, res) => {
     file = (docs[key] || [])[index || 0];
   }
 
-  if (!file || !file.data) {
-    return res.status(404).json({ error: 'Document data not available' });
+  if (file && (file.data || file.url)) {
+    return res.json({
+      ok: true,
+      name: file.name || file.fileName || `${key}_Document`,
+      data: file.data || file.url,
+      mimeType: file.mimeType || 'image/jpeg',
+      status: file.status || 'Approved',
+      load: shapeLoadForDriver(load),
+    });
   }
-  res.json({ ok: true, name: file.name || file.fileName || `${key}_Document`, data: file.data, mimeType: file.mimeType || 'image/jpeg', status: file.status || 'Approved' });
+
+  if (key === 'RC') {
+    return res.json({
+      ok: true,
+      name: `Rate_Confirmation_${load.loadNumber || load.id}.pdf`,
+      isDigital: true,
+      data: null,
+      status: 'Approved',
+      load: shapeLoadForDriver(load),
+    });
+  }
+
+  return res.status(404).json({ error: 'Document data not available', load: shapeLoadForDriver(load) });
 });
 
 const DRIVER_UPLOAD_CAPS = { BOL: 1, POD: 1, PhotosPU: 6, PhotosDO: 6, Extra: 6 };
