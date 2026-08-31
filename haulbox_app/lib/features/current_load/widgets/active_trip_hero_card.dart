@@ -305,6 +305,60 @@ class ActiveTripHeroCard extends StatelessWidget {
               ],
             ),
           ),
+          // 2.5 Rejection Alert Banner (Prominently alerts driver if BOL or POD was rejected)
+          if (workflowState == LoadWorkflowState.bolRejected ||
+              workflowState == LoadWorkflowState.podRejected ||
+              workflowState == LoadWorkflowState.bolQualityFailed ||
+              workflowState == LoadWorkflowState.podQualityFailed) ...[
+            Container(
+              margin: const EdgeInsets.only(top: 14),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 22),
+                      const SizedBox(width: 8),
+                      Text(
+                        (workflowState == LoadWorkflowState.bolRejected || workflowState == LoadWorkflowState.bolQualityFailed)
+                            ? 'BOL REJECTED — RETAKE REQUIRED'
+                            : 'POD REJECTED — RETAKE REQUIRED',
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF991B1B),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    (workflowState == LoadWorkflowState.bolRejected || workflowState == LoadWorkflowState.bolQualityFailed)
+                        ? (load.bolRejectionReason != null && load.bolRejectionReason!.isNotEmpty
+                            ? 'Dispatcher Note: "${load.bolRejectionReason}"\nTap below to retake a clear photo of the BOL.'
+                            : 'The Shipper BOL photo was not accepted. Please take a clear, well-lit photo and resubmit.')
+                        : (load.podRejectionReason != null && load.podRejectionReason!.isNotEmpty
+                            ? 'Dispatcher Note: "${load.podRejectionReason}"\nTap below to retake a clear photo of the POD.'
+                            : 'The Receiver POD photo was not accepted. Please take a clear, legible photo and resubmit.'),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFB91C1C),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 16),
 
           // 3. High-Contrast Hero Primary Action Button (56px minimum height)

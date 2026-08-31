@@ -29,8 +29,17 @@ class TripDocStatusStrip extends StatelessWidget {
   }
 
   Widget _buildSingleStopStrip(BuildContext context) {
-    final isBolUploaded = load.bolStatus != null && load.bolStatus != 'PENDING';
-    final isPodUploaded = load.podStatus != null && load.podStatus != 'PENDING';
+    final bolSt = (load.bolStatus ?? '').toUpperCase();
+    final podSt = (load.podStatus ?? '').toUpperCase();
+
+    final isBolRejected = bolSt.contains('REJECT') || bolSt.contains('RETAKE');
+    final isPodRejected = podSt.contains('REJECT') || podSt.contains('RETAKE');
+
+    final isBolApproved = bolSt.contains('APPROV');
+    final isPodApproved = podSt.contains('APPROV') || load.status == 'COMPLETED';
+
+    final isBolUploaded = isBolApproved || bolSt == 'PENDING_REVIEW';
+    final isPodUploaded = isPodApproved || podSt == 'PENDING_REVIEW';
 
     return Container(
       decoration: BoxDecoration(
@@ -85,6 +94,7 @@ class TripDocStatusStrip extends StatelessWidget {
                   status: 'VERIFIED',
                   icon: Icons.description_outlined,
                   isComplete: true,
+                  isRejected: false,
                   onTap: () => _openDocPreview(
                     context,
                     title: 'Rate Confirmation (RC)',
@@ -101,18 +111,21 @@ class TripDocStatusStrip extends StatelessWidget {
                 child: _buildDocPill(
                   context: context,
                   title: 'Shipper BOL',
-                  status: load.bolStatus ?? 'REQUIRED',
-                  icon: Icons.assignment_outlined,
-                  isComplete: isBolUploaded,
-                  onTap: isBolUploaded
-                      ? () => _openDocPreview(
-                            context,
-                            title: 'Bill of Lading (BOL)',
-                            docNumber: 'BOL-${load.loadNumber}',
-                            status: load.bolStatus ?? 'APPROVED',
-                            docKey: 'BOL',
-                          )
-                      : onUploadBol,
+                  status: isBolRejected ? 'REJECTED' : (load.bolStatus ?? 'REQUIRED'),
+                  icon: isBolRejected ? Icons.warning_amber_rounded : Icons.assignment_outlined,
+                  isComplete: isBolApproved,
+                  isRejected: isBolRejected,
+                  onTap: isBolRejected
+                      ? onUploadBol
+                      : (isBolUploaded
+                          ? () => _openDocPreview(
+                                context,
+                                title: 'Bill of Lading (BOL)',
+                                docNumber: 'BOL-${load.loadNumber}',
+                                status: load.bolStatus ?? 'APPROVED',
+                                docKey: 'BOL',
+                              )
+                          : onUploadBol),
                 ),
               ),
               const SizedBox(width: 8),
@@ -122,18 +135,21 @@ class TripDocStatusStrip extends StatelessWidget {
                 child: _buildDocPill(
                   context: context,
                   title: 'Receiver POD',
-                  status: load.podStatus ?? (load.status == 'COMPLETED' ? 'APPROVED' : 'REQUIRED'),
-                  icon: Icons.assignment_turned_in_outlined,
-                  isComplete: isPodUploaded || load.status == 'COMPLETED',
-                  onTap: (isPodUploaded || load.status == 'COMPLETED')
-                      ? () => _openDocPreview(
-                            context,
-                            title: 'Proof of Delivery (POD)',
-                            docNumber: 'POD-${load.loadNumber}',
-                            status: load.podStatus ?? 'APPROVED',
-                            docKey: 'POD',
-                          )
-                      : onUploadPod,
+                  status: isPodRejected ? 'REJECTED' : (load.podStatus ?? (load.status == 'COMPLETED' ? 'APPROVED' : 'REQUIRED')),
+                  icon: isPodRejected ? Icons.warning_amber_rounded : Icons.assignment_turned_in_outlined,
+                  isComplete: isPodApproved,
+                  isRejected: isPodRejected,
+                  onTap: isPodRejected
+                      ? onUploadPod
+                      : ((isPodUploaded || load.status == 'COMPLETED')
+                          ? () => _openDocPreview(
+                                context,
+                                title: 'Proof of Delivery (POD)',
+                                docNumber: 'POD-${load.loadNumber}',
+                                status: load.podStatus ?? 'APPROVED',
+                                docKey: 'POD',
+                              )
+                          : onUploadPod),
                 ),
               ),
             ],
@@ -291,10 +307,26 @@ class TripDocStatusStrip extends StatelessWidget {
     required String status,
     required IconData icon,
     required bool isComplete,
+    bool isRejected = false,
     required VoidCallback onTap,
   }) {
-    final statusColor = isComplete ? AppColors.emeraldDark : const Color(0xFFD97706);
-    final statusBg = isComplete ? AppColors.emeraldSoft : const Color(0xFFFEF3C7);
+    final Color statusColor;
+    final Color statusBg;
+    final String prefix;
+
+    if (isRejected) {
+      statusColor = const Color(0xFFDC2626);
+      statusBg = const Color(0xFFFEE2E2);
+      prefix = '✕ ';
+    } else if (isComplete) {
+      statusColor = AppColors.emeraldDark;
+      statusBg = AppColors.emeraldSoft;
+      prefix = '✓ ';
+    } else {
+      statusColor = const Color(0xFFD97706);
+      statusBg = const Color(0xFFFEF3C7);
+      prefix = '▲ ';
+    }
 
     return InkWell(
       onTap: onTap,
@@ -302,10 +334,13 @@ class TripDocStatusStrip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.bgSecondary,
+          color: isRejected ? const Color(0xFFFEF2F2) : AppColors.bgSecondary,
           borderRadius: AppRadius.mdBorder,
           border: Border.all(
-            color: isComplete ? AppColors.emeraldPrimary.withValues(alpha: 0.3) : AppColors.borderLight,
+            color: isRejected
+                ? const Color(0xFFEF4444)
+                : (isComplete ? AppColors.emeraldPrimary.withValues(alpha: 0.3) : AppColors.borderLight),
+            width: isRejected ? 1.5 : 1.0,
           ),
         ),
         child: Column(
@@ -326,7 +361,7 @@ class TripDocStatusStrip extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                isComplete ? '✓ $status' : '▲ $status',
+                '$prefix$status',
                 maxLines: 1,
                 style: TextStyle(
                   fontSize: 9.5,

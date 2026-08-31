@@ -610,7 +610,42 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: 16),
+          // Rejection banner if document is rejected
+          if (widget.status.toUpperCase().contains('REJECT')) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'DOCUMENT REJECTED BY DISPATCH',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF991B1B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'This document was not accepted. Please tap "UPLOAD / REPLACE DOCUMENT" below to take a new, clear photo and resubmit.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFFB91C1C), height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // 2. Metadata Specs Card
           HaulBoxCard(

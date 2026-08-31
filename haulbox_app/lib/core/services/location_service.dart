@@ -83,41 +83,66 @@ class LocationService {
     return true;
   }
 
+  Timer? _heartbeatTimer;
+
   Future<void> startTripTracking({
     required String loadId,
     required String token,
   }) async {
+    _currentLoadId = loadId;
+    _currentToken = token;
+
     if (_isTracking) return;
 
     final hasPermission = await requestLocationPermission();
     if (!hasPermission) return;
 
     _isTracking = true;
-    _currentLoadId = loadId;
-    _currentToken = token;
 
+    // 1. Immediately send last known position for instant update
     try {
-      final initialPos = await Geolocator.getCurrentPosition();
+      final lastPos = await Geolocator.getLastKnownPosition();
+      if (lastPos != null) {
+        _handleNewPosition(lastPos);
+      }
+    } catch (_) {}
+
+    // 2. Fetch high accuracy current position
+    try {
+      final initialPos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
       _handleNewPosition(initialPos);
     } catch (_) {}
 
     final locationSettings = const LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 50, // Update every 50 meters
+      distanceFilter: 25, // Update every 25 meters
     );
 
+    _positionStream?.cancel();
     _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings)
         .listen((Position position) {
       _handleNewPosition(position);
     });
     
-    Timer.periodic(const Duration(minutes: 5), (timer) async {
+    // 3. Reliable 20-second heartbeat timer so stationary trucks still update live telemetry
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 20), (timer) async {
       if (!_isTracking) {
         timer.cancel();
         return;
       }
       try {
-        final pos = await Geolocator.getCurrentPosition();
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
         _handleNewPosition(pos);
       } catch (_) {}
     });
@@ -138,7 +163,8 @@ class LocationService {
       batteryLevel = await _battery.batteryLevel;
     } catch (_) {}
 
-    final speedMph = position.speed * 2.23694;
+    final rawSpeed = position.speed * 2.23694;
+    final speedMph = rawSpeed > 0 ? rawSpeed : 0.0;
 
     final data = {
       'latitude': position.latitude,
@@ -204,6 +230,8 @@ class LocationService {
     _isTracking = false;
     _positionStream?.cancel();
     _positionStream = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     _currentLoadId = null;
   }
 

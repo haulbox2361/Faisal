@@ -334,23 +334,39 @@ function canDriverAccessLoad(driver, load) {
   return String(load.driverId) === String(driver.id);
 }
 
-// Shapes a load down to only what a driver should ever see about their own
-// run — no dispatch revenue, no broker rate, no other drivers' pay, nothing
+// Shapes a load down to what a driver sees about their own run
+// Ensures full RC Rate is visible and document verification/rejection status is retained
 function shapeLoadForDriver(l, driverId) {
-  // Security check: verify this load belongs to the requesting driver
-  if (!canDriverAccessLoad({ id: driverId }, l)) {
+  if (!l) return null;
+  // Security check: verify this load belongs to the requesting driver if driverId is provided
+  if (driverId && !canDriverAccessLoad({ id: driverId }, l)) {
     console.warn(`Driver ${driverId} attempted to access load ${l.id}`);
-    return null; // Silently exclude unauthorized load
+    return null;
   }
   const docs = l.docs || l.documents || {};
   const singleMeta = (doc) => {
-    if (!doc) return { hasFile: false };
-    if (typeof doc === 'object' && (doc.hasFile || doc.name || doc.data || doc.fileName)) {
-      return { hasFile: true, name: doc.name || doc.fileName || 'Document', fileName: doc.fileName || doc.name || null, mimeType: doc.mimeType || null };
+    if (!doc) return { hasFile: false, status: 'NOT_UPLOADED' };
+    if (typeof doc === 'object' && (doc.hasFile || doc.name || doc.data || doc.fileName || doc.status)) {
+      return {
+        hasFile: Boolean(doc.hasFile || doc.name || doc.data || doc.fileName || doc.url),
+        name: doc.name || doc.fileName || 'Document',
+        fileName: doc.fileName || doc.name || null,
+        mimeType: doc.mimeType || null,
+        status: doc.status || (doc.hasFile || doc.name || doc.data ? 'Pending Verification' : 'NOT_UPLOADED'),
+        rejectionReason: doc.rejectionReason || doc.reason || null,
+        url: doc.url || null,
+      };
     }
-    return { hasFile: false };
+    return { hasFile: false, status: 'NOT_UPLOADED' };
   };
-  const arrMeta = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && (x.hasFile || x.name || x.data || x.fileName)).map((x) => ({ hasFile: true, name: x.name || x.fileName || 'Photo', fileName: x.fileName || x.name || null, mimeType: x.mimeType || null })) : []);
+
+  const arrMeta = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && (x.hasFile || x.name || x.data || x.fileName)).map((x) => ({
+    hasFile: true,
+    name: x.name || x.fileName || 'Photo',
+    fileName: x.fileName || x.name || null,
+    mimeType: x.mimeType || null,
+    status: x.status || 'Approved',
+  })) : []);
 
   const shapedDocs = {
     RC: singleMeta(docs.RC),
@@ -361,8 +377,32 @@ function shapeLoadForDriver(l, driverId) {
     Extra: arrMeta(docs.Extra),
   };
 
-  // Show driver the full Rate Con (RC) price clearly (not reduced to 80%)
+  // Show driver the full Rate Con (RC) price clearly (e.g. $1,500 if RC is $1,500)
   const fullRcRate = Number(l.brokerRate || l.rate || l.grossAmount || l.driverPay || 0);
+
+  // Derive explicit BOL & POD statuses
+  const bolStatusRaw = String((docs.BOL && docs.BOL.status) || l.bolStatus || '').toUpperCase();
+  let bolStatus = 'NOT_UPLOADED';
+  if (bolStatusRaw.includes('REJECT') || bolStatusRaw.includes('RETAKE')) {
+    bolStatus = 'REJECTED';
+  } else if (bolStatusRaw.includes('APPROV') || l.status === 'Loaded' || l.driverProgress === 'LOADED') {
+    bolStatus = 'APPROVED';
+  } else if (docs.BOL && (docs.BOL.hasFile || docs.BOL.data || docs.BOL.fileName || docs.BOL.name)) {
+    bolStatus = 'PENDING_REVIEW';
+  }
+
+  const podStatusRaw = String((docs.POD && docs.POD.status) || l.podStatus || '').toUpperCase();
+  let podStatus = 'NOT_UPLOADED';
+  if (podStatusRaw.includes('REJECT') || podStatusRaw.includes('RETAKE')) {
+    podStatus = 'REJECTED';
+  } else if (podStatusRaw.includes('APPROV') || l.status === 'Drop-off' || l.status === 'Delivered' || l.driverProgress === 'DELIVERED') {
+    podStatus = 'APPROVED';
+  } else if (docs.POD && (docs.POD.hasFile || docs.POD.data || docs.POD.fileName || docs.POD.name)) {
+    podStatus = 'PENDING_REVIEW';
+  }
+
+  const bolRejectionReason = (docs.BOL && (docs.BOL.rejectionReason || docs.BOL.reason)) || l.bolRejectionReason || null;
+  const podRejectionReason = (docs.POD && (docs.POD.rejectionReason || docs.POD.reason)) || l.podRejectionReason || null;
 
   // Format per-stop metadata for driver mobile app
   const formatStop = (s, idx, type) => {
@@ -371,6 +411,15 @@ function shapeLoadForDriver(l, driverId) {
     const docKey = type === 'PICKUP' ? `BOL_${sNum}` : `POD_${sNum}`;
     const legacyKey = type === 'PICKUP' ? 'BOL' : 'POD';
     const stopDoc = docs[docKey] || (sNum === 1 ? docs[legacyKey] : null);
+    const stopDocStatus = String(stopDoc?.status || '').toUpperCase();
+    
+    let derivedStopStatus = s.status || 'PENDING';
+    if (stopDocStatus.includes('APPROV')) {
+      derivedStopStatus = type === 'PICKUP' ? 'BOL_APPROVED' : 'POD_APPROVED';
+    } else if (stopDocStatus.includes('REJECT')) {
+      derivedStopStatus = type === 'PICKUP' ? 'BOL_REJECTED' : 'POD_REJECTED';
+    }
+
     return {
       stopNumber: sNum,
       facilityName: s.facility_name || s.facilityName || `${type === 'PICKUP' ? 'Shipper Stop' : 'Receiver Stop'} ${sNum}`,
@@ -379,9 +428,10 @@ function shapeLoadForDriver(l, driverId) {
       state: s.state || (s.address ? (s.address.split(',')[1] || '').trim().slice(0, 2) : ''),
       zip: s.zip || null,
       scheduledDate: s.scheduled_date || s.scheduledDate || s.date || null,
-      status: s.status || (stopDoc && stopDoc.status === 'Approved' ? (type === 'PICKUP' ? 'BOL_APPROVED' : 'POD_APPROVED') : 'PENDING'),
+      status: derivedStopStatus,
       hasDoc: Boolean(stopDoc && (stopDoc.hasFile || stopDoc.data || stopDoc.fileName)),
       docStatus: stopDoc?.status || 'PENDING',
+      rejectionReason: stopDoc?.rejectionReason || stopDoc?.reason || null,
     };
   };
 
@@ -398,9 +448,10 @@ function shapeLoadForDriver(l, driverId) {
         state: l.pickup ? (l.pickup.split(',')[1] || '').trim().slice(0, 2) : '',
         zip: null,
         scheduledDate: l.pickupDate || null,
-        status: (l.status === 'Loaded' || l.status === 'Drop-off' || l.driverProgress === 'LOADED' || l.driverProgress === 'DELIVERED') ? 'BOL_APPROVED' : 'PENDING',
+        status: bolStatus === 'APPROVED' ? 'BOL_APPROVED' : (bolStatus === 'REJECTED' ? 'BOL_REJECTED' : 'PENDING'),
         hasDoc: Boolean(docs.BOL && (docs.BOL.hasFile || docs.BOL.data || docs.BOL.fileName)),
         docStatus: docs.BOL?.status || 'PENDING',
+        rejectionReason: bolRejectionReason,
       }];
 
   const deliveryStops = rawDeliveries.length > 0
@@ -413,9 +464,10 @@ function shapeLoadForDriver(l, driverId) {
         state: l.dropoff ? (l.dropoff.split(',')[1] || '').trim().slice(0, 2) : '',
         zip: null,
         scheduledDate: l.deliveryDate || null,
-        status: (l.status === 'Drop-off' || l.driverProgress === 'DELIVERED') ? 'POD_APPROVED' : 'PENDING',
+        status: podStatus === 'APPROVED' ? 'POD_APPROVED' : (podStatus === 'REJECTED' ? 'POD_REJECTED' : 'PENDING'),
         hasDoc: Boolean(docs.POD && (docs.POD.hasFile || docs.POD.data || docs.POD.fileName)),
         docStatus: docs.POD?.status || 'PENDING',
+        rejectionReason: podRejectionReason,
       }];
 
   return {
@@ -428,9 +480,14 @@ function shapeLoadForDriver(l, driverId) {
     driverPay: fullRcRate,
     rate: fullRcRate,
     brokerRate: fullRcRate,
+    rcRate: fullRcRate,
     status: l.status,
     driverProgress: l.driverProgress || l.driverCheckpoint || 'ASSIGNED',
     driverCheckpoint: l.driverProgress || l.driverCheckpoint || null,
+    bolStatus,
+    podStatus,
+    bolRejectionReason,
+    podRejectionReason,
     pickup: l.pickup,
     dropoff: l.dropoff,
     pickupDate: l.pickupDate,
@@ -790,15 +847,37 @@ router.post('/api/driver/location', async (req, res) => {
 
     const tracking = currentLoad ? calculateLoadTracking(currentLoad, loc) : null;
 
+    // Update in-memory driver location state
+    if (ctx.state && ctx.state.drivers) {
+      const d = ctx.state.drivers.find(x => String(x.id) === String(ctx.driver.id));
+      if (d) {
+        d.location = {
+          lat: Number(latitude),
+          lng: Number(longitude),
+          speed: speed != null ? Number(speed) : null,
+          heading: heading != null ? Number(heading) : null,
+          city: (tracking && tracking.currentCity) || d.location?.city || 'En Route',
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    }
+
     // ── Broadcast live GPS update over Socket.IO to all connected dispatchers ──
-    const io = req.app.get('io');
+    const io = req.app.get('io') || global.io;
     if (io) {
       io.emit('driver_location_update', {
         driverId: ctx.driver.id,
         driverName: ctx.driver.name,
         driverTruck: ctx.driver.truck || ctx.driver.truckId || null,
         loadId: loadId || (currentLoad ? currentLoad.id : null),
-        location: loc,
+        location: {
+          latitude: Number(latitude),
+          longitude: Number(longitude),
+          lat: Number(latitude),
+          lng: Number(longitude),
+          speed: speed != null ? Number(speed) : null,
+          heading: heading != null ? Number(heading) : null,
+        },
         tracking,
       });
     }
@@ -986,63 +1065,8 @@ router.get('/api/driver/loads/:id/history', async (req, res) => {
   }
 });
 
-function shapeLoadForDriver(l) {
-  const docs = l.docs || l.documents || {};
-  const singleMeta = (doc) => (doc && (doc.hasFile || doc.name || doc.data) ? { hasFile: true, name: doc.name || doc.fileName || null, fileName: doc.name || doc.fileName || null, mimeType: doc.mimeType || null } : { hasFile: false });
-  const arrMeta = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && (x.hasFile || x.name || x.data)).map((x) => ({ hasFile: true, name: x.name || x.fileName || null, fileName: x.name || x.fileName || null, mimeType: x.mimeType || null, index: x.index })) : []);
 
-  return {
-    id: l.id,
-    loadNumber: l.loadNumber,
-    status: l.status,
-    driverProgress: l.driverProgress || 'ASSIGNED',
-    driverCheckpoint: l.driverProgress || l.driverCheckpoint || 'ASSIGNED',
-    pickup: l.pickup,
-    dropoff: l.dropoff,
-    pickupDate: l.pickupDate,
-    pickupTime: l.pickupTime,
-    deliveryDate: l.deliveryDate,
-    deliveryTime: l.deliveryTime,
-    pickupEta: l.pickupEta || l.driverManualEta || l.eta || null,
-    eta: l.pickupEta || l.driverManualEta || l.eta || null,
-    acceptNotes: l.acceptNotes || null,
-    timestamps: l.timestamps || {},
-    brokerName: l.brokerName || null,
-    driverPay: l.driverPay || 0,
-    driverPaid: !!l.driverPaid,
-    driverPaidDate: l.driverPaidDate || null,
-    pickupAddress: l.pickupAddress || null,
-    pickupContact: l.pickupContact || null,
-    pickupPhone: l.pickupPhone || null,
-    dropoffAddress: l.dropoffAddress || null,
-    dropoffContact: l.dropoffContact || null,
-    dropoffPhone: l.dropoffPhone || null,
-    notes: l.notes || null,
-    weight: l.weight || null,
-    commodity: l.commodity || null,
-    trailerType: l.trailerType || null,
-    docs: {
-      RC: singleMeta(docs.RC),
-      BOL: singleMeta(docs.BOL),
-      POD: singleMeta(docs.POD),
-      PhotosPU: arrMeta(docs.PhotosPU),
-      PhotosDO: arrMeta(docs.PhotosDO),
-      Extra: arrMeta(docs.Extra),
-    },
-    documents: {
-      RC: singleMeta(docs.RC),
-      BOL: singleMeta(docs.BOL),
-      POD: singleMeta(docs.POD),
-      PhotosPU: arrMeta(docs.PhotosPU),
-      PhotosDO: arrMeta(docs.PhotosDO),
-      Extra: arrMeta(docs.Extra),
-    },
-  };
-}
 
-function driverLoads(state, driverId) {
-  return (state.loads || []).filter((l) => l.driverId === driverId);
-}
 
 function isCompleted(l) {
   const cp = (l.driverProgress || l.status || '').toUpperCase();

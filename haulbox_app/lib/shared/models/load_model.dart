@@ -219,34 +219,57 @@ class LoadModel {
     // Determine BOL and POD status from documents map if present
     String bolSt = 'NOT_UPLOADED';
     String podSt = 'NOT_UPLOADED';
+    String? bolRejectReason;
+    String? podRejectReason;
+
     if (docs != null) {
       if (docs['BOL'] != null && docs['BOL'] is Map) {
         final b = docs['BOL'] as Map;
-        final hasFile = b['hasFile'] == true || b['name'] != null || b['data'] != null || b['url'] != null;
-        if (hasFile) {
-          final st = (b['status']?.toString() ?? 'Pending Verification').toUpperCase();
-          if (st.contains('APPROV')) {
-            bolSt = 'APPROVED';
-          } else if (st.contains('REJECT')) {
-            bolSt = 'REJECTED';
-          } else {
-            bolSt = 'PENDING_REVIEW';
-          }
+        final hasFile = b['hasFile'] == true || b['name'] != null || b['data'] != null || b['url'] != null || b['fileName'] != null;
+        final st = (b['status']?.toString() ?? '').toUpperCase();
+        if (st.contains('REJECT') || st.contains('RETAKE')) {
+          bolSt = 'REJECTED';
+          bolRejectReason = b['rejectionReason']?.toString() ?? b['reason']?.toString();
+        } else if (st.contains('APPROV')) {
+          bolSt = 'APPROVED';
+        } else if (hasFile) {
+          bolSt = 'PENDING_REVIEW';
         }
       }
       if (docs['POD'] != null && docs['POD'] is Map) {
         final p = docs['POD'] as Map;
-        final hasFile = p['hasFile'] == true || p['name'] != null || p['data'] != null || p['url'] != null;
-        if (hasFile) {
-          final st = (p['status']?.toString() ?? 'Pending Verification').toUpperCase();
-          if (st.contains('APPROV')) {
-            podSt = 'APPROVED';
-          } else if (st.contains('REJECT')) {
-            podSt = 'REJECTED';
-          } else {
-            podSt = 'PENDING_REVIEW';
-          }
+        final hasFile = p['hasFile'] == true || p['name'] != null || p['data'] != null || p['url'] != null || p['fileName'] != null;
+        final st = (p['status']?.toString() ?? '').toUpperCase();
+        if (st.contains('REJECT') || st.contains('RETAKE')) {
+          podSt = 'REJECTED';
+          podRejectReason = p['rejectionReason']?.toString() ?? p['reason']?.toString();
+        } else if (st.contains('APPROV')) {
+          podSt = 'APPROVED';
+        } else if (hasFile) {
+          podSt = 'PENDING_REVIEW';
         }
+      }
+    }
+
+    final rootBolSt = json['bolStatus']?.toString().toUpperCase();
+    if (rootBolSt != null && rootBolSt.isNotEmpty) {
+      if (rootBolSt.contains('REJECT') || rootBolSt.contains('RETAKE')) {
+        bolSt = 'REJECTED';
+      } else if (rootBolSt.contains('APPROV')) {
+        bolSt = 'APPROVED';
+      } else if (rootBolSt.contains('PENDING') || rootBolSt.contains('REVIEW')) {
+        bolSt = 'PENDING_REVIEW';
+      }
+    }
+
+    final rootPodSt = json['podStatus']?.toString().toUpperCase();
+    if (rootPodSt != null && rootPodSt.isNotEmpty) {
+      if (rootPodSt.contains('REJECT') || rootPodSt.contains('RETAKE')) {
+        podSt = 'REJECTED';
+      } else if (rootPodSt.contains('APPROV')) {
+        podSt = 'APPROVED';
+      } else if (rootPodSt.contains('PENDING') || rootPodSt.contains('REVIEW')) {
+        podSt = 'PENDING_REVIEW';
       }
     }
 
@@ -256,12 +279,20 @@ class LoadModel {
     final pStops = pStopsRaw?.map((e) => StopModel.fromJson(e as Map<String, dynamic>)).toList() ?? [];
     final dStops = dStopsRaw?.map((e) => StopModel.fromJson(e as Map<String, dynamic>)).toList() ?? [];
 
+    final rawRcAmount = json['grossAmount'] ??
+        json['rcRate'] ??
+        json['brokerRate'] ??
+        json['rate'] ??
+        json['loadAmount'] ??
+        json['driverPay'] ??
+        0;
+
     return LoadModel(
       id: json['id']?.toString() ?? '',
       loadNumber: json['loadNumber']?.toString() ?? json['load_number']?.toString() ?? 'Load',
       brokerName: json['brokerName']?.toString() ?? json['broker_name']?.toString() ?? 'Broker',
-      driverPay: json['driverPay'] ?? json['driver_pay'] ?? json['brokerRate'] ?? json['rate'] ?? 0,
-      grossAmount: json['grossAmount'] ?? json['loadAmount'] ?? json['brokerRate'] ?? json['rate'] ?? json['driverPay'] ?? 0,
+      driverPay: rawRcAmount,
+      grossAmount: rawRcAmount,
       status: (json['status']?.toString() ?? 'ASSIGNED').toUpperCase(),
       driverProgress: (json['driverProgress']?.toString() ?? json['driver_progress']?.toString() ?? json['status']?.toString() ?? 'ASSIGNED').toUpperCase(),
       pickup: json['pickup']?.toString() ?? '',
@@ -283,10 +314,10 @@ class LoadModel {
       weight: json['weight'],
       commodity: json['commodity']?.toString(),
       trailerType: json['trailerType']?.toString() ?? json['trailer_type']?.toString(),
-      bolStatus: json['bolStatus']?.toString() ?? bolSt,
-      podStatus: json['podStatus']?.toString() ?? podSt,
-      bolRejectionReason: json['bolRejectionReason']?.toString(),
-      podRejectionReason: json['podRejectionReason']?.toString(),
+      bolStatus: bolSt,
+      podStatus: podSt,
+      bolRejectionReason: json['bolRejectionReason']?.toString() ?? bolRejectReason,
+      podRejectionReason: json['podRejectionReason']?.toString() ?? podRejectReason,
       paymentStatus: (json['paymentStatus']?.toString() ?? (json['driverPaid'] == true ? 'PAID' : 'PENDING')).toUpperCase(),
       paymentDate: json['paymentDate']?.toString() ?? json['driverPaidDate']?.toString(),
       loadingPhotos: (json['loadingPhotos'] as List?)?.map((e) => e.toString()).toList() ?? [],

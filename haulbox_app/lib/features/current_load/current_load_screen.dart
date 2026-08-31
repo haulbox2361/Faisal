@@ -47,11 +47,15 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         LocationPermissionService.checkInitialLocationPermission(context);
-        final load = Provider.of<AuthProvider>(context, listen: false).currentLoad;
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final load = auth.currentLoad;
         if (load != null) {
           setState(() {
             _workflowState = _deriveWorkflowState(load);
           });
+          if (auth.token != null && auth.token!.isNotEmpty) {
+            LocationService().startTripTracking(loadId: load.id, token: auth.token!);
+          }
         }
       }
     });
@@ -73,14 +77,22 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
     final docs = load.documents ?? {};
 
     final bolDoc = docs['BOL'] is Map ? docs['BOL'] as Map : null;
-    final hasBolFile = bolDoc != null && (bolDoc['hasFile'] == true || bolDoc['name'] != null || bolDoc['data'] != null || bolDoc['url'] != null);
     final bolDocStatus = (bolDoc != null ? (bolDoc['status']?.toString() ?? '') : '').toUpperCase();
 
     final podDoc = docs['POD'] is Map ? docs['POD'] as Map : null;
-    final hasPodFile = podDoc != null && (podDoc['hasFile'] == true || podDoc['name'] != null || podDoc['data'] != null || podDoc['url'] != null);
     final podDocStatus = (podDoc != null ? (podDoc['status']?.toString() ?? '') : '').toUpperCase();
 
-    // 1. Delivered / Completed / Drop-off
+    // 1. REJECTED POD — Highest priority so driver is prompted to retake immediately
+    if (podStatus == 'REJECTED' || podDocStatus.contains('REJECT') || podDocStatus.contains('RETAKE')) {
+      return LoadWorkflowState.podRejected;
+    }
+
+    // 2. REJECTED BOL — Highest priority so driver is prompted to retake immediately
+    if (bolStatus == 'REJECTED' || bolDocStatus.contains('REJECT') || bolDocStatus.contains('RETAKE')) {
+      return LoadWorkflowState.bolRejected;
+    }
+
+    // 3. Delivered / Completed / Drop-off
     if (status == 'DROP-OFF' ||
         status == 'DELIVERED' ||
         status == 'COMPLETED' ||
@@ -92,21 +104,20 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       return LoadWorkflowState.delivered;
     }
 
-    // 2. POD States (Delivery phase)
-    if (hasPodFile && (podStatus == 'REJECTED' || podDocStatus == 'REJECTED')) {
-      return LoadWorkflowState.podRejected;
-    }
-    if (hasPodFile && (podDocStatus.contains('PENDING') || podDocStatus.contains('REVIEW') || podStatus == 'PENDING_REVIEW')) {
+    // 4. POD Uploaded / Pending Review
+    if (podDocStatus.contains('PENDING') || podDocStatus.contains('REVIEW') || podStatus == 'PENDING_REVIEW') {
       return LoadWorkflowState.podUploaded;
     }
+
     if (status == 'AT DELIVERY' || driverProg == 'AT_DELIVERY') {
       return LoadWorkflowState.arrivedDelivery;
     }
+
     if (status == 'IN TRANSIT' || driverProg == 'IN_TRANSIT') {
       return LoadWorkflowState.inTransit;
     }
 
-    // 3. Loaded / BOL Approved (Transit phase)
+    // 5. Loaded / BOL Approved
     if (status == 'LOADED' ||
         driverProg == 'LOADED' ||
         bolStatus == 'APPROVED' ||
@@ -115,18 +126,16 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       return LoadWorkflowState.loaded;
     }
 
-    // 4. BOL States (Pickup phase)
-    if (hasBolFile && (bolStatus == 'REJECTED' || bolDocStatus == 'REJECTED')) {
-      return LoadWorkflowState.bolRejected;
-    }
-    if (hasBolFile && (bolDocStatus.contains('PENDING') || bolDocStatus.contains('REVIEW') || bolStatus == 'PENDING_REVIEW')) {
+    // 6. BOL Uploaded / Pending Review
+    if (bolDocStatus.contains('PENDING') || bolDocStatus.contains('REVIEW') || bolStatus == 'PENDING_REVIEW') {
       return LoadWorkflowState.bolUploaded;
     }
+
     if (status == 'AT PICKUP' || driverProg == 'AT_PICKUP') {
       return LoadWorkflowState.arrivedPickup;
     }
 
-    // 5. Initial / Pre-Trip States
+    // 7. Pre-Trip States
     if (status == 'GOING_TO_PICKUP' || driverProg == 'GOING_TO_PICKUP') {
       return LoadWorkflowState.goingToPickup;
     }
@@ -141,22 +150,8 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
   }
 
   void _startPendingReviewTimerIfNeeded(AuthProvider auth) {
-    if (_workflowState == LoadWorkflowState.bolUploaded ||
-        _workflowState == LoadWorkflowState.podUploaded) {
-      if (_pendingReviewTimer == null || !_pendingReviewTimer!.isActive) {
-        _pendingReviewTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-          if (mounted &&
-              (_workflowState == LoadWorkflowState.bolUploaded ||
-                  _workflowState == LoadWorkflowState.podUploaded)) {
-            auth.syncAllData(silent: true);
-          } else {
-            _pendingReviewTimer?.cancel();
-          }
-        });
-      }
-    } else {
-      _pendingReviewTimer?.cancel();
-    }
+    // Socket events handle instant push updates; timer is no longer needed
+    _pendingReviewTimer?.cancel();
   }
 
   // PRIMARY WORKFLOW DISPATCHER ACTION

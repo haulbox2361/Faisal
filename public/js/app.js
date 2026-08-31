@@ -2101,6 +2101,10 @@
       // 3. Update the driver tracking info panel if this driver is currently selected
       const select = document.getElementById('tracking-driver-select');
       if (select && String(select.value) === driverId) {
+        if (typeof showDriverDetails === 'function') {
+          showDriverDetails(driverId);
+        }
+
         // Update speed display
         const speedEl = document.getElementById('driver-live-speed');
         if (speedEl && speed != null) speedEl.textContent = speed + ' mph';

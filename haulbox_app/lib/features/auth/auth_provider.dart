@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/location_service.dart';
 import '../../core/services/socket_service.dart';
 import '../../shared/models/driver_model.dart';
 import '../../shared/models/load_model.dart';
@@ -155,9 +156,12 @@ class AuthProvider extends ChangeNotifier {
     return _loads.first;
   }
 
+  bool _isSyncing = false;
+
   // 3. Full Live Synchronization (Master Source of Truth)
   Future<void> syncAllData({bool silent = false}) async {
-    if (_token == null) return;
+    if (_token == null || _isSyncing) return;
+    _isSyncing = true;
     if (!silent) {
       _isLoading = true;
       notifyListeners();
@@ -182,6 +186,12 @@ class AuthProvider extends ChangeNotifier {
           _companyName = syncData['companyName'].toString();
         }
         _errorMessage = null;
+
+        // Auto-start GPS tracking on active load
+        final curLoad = currentLoad;
+        if (curLoad != null && _token != null && !LocationService().isTracking) {
+          LocationService().startTripTracking(loadId: curLoad.id, token: _token!);
+        }
       } else {
         // Fallback individual refreshes if sync endpoint is unavailable
         await refreshLoads(silent: true);
@@ -191,6 +201,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('Sync error: $e');
     } finally {
+      _isSyncing = false;
       if (!silent) {
         _isLoading = false;
       }
