@@ -58,7 +58,7 @@ async function runEndToEndVerification() {
   console.log('  ✓ Bearer session token generated & verified.');
 
   // 3. Test Negative Case: Random non-document picture
-  console.log('\n🧪 Step 3: Testing Rejection of Non-Document Photo (e.g. selfie/blank)...');
+  console.log('\n🧪 Step 3: Testing Routing of Non-Document Photo (e.g. selfie/blank)...');
   const fakeAiNonDoc = {
     isDocument: false,
     detectedType: 'UNKNOWN',
@@ -66,12 +66,12 @@ async function runEndToEndVerification() {
     quality: { isClear: false, cornersVisible: false },
   };
   const nonDocOutcome = verifier.evaluateBolVerification(fakeAiNonDoc, sampleLoad, null);
-  assert.strictEqual(nonDocOutcome.status, 'REJECTED', 'Random photo must be REJECTED');
-  assert(nonDocOutcome.reason.includes('not a Bill of Lading'), 'Expected invalid doc rejection reason');
-  console.log('  ✓ Non-document photo correctly REJECTED.');
+  assert.strictEqual(nonDocOutcome.status, 'PENDING_REVIEW', 'Upload must produce PENDING_REVIEW for human decision');
+  assert.strictEqual(nonDocOutcome.validationResults.docTypeMatch, 'FAIL', 'Expected docTypeMatch FAIL');
+  console.log('  ✓ Non-document photo correctly routed to PENDING_REVIEW with flagged issue.');
 
-  // 4. Test Negative Case: Unsigned BOL
-  console.log('\n🧪 Step 4: Testing Rejection of Unsigned BOL...');
+  // 4. Test Case: Unsigned BOL
+  console.log('\n🧪 Step 4: Testing Routing of Unsigned BOL...');
   const fakeAiUnsignedBol = {
     isDocument: true,
     detectedType: 'BOL',
@@ -80,9 +80,9 @@ async function runEndToEndVerification() {
     extractedData: { shipperAddress: sampleLoad.pickupAddress, weight: 42500 },
   };
   const unsignedBolOutcome = verifier.evaluateBolVerification(fakeAiUnsignedBol, sampleLoad, null);
-  assert.strictEqual(unsignedBolOutcome.status, 'REJECTED', 'Unsigned BOL must be REJECTED');
-  assert(unsignedBolOutcome.reason.includes('signature is missing'), 'Expected missing signature reason');
-  console.log('  ✓ Unsigned BOL correctly REJECTED.');
+  assert.strictEqual(unsignedBolOutcome.status, 'PENDING_REVIEW', 'Unsigned BOL must be held in PENDING_REVIEW');
+  assert.strictEqual(unsignedBolOutcome.validationResults.signatureDetected, 'FAIL', 'Expected signatureDetected FAIL');
+  console.log('  ✓ Unsigned BOL correctly routed to PENDING_REVIEW with flagged issue.');
 
   // 5. Test Positive Case: Valid Signed BOL produces PENDING_REVIEW (awaiting human dispatcher review)
   console.log('\n🧪 Step 5: Testing Processing of Valid Signed BOL (must be PENDING_REVIEW)...');
@@ -132,8 +132,8 @@ async function runEndToEndVerification() {
     extractedData: { consigneeAddress: sampleLoad.dropoffAddress },
   };
   const unsignedPodOutcome = verifier.evaluatePodVerification(fakeAiUnsignedPod, sampleLoad, null);
-  assert.strictEqual(unsignedPodOutcome.status, 'REJECTED', 'Unsigned POD must be REJECTED');
-  console.log('  ✓ Unsigned POD correctly REJECTED.');
+  assert.strictEqual(unsignedPodOutcome.status, 'PENDING_REVIEW', 'Unsigned POD must be held in PENDING_REVIEW');
+  console.log('  ✓ Unsigned POD correctly routed to PENDING_REVIEW with flagged issue.');
 
   const fakeAiValidPod = {
     isDocument: true,

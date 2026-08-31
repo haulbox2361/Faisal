@@ -26,8 +26,8 @@ async function runTests() {
   assert(simExact >= 0.85, `Expected >=0.85 similarity, got ${simExact}`);
   console.log('  ✓ Normalizers and similarity calculations accurate.');
 
-  // Test 2: Rejection of non-document images
-  console.log('\n🧪 2. Testing Non-document Photo: REJECTED...');
+  // Test 2: Non-document photo flags issue and routes to PENDING_REVIEW
+  console.log('\n🧪 2. Testing Non-document Photo: Held for review with issue...');
   const fakeAiNonDoc = {
     isDocument: false,
     detectedType: 'UNKNOWN',
@@ -35,12 +35,13 @@ async function runTests() {
     quality: { isClear: false, cornersVisible: false },
   };
   const nonDocRes = verifier.evaluateBolVerification(fakeAiNonDoc, testLoad, null);
-  assert.strictEqual(nonDocRes.status, 'REJECTED', 'Random photo must be REJECTED');
-  assert(nonDocRes.reason.includes('not a Bill of Lading'), 'Expected invalid document rejection reason');
-  console.log('  ✓ Random/non-document photo correctly REJECTED.');
+  assert.strictEqual(nonDocRes.status, 'PENDING_REVIEW', 'Upload must produce PENDING_REVIEW for human dispatcher decision');
+  assert.strictEqual(nonDocRes.validationResults.docTypeMatch, 'FAIL', 'Expected docTypeMatch FAIL');
+  assert(nonDocRes.issues.some(i => i.includes('Document type check flagged')), 'Expected document type issue');
+  console.log('  ✓ Non-document photo correctly routed to PENDING_REVIEW with flagged issue.');
 
-  // Test 3: Rejection of BOL with missing shipper signature
-  console.log('\n🧪 3. Testing BOL Missing Signature: REJECTED...');
+  // Test 3: BOL with missing shipper signature flags issue and routes to PENDING_REVIEW
+  console.log('\n🧪 3. Testing BOL Missing Signature: Held for review with issue...');
   const fakeAiMissingSig = {
     isDocument: true,
     detectedType: 'BOL',
@@ -49,9 +50,10 @@ async function runTests() {
     extractedData: { shipperAddress: '123 Logistics Blvd, Dallas, TX 75201', weight: 42500 },
   };
   const missingSigRes = verifier.evaluateBolVerification(fakeAiMissingSig, testLoad, null);
-  assert.strictEqual(missingSigRes.status, 'REJECTED', 'Unsigned BOL must be REJECTED');
-  assert(missingSigRes.reason.includes('signature is missing'), 'Expected signature rejection reason');
-  console.log('  ✓ Unsigned BOL correctly REJECTED.');
+  assert.strictEqual(missingSigRes.status, 'PENDING_REVIEW', 'Upload must produce PENDING_REVIEW for human dispatcher decision');
+  assert.strictEqual(missingSigRes.validationResults.signatureDetected, 'FAIL', 'Expected signatureDetected FAIL');
+  assert(missingSigRes.issues.some(i => i.includes('Shipper signature may be missing')), 'Expected signature issue');
+  console.log('  ✓ Unsigned BOL correctly routed to PENDING_REVIEW with flagged issue.');
 
   // Test 4: Valid BOL — OCR passes ALL checks but must still produce PENDING_REVIEW.
   // OCR can never produce APPROVED; only a human Dispatcher/Admin review can approve.
@@ -77,8 +79,8 @@ async function runTests() {
   assert.strictEqual(validBolRes.ocrData.sealNumbers.length, 0, 'sealNumbers must be empty when not found in OCR');
   console.log('  ✓ Valid BOL correctly produces PENDING_REVIEW (awaiting Dispatcher approval).');
 
-  // Test 5: Rejection of POD with missing receiver signature
-  console.log('\n🧪 5. Testing POD Missing Consignee Signature: REJECTED...');
+  // Test 5: POD with missing receiver signature flags issue and routes to PENDING_REVIEW
+  console.log('\n🧪 5. Testing POD Missing Consignee Signature: Held for review with issue...');
   const fakeAiMissingPodSig = {
     isDocument: true,
     detectedType: 'POD',
@@ -88,8 +90,10 @@ async function runTests() {
     extractedData: { consigneeAddress: '700 Warehouse St, Houston, TX 77001' },
   };
   const missingPodSigRes = verifier.evaluatePodVerification(fakeAiMissingPodSig, testLoad, null);
-  assert.strictEqual(missingPodSigRes.status, 'REJECTED', 'Unsigned POD must be REJECTED');
-  console.log('  ✓ Unsigned POD correctly REJECTED.');
+  assert.strictEqual(missingPodSigRes.status, 'PENDING_REVIEW', 'Upload must produce PENDING_REVIEW for human dispatcher decision');
+  assert.strictEqual(missingPodSigRes.validationResults.signatureDetected, 'FAIL', 'Expected signatureDetected FAIL');
+  assert(missingPodSigRes.issues.some(i => i.includes('Receiver / Consignee signature may be missing')), 'Expected signature issue');
+  console.log('  ✓ Unsigned POD correctly routed to PENDING_REVIEW with flagged issue.');
 
   // Test 6: Database Storage & Validation Retrieval
   console.log('\n🧪 6. Testing Database Schema & Persistence...');

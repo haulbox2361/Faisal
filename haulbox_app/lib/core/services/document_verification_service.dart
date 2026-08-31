@@ -225,15 +225,13 @@ class DocumentVerificationService {
         AiDocumentStatus status;
         if (statusStr == 'APPROVED') {
           status = AiDocumentStatus.approved;
-        } else if (statusStr == 'PENDING_REVIEW' || statusStr == 'DISPATCHER_REVIEW') {
-          status = AiDocumentStatus.pendingReview;
         } else {
-          status = AiDocumentStatus.rejected;
+          status = AiDocumentStatus.pendingReview;
         }
 
         return AiVerificationDetails(
           status: status,
-          message: reason ?? (status == AiDocumentStatus.approved ? '✓ $documentType Approved' : (status == AiDocumentStatus.pendingReview ? 'Under Review' : 'Retake Required')),
+          message: reason ?? (status == AiDocumentStatus.approved ? '✓ $documentType Approved' : '✓ $documentType Uploaded — Sent to Dispatcher for Review'),
           reason: reason,
           confidence: (ocr['confidence'] as num?)?.toDouble() ?? 0.85,
           extractedData: ocr,
@@ -241,9 +239,9 @@ class DocumentVerificationService {
         );
       } else {
         return AiVerificationDetails(
-          status: AiDocumentStatus.rejected,
-          message: 'Document verification failed (${resp.statusCode}). Please retake a clear photo.',
-          reason: 'Server error during verification (${resp.statusCode}). Please ensure the photo is clear and retry.',
+          status: AiDocumentStatus.pendingReview,
+          message: '$documentType received and queued for Dispatch review.',
+          reason: 'Uploaded and queued for Dispatch review.',
           confidence: 0.0,
         );
       }

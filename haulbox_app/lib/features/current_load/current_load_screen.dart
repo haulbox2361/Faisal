@@ -319,7 +319,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'AI is analyzing $docType$stopLabel with Mistral Vision OCR...';
+      _statusMessage = 'Uploading $docType$stopLabel to Dispatch...';
     });
 
     try {
@@ -340,7 +340,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       });
 
       if (result.isApproved) {
-        // Outcome 1: APPROVED -> Sync data
+        // Outcome: APPROVED -> Sync data & advance
         await auth.syncAllData();
 
         setState(() {
@@ -371,7 +371,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
                 ],
               ),
               content: Text(
-                'AI OCR verified all details for Stop $stopNumber successfully.',
+                'Document verified for Stop $stopNumber successfully.',
                 style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
               actions: [
@@ -387,40 +387,9 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
             ),
           );
         }
-      } else if (result.isPendingReview) {
-        // Outcome 2: PENDING_REVIEW -> Show yellow modal, keep load in current state
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              backgroundColor: const Color(0xFF0F172A),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              title: const Row(
-                children: [
-                  Icon(Icons.access_time_filled_rounded, color: Color(0xFFF59E0B), size: 28),
-                  SizedBox(width: 10),
-                  Text('Sent to Dispatcher', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
-                ],
-              ),
-              content: Text(
-                result.issueDescription ?? 'Your $docType has been sent to Dispatch for review. You may continue working; you will be notified once approved.',
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-              actions: [
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('GOT IT', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          );
-        }
       } else {
-        // Outcome 3: REJECTED -> Show red modal + immediate Retake Photo button
+        // Outcome: PENDING_REVIEW -> Show confirmation modal, sent to Dispatcher review
+        await auth.syncAllData();
         if (mounted) {
           showDialog(
             context: context,
@@ -429,30 +398,23 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               title: Row(
                 children: [
-                  const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 28),
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 28),
                   const SizedBox(width: 10),
-                  Text('✕ Retake Required', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+                  Text('✓ $docType$stopLabel Uploaded', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
                 ],
               ),
               content: Text(
-                'Reason: ${result.issueDescription ?? "Document verification failed."}\nPlease capture a clear photo of the signed $docType.',
+                'Your $docType has been received and sent to Dispatch for review. You may continue working; you will be notified once approved.',
                 style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('CANCEL', style: TextStyle(color: Colors.white60, fontWeight: FontWeight.bold)),
-                ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
+                    backgroundColor: const Color(0xFF0284C7),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _runDocumentAiVerification(load, isBol: isBol);
-                  },
-                  child: const Text('RETAKE PHOTO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('GOT IT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

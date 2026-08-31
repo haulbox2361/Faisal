@@ -124,11 +124,12 @@ async function runMultiStopTests() {
   const valStop1 = verifier.evaluateBolVerification(aiPickup1, multiStopLoad, null, { stopType: 'PICKUP', stopNumber: 1 });
   assert.strictEqual(valStop1.status, 'PENDING_REVIEW', 'Stop 1 BOL should be PENDING_REVIEW (awaiting human dispatcher review)');
 
-  // Attempting to upload Stop 1 BOL (Dallas) for Stop 2 (Fort Worth) -> Address Mismatch FAIL
+  // Attempting to upload Stop 1 BOL (Dallas) for Stop 2 (Fort Worth) -> Address Mismatch flagged for review
   const valWrongStop = verifier.evaluateBolVerification(aiPickup1, multiStopLoad, null, { stopType: 'PICKUP', stopNumber: 2 });
-  assert.strictEqual(valWrongStop.status, 'REJECTED', 'Mismatched stop address must be REJECTED');
-  assert(valWrongStop.reason.includes('Pickup address mismatch'), 'Expected address mismatch reason');
-  console.log('  ✓ Stop-specific cross-validation verified: matched stop approved, wrong stop rejected.');
+  assert.strictEqual(valWrongStop.status, 'PENDING_REVIEW', 'Mismatched stop address must be held in PENDING_REVIEW');
+  assert.strictEqual(valWrongStop.validationResults.addressMatch, 'FAIL', 'Expected addressMatch to be FAIL');
+  assert(valWrongStop.issues.some(i => i.includes('Pickup address discrepancy')), 'Expected address mismatch issue');
+  console.log('  ✓ Stop-specific cross-validation verified: matched stop and mismatched stop properly analyzed.');
 
   // Test 5: Multi-Stop Load Advancement Rule
   console.log('\n🧪 Test 5: Multi-Stop Load Advancement Rule (All Pickups / All Deliveries)...');
