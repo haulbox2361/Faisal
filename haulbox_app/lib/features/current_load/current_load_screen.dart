@@ -71,44 +71,42 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
     final bolStatus = (load.bolStatus ?? '').toUpperCase();
     final podStatus = (load.podStatus ?? '').toUpperCase();
     final docs = load.documents ?? {};
-    final bolDocStatus = (docs['BOL'] is Map ? docs['BOL']['status']?.toString() : '')?.toUpperCase() ?? '';
-    final podDocStatus = (docs['POD'] is Map ? docs['POD']['status']?.toString() : '')?.toUpperCase() ?? '';
 
-    // If fully delivered or drop-off
+    final bolDoc = docs['BOL'] is Map ? docs['BOL'] as Map : null;
+    final hasBolFile = bolDoc != null && (bolDoc['hasFile'] == true || bolDoc['name'] != null || bolDoc['data'] != null || bolDoc['url'] != null);
+    final bolDocStatus = (bolDoc != null ? (bolDoc['status']?.toString() ?? '') : '').toUpperCase();
+
+    final podDoc = docs['POD'] is Map ? docs['POD'] as Map : null;
+    final hasPodFile = podDoc != null && (podDoc['hasFile'] == true || podDoc['name'] != null || podDoc['data'] != null || podDoc['url'] != null);
+    final podDocStatus = (podDoc != null ? (podDoc['status']?.toString() ?? '') : '').toUpperCase();
+
+    // 1. Delivered / Completed / Drop-off
     if (status == 'DROP-OFF' ||
         status == 'DELIVERED' ||
+        status == 'COMPLETED' ||
         driverProg == 'DELIVERED' ||
+        driverProg == 'COMPLETED' ||
         podStatus == 'APPROVED' ||
         podStatus == 'VERIFIED' ||
         podDocStatus == 'APPROVED') {
       return LoadWorkflowState.delivered;
     }
 
-    // If POD rejected
-    if (podStatus == 'REJECTED' || podDocStatus == 'REJECTED') {
+    // 2. POD States (Delivery phase)
+    if (hasPodFile && (podStatus == 'REJECTED' || podDocStatus == 'REJECTED')) {
       return LoadWorkflowState.podRejected;
     }
-
-    // If POD uploaded / pending review
-    if (podStatus == 'PENDING' ||
-        podStatus == 'PENDING_REVIEW' ||
-        podDocStatus.contains('PENDING') ||
-        docs['POD'] != null) {
-      if (status == 'AT DELIVERY' || driverProg == 'AT_DELIVERY' || status == 'IN TRANSIT' || driverProg == 'IN_TRANSIT') {
-        return LoadWorkflowState.podUploaded;
-      }
+    if (hasPodFile && (podDocStatus.contains('PENDING') || podDocStatus.contains('REVIEW') || podStatus == 'PENDING_REVIEW')) {
+      return LoadWorkflowState.podUploaded;
     }
-
-    // If in transit / at delivery
+    if (status == 'AT DELIVERY' || driverProg == 'AT_DELIVERY') {
+      return LoadWorkflowState.arrivedDelivery;
+    }
     if (status == 'IN TRANSIT' || driverProg == 'IN_TRANSIT') {
       return LoadWorkflowState.inTransit;
     }
 
-    if (status == 'AT DELIVERY' || driverProg == 'AT_DELIVERY') {
-      return LoadWorkflowState.arrivedDelivery;
-    }
-
-    // If loaded / BOL approved
+    // 3. Loaded / BOL Approved (Transit phase)
     if (status == 'LOADED' ||
         driverProg == 'LOADED' ||
         bolStatus == 'APPROVED' ||
@@ -117,27 +115,25 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       return LoadWorkflowState.loaded;
     }
 
-    // If BOL rejected
-    if (bolStatus == 'REJECTED' || bolDocStatus == 'REJECTED') {
+    // 4. BOL States (Pickup phase)
+    if (hasBolFile && (bolStatus == 'REJECTED' || bolDocStatus == 'REJECTED')) {
       return LoadWorkflowState.bolRejected;
     }
-
-    // If BOL uploaded / pending review
-    if (bolStatus == 'PENDING' ||
-        bolStatus == 'PENDING_REVIEW' ||
-        bolDocStatus.contains('PENDING') ||
-        docs['BOL'] != null) {
+    if (hasBolFile && (bolDocStatus.contains('PENDING') || bolDocStatus.contains('REVIEW') || bolStatus == 'PENDING_REVIEW')) {
       return LoadWorkflowState.bolUploaded;
     }
-
-    // Pre-pickup states
     if (status == 'AT PICKUP' || driverProg == 'AT_PICKUP') {
       return LoadWorkflowState.arrivedPickup;
+    }
+
+    // 5. Initial / Pre-Trip States
+    if (status == 'GOING_TO_PICKUP' || driverProg == 'GOING_TO_PICKUP') {
+      return LoadWorkflowState.goingToPickup;
     }
     if (status == 'ASSIGNED' || driverProg == 'ASSIGNED') {
       return LoadWorkflowState.assigned;
     }
-    if (status == 'ACCEPTED' || driverProg == 'ACCEPTED') {
+    if (status == 'ACCEPTED' || driverProg == 'ACCEPTED' || status == 'BOOKED') {
       return LoadWorkflowState.startTrip;
     }
 

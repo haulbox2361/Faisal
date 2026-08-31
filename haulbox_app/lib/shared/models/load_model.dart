@@ -217,14 +217,36 @@ class LoadModel {
     final docs = json['documents'] as Map<String, dynamic>? ?? json['docs'] as Map<String, dynamic>?;
     
     // Determine BOL and POD status from documents map if present
-    String bolSt = 'PENDING';
-    String podSt = 'PENDING';
+    String bolSt = 'NOT_UPLOADED';
+    String podSt = 'NOT_UPLOADED';
     if (docs != null) {
-      if (docs['BOL'] != null && (docs['BOL']['hasFile'] == true || docs['BOL']['name'] != null)) {
-        bolSt = 'VERIFIED';
+      if (docs['BOL'] != null && docs['BOL'] is Map) {
+        final b = docs['BOL'] as Map;
+        final hasFile = b['hasFile'] == true || b['name'] != null || b['data'] != null || b['url'] != null;
+        if (hasFile) {
+          final st = (b['status']?.toString() ?? 'Pending Verification').toUpperCase();
+          if (st.contains('APPROV')) {
+            bolSt = 'APPROVED';
+          } else if (st.contains('REJECT')) {
+            bolSt = 'REJECTED';
+          } else {
+            bolSt = 'PENDING_REVIEW';
+          }
+        }
       }
-      if (docs['POD'] != null && (docs['POD']['hasFile'] == true || docs['POD']['name'] != null)) {
-        podSt = 'VERIFIED';
+      if (docs['POD'] != null && docs['POD'] is Map) {
+        final p = docs['POD'] as Map;
+        final hasFile = p['hasFile'] == true || p['name'] != null || p['data'] != null || p['url'] != null;
+        if (hasFile) {
+          final st = (p['status']?.toString() ?? 'Pending Verification').toUpperCase();
+          if (st.contains('APPROV')) {
+            podSt = 'APPROVED';
+          } else if (st.contains('REJECT')) {
+            podSt = 'REJECTED';
+          } else {
+            podSt = 'PENDING_REVIEW';
+          }
+        }
       }
     }
 

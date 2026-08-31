@@ -4351,26 +4351,32 @@
       if (hasMultiPickup || hasMultiDelivery) {
         multiStopSection = `
           <div style="background:var(--bg-subtle,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:12px;margin-bottom:14px;">
-            <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:8px;">Multi-Stop Document Verification</div>
+            <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:8px;">Multi-Stop Document Management</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;">
               <div>
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;">Pickup Stops (${l.pickupStops ? l.pickupStops.length : 1})</div>
                 ${(l.pickupStops || []).map(s => {
                   const sNum = s.stop_number || s.stopNumber || 1;
-                  const doc = l.docs['BOL_' + sNum] || (sNum === 1 ? l.docs.BOL : null);
+                  const docKey = 'BOL_' + sNum;
+                  const doc = l.docs[docKey] || (sNum === 1 ? l.docs.BOL : null);
+                  const hasDoc = doc && (doc.name || doc.fileName || doc.data || doc.url);
                   const isApproved = s.status === 'BOL_APPROVED' || (doc && doc.status === 'Approved');
                   const isRejected = s.status === 'BOL_REJECTED' || (doc && doc.status === 'Rejected');
-                  const badgeColor = isApproved ? '#10b981' : (isRejected ? '#ef4444' : '#f59e0b');
-                  const badgeLabel = isApproved ? 'Approved' : (isRejected ? 'Rejected' : 'Pending');
+                  const badgeColor = isApproved ? '#10b981' : (isRejected ? '#ef4444' : (hasDoc ? '#f59e0b' : '#64748b'));
+                  const badgeLabel = isApproved ? 'Approved' : (isRejected ? 'Rejected' : (hasDoc ? 'Pending' : 'Missing'));
                   return `
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:4px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg-card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:6px;">
                       <div>
-                        <div style="font-size:12px;font-weight:600;">Stop ${sNum}: ${escapeAttr(s.city || s.address || 'Pickup')}</div>
-                        <div style="font-size:10px;color:var(--text-faint);">${escapeAttr(s.facility_name || s.facilityName || '')}</div>
+                        <div style="font-size:12px;font-weight:700;">Stop ${sNum}: ${escapeAttr(s.city || s.address || 'Pickup')}</div>
+                        <div style="font-size:10.5px;color:var(--text-faint);">${escapeAttr(s.facility_name || s.facilityName || s.address || '')}</div>
                       </div>
                       <div style="display:flex;align-items:center;gap:6px;">
                         <span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${badgeColor}15;color:${badgeColor};font-weight:700;">${badgeLabel}</span>
-                        ${doc ? `<button type="button" class="btn btn-sm btn-accent" style="font-size:10px;padding:2px 6px;" onclick="viewLoadDocument('${l.id}','BOL_${sNum}')">View BOL</button>` : ''}
+                        ${hasDoc ? `<button type="button" class="btn btn-sm btn-accent" style="font-size:10px;padding:3px 7px;" onclick="viewLoadDocument('${l.id}','${docKey}')">View</button>` : ''}
+                        <label style="cursor:pointer;margin:0;" class="btn btn-sm ${hasDoc ? 'btn-ghost' : 'btn-primary'}" style="font-size:10px;padding:3px 7px;">
+                          ${hasDoc ? 'Replace' : '+ Upload BOL'}
+                          <input type="file" accept="image/*,application/pdf" style="display:none;" onchange="handleDocUpload('${l.id}','${docKey}', this)">
+                        </label>
                       </div>
                     </div>
                   `;
@@ -4380,20 +4386,26 @@
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-faint);margin-bottom:6px;">Delivery Stops (${l.deliveryStops ? l.deliveryStops.length : 1})</div>
                 ${(l.deliveryStops || []).map(s => {
                   const sNum = s.stop_number || s.stopNumber || 1;
-                  const doc = l.docs['POD_' + sNum] || (sNum === 1 ? l.docs.POD : null);
+                  const docKey = 'POD_' + sNum;
+                  const doc = l.docs[docKey] || (sNum === 1 ? l.docs.POD : null);
+                  const hasDoc = doc && (doc.name || doc.fileName || doc.data || doc.url);
                   const isApproved = s.status === 'POD_APPROVED' || (doc && doc.status === 'Approved');
                   const isRejected = s.status === 'POD_REJECTED' || (doc && doc.status === 'Rejected');
-                  const badgeColor = isApproved ? '#10b981' : (isRejected ? '#ef4444' : '#f59e0b');
-                  const badgeLabel = isApproved ? 'Approved' : (isRejected ? 'Rejected' : 'Pending');
+                  const badgeColor = isApproved ? '#10b981' : (isRejected ? '#ef4444' : (hasDoc ? '#f59e0b' : '#64748b'));
+                  const badgeLabel = isApproved ? 'Approved' : (isRejected ? 'Rejected' : (hasDoc ? 'Pending' : 'Missing'));
                   return `
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:4px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg-card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;margin-bottom:6px;">
                       <div>
-                        <div style="font-size:12px;font-weight:600;">Stop ${sNum}: ${escapeAttr(s.city || s.address || 'Delivery')}</div>
-                        <div style="font-size:10px;color:var(--text-faint);">${escapeAttr(s.facility_name || s.facilityName || '')}</div>
+                        <div style="font-size:12px;font-weight:700;">Stop ${sNum}: ${escapeAttr(s.city || s.address || 'Delivery')}</div>
+                        <div style="font-size:10.5px;color:var(--text-faint);">${escapeAttr(s.facility_name || s.facilityName || s.address || '')}</div>
                       </div>
                       <div style="display:flex;align-items:center;gap:6px;">
                         <span style="font-size:10px;padding:2px 6px;border-radius:10px;background:${badgeColor}15;color:${badgeColor};font-weight:700;">${badgeLabel}</span>
-                        ${doc ? `<button type="button" class="btn btn-sm btn-accent" style="font-size:10px;padding:2px 6px;" onclick="viewLoadDocument('${l.id}','POD_${sNum}')">View POD</button>` : ''}
+                        ${hasDoc ? `<button type="button" class="btn btn-sm btn-accent" style="font-size:10px;padding:3px 7px;" onclick="viewLoadDocument('${l.id}','${docKey}')">View</button>` : ''}
+                        <label style="cursor:pointer;margin:0;" class="btn btn-sm ${hasDoc ? 'btn-ghost' : 'btn-primary'}" style="font-size:10px;padding:3px 7px;">
+                          ${hasDoc ? 'Replace' : '+ Upload POD'}
+                          <input type="file" accept="image/*,application/pdf" style="display:none;" onchange="handleDocUpload('${l.id}','${docKey}', this)">
+                        </label>
                       </div>
                     </div>
                   `;
@@ -4404,20 +4416,55 @@
         `;
       }
 
+      // Build dynamic document slots
       const slots = [
-        { key: 'RC', label: 'Rate Confirmation', hint: 'Required — books the load' },
-        { key: 'BOL', label: 'Bill of Lading', hint: 'Moves the load to Loaded — checked against pickup address' },
-        { key: 'POD', label: 'Proof of Delivery', hint: 'Moves the load to Drop-off — checked against drop-off address' },
+        { key: 'RC', label: 'Rate Confirmation (RC)', hint: 'Required — books the load' },
+      ];
+
+      // Auto-expand pickup BOL slots
+      if (l.pickupStops && l.pickupStops.length > 1) {
+        l.pickupStops.forEach(s => {
+          const sNum = s.stop_number || s.stopNumber || 1;
+          slots.push({
+            key: 'BOL_' + sNum,
+            label: `BOL (Stop ${sNum} Pickup — ${s.city || 'Stop ' + sNum})`,
+            hint: `Shipper BOL for Pickup Stop ${sNum}`,
+          });
+        });
+      } else {
+        slots.push({ key: 'BOL', label: 'Bill of Lading (BOL)', hint: 'Moves the load to Loaded' });
+      }
+
+      // Auto-expand delivery POD slots
+      if (l.deliveryStops && l.deliveryStops.length > 1) {
+        l.deliveryStops.forEach(s => {
+          const sNum = s.stop_number || s.stopNumber || 1;
+          slots.push({
+            key: 'POD_' + sNum,
+            label: `POD (Stop ${sNum} Delivery — ${s.city || 'Stop ' + sNum})`,
+            hint: `Receiver signed POD for Delivery Stop ${sNum}`,
+          });
+        });
+      } else {
+        slots.push({ key: 'POD', label: 'Proof of Delivery (POD)', hint: 'Moves the load to Drop-off' });
+      }
+
+      slots.push(
         { key: 'PhotosPU', label: 'Pickup Photos', hint: '1–3 photos of the freight at pickup' },
         { key: 'PhotosDO', label: 'Drop-off Photos', hint: '1–3 photos of the freight at drop-off' },
-        { key: 'Extra', label: 'Extra Documents', hint: 'Any other paperwork for this load — lumper receipts, detention, accessorials, etc.' },
-      ];
-      const anyDocs = l.docs.RC || l.docs.BOL || l.docs.POD || (l.docs.PhotosPU && l.docs.PhotosPU.length) || (l.docs.PhotosDO && l.docs.PhotosDO.length) || (l.docs.Extra && l.docs.Extra.length);
+        { key: 'Extra', label: 'Extra Documents', hint: 'Lumper receipts, scale tickets, accessorials' }
+      );
+
+      const anyDocs = Object.keys(l.docs || {}).some(k => {
+        const d = l.docs[k];
+        return d && (d.name || d.fileName || d.data || d.url || (Array.isArray(d) && d.length));
+      });
+
       return multiStopSection + '<div class="doc-grid">' + slots.map(s => {
         const isArray = ARRAY_DOC_KEYS.includes(s.key);
         const isPhoto = PHOTO_KEYS.includes(s.key);
         const arr = isArray ? (l.docs[s.key] || []) : null;
-        const has = isArray ? arr.length : l.docs[s.key];
+        const has = isArray ? arr.length : (l.docs[s.key] || (s.key === 'BOL' && l.docs['BOL_1']) || (s.key === 'POD' && l.docs['POD_1']));
         const cap = docCap(s.key);
         const atCap = isArray && arr.length >= cap;
         const fileLabel = isArray ? (has ? arr.length + ' of ' + cap + ' file(s)' : '') : (has ? (has.name || has.fileName || 'Uploaded') : '');
@@ -4429,7 +4476,7 @@
               <div style="display:flex;gap:6px;margin-top:6px;justify-content:center;" onclick="event.stopPropagation()">
                 <button type="button" class="btn btn-sm btn-accent" style="font-size:11px;padding:3px 8px;font-weight:700;" onclick="viewLoadDocument('${l.id}','${s.key}')">View</button>
                 <label style="cursor:pointer;" class="btn btn-sm btn-ghost" style="font-size:11px;padding:3px 8px;">
-                  Replace <input type="file" ${isPhoto ? 'accept="image/*"' : ''} style="display:none;" onchange="handleDocUpload('${l.id}','${s.key}', this)">
+                  Replace <input type="file" ${isPhoto ? 'accept="image/*"' : 'accept="image/*,application/pdf"'} style="display:none;" onchange="handleDocUpload('${l.id}','${s.key}', this)">
                 </label>
               </div>
             `;
@@ -4444,10 +4491,10 @@
         }
 
         return `<div class="doc-slot ${has ? 'filled' : ''} ${atCap ? 'atcap' : ''}" style="cursor:pointer;position:relative;" ${has ? `onclick="viewLoadDocument('${l.id}','${s.key}')"` : ''}>
-          ${!has ? `<input type="file" ${isArray ? 'multiple' : ''} ${isPhoto ? 'accept="image/*"' : ''} ${STATE.role === 'viewonly' || atCap ? 'disabled' : ''} onchange="handleDocUpload('${l.id}','${s.key}', this)" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">` : ''}
+          ${!has ? `<input type="file" ${isArray ? 'multiple' : ''} ${isPhoto ? 'accept="image/*"' : 'accept="image/*,application/pdf"'} ${STATE.role === 'viewonly' || atCap ? 'disabled' : ''} onchange="handleDocUpload('${l.id}','${s.key}', this)" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">` : ''}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
           <div class="doc-slot-label">${s.label}</div>
-          <div class="doc-slot-file" style="font-weight:700;color:${has ? '#0284c7' : 'inherit'};">${has ? fileLabel : (STATE.role === 'viewonly' ? '—' : (atCap ? 'Limit reached' : 'Click to upload'))}</div>
+          <div class="doc-slot-file" style="font-weight:700;color:${has ? '#0284c7' : 'inherit'};">${has ? fileLabel : (STATE.role === 'viewonly' ? '—' : (atCap ? 'Limit reached' : '+ Click to upload'))}</div>
           <div class="doc-slot-file" style="opacity:.7;">${atCap ? 'Max ' + cap + ' reached' : s.hint}</div>
           ${actionsHtml}
         </div>`;
@@ -4501,24 +4548,90 @@
       if (file.size > 1500000) {
         toast('File too large to store', file.name + ' is over 1.5MB — the filename will be recorded. Please keep individual attachments under 1.5MB.', false);
       } else {
-        try { dataUrl = await readFileAsDataURL(file); } catch (e) { /* still record the filename even if we can't read it */ }
+        try { dataUrl = await readFileAsDataURL(file); } catch (e) { }
       }
-      const rec = { name: file.name, data: dataUrl };
+      const rec = {
+        name: file.name,
+        fileName: file.name,
+        data: dataUrl,
+        status: 'Approved',
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: (STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'Dispatcher'))
+      };
 
+      l.docs = l.docs || {};
       l.docs[key] = rec;
+
+      // Handle multi-stop stop status sync
+      const isBol = key.startsWith('BOL');
+      const isPod = key.startsWith('POD');
+      const stopNum = key.includes('_') ? Number(key.split('_')[1]) : 1;
+
+      if (isBol) {
+        if (l.pickupStops && l.pickupStops.length > 0) {
+          const pStop = l.pickupStops.find(s => (s.stop_number || s.stopNumber) === stopNum);
+          if (pStop) pStop.status = 'BOL_APPROVED';
+          if (stopNum === 1) l.docs.BOL = rec;
+        } else {
+          l.docs.BOL = rec;
+        }
+      } else if (isPod) {
+        if (l.deliveryStops && l.deliveryStops.length > 0) {
+          const dStop = l.deliveryStops.find(s => (s.stop_number || s.stopNumber) === stopNum);
+          if (dStop) dStop.status = 'POD_APPROVED';
+          if (stopNum === 1) l.docs.POD = rec;
+        } else {
+          l.docs.POD = rec;
+        }
+      }
+
+      // Check multi-stop load progression
+      const allPickupsApproved = (l.pickupStops && l.pickupStops.length > 0)
+        ? l.pickupStops.every(s => s.status === 'BOL_APPROVED' || (l.docs['BOL_' + (s.stop_number || s.stopNumber)] && l.docs['BOL_' + (s.stop_number || s.stopNumber)].status === 'Approved'))
+        : (l.docs.BOL && (l.docs.BOL.data || l.docs.BOL.name));
+
+      const allDeliveriesApproved = (l.deliveryStops && l.deliveryStops.length > 0)
+        ? l.deliveryStops.every(s => s.status === 'POD_APPROVED' || (l.docs['POD_' + (s.stop_number || s.stopNumber)] && l.docs['POD_' + (s.stop_number || s.stopNumber)].status === 'Approved'))
+        : (l.docs.POD && (l.docs.POD.data || l.docs.POD.name));
+
       const prevStatus = l.status;
-      l.status = computeStatus(l);
-      if (l.status === 'Drop-off' && !PAYMENT_STAGES.includes(l.payment)) l.payment = 'Payment Not Requested';
-      if (l.status !== 'Drop-off') l.payment = null;
+      if (allDeliveriesApproved) {
+        l.status = 'Drop-off';
+        l.driverProgress = 'DELIVERED';
+        if (!PAYMENT_STAGES.includes(l.payment)) l.payment = 'Payment Not Requested';
+      } else if (allPickupsApproved) {
+        l.status = 'Loaded';
+        l.driverProgress = 'LOADED';
+      } else {
+        l.status = computeStatus(l);
+      }
+
       syncLoadToSheet(l);
       persist();
-      toast('Document attached', file.name, true);
+      toast('Document attached', file.name + ' (Approved ✓)', true);
       if (l.status !== prevStatus) toast('Status updated', l.loadNumber + ' → ' + l.status, true);
+
+      // Sync approval to backend & broadcast WebSocket events to driver app
+      if (isBol || isPod) {
+        fetch('/api/documents/review-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            loadId: l.id,
+            docType: isBol ? 'BOL' : 'POD',
+            stopNumber: stopNum,
+            stopType: isBol ? 'PICKUP' : 'DELIVERY',
+            action: 'APPROVE',
+            reviewerId: (STATE.currentUser ? STATE.currentUser.name : (STATE.role === 'admin' ? 'Admin' : 'Dispatcher'))
+          })
+        }).catch(() => {});
+      }
+
       // Auto-upload individual RC, BOL, POD to Drive in background (non-blocking)
-      if (['RC', 'BOL', 'POD'].includes(key)) {
+      if (['RC', 'BOL', 'POD'].includes(key) || key.startsWith('BOL_') || key.startsWith('POD_')) {
         autoDriveUploadDoc(l, key, rec).catch(() => { });
       }
-      openLoadModal(loadId); // refresh
+      openLoadModal(loadId); // refresh modal
       renderLoadBoard(); renderDashboard(); renderDocsList();
     }
     // Downloads a plain-text record of the load's data — available any time, even before
