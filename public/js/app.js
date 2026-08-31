@@ -981,6 +981,7 @@
       if (STATE.notifications.length > 50) STATE.notifications.length = 50;
       persist();
       renderNotifications();
+      renderDashboardNotifications();
     }
 
     function onNotificationClicked(notifId) {
@@ -989,6 +990,7 @@
       n.read = true;
       persist();
       renderNotifications();
+      renderDashboardNotifications();
       
       const panel = document.getElementById('notif-panel');
       if (panel) panel.style.display = 'none';
@@ -1031,6 +1033,9 @@
       const days = Math.floor(hrs / 24);
       return days + 'd ago';
     }
+    function timeAgo(iso) {
+      return timeAgoShort(iso);
+    }
 
     function renderNotifications() {
       const list = STATE.notifications || [];
@@ -1068,6 +1073,7 @@
       STATE.notifications = [];
       persist();
       renderNotifications();
+      renderDashboardNotifications();
     }
     document.addEventListener('click', function (e) {
       const panel = document.getElementById('notif-panel');
@@ -2240,34 +2246,82 @@
       const events = STATE.notifications || [];
 
       // Sort by time descending
-      const sorted = events.slice().sort((a, b) => new Date(b.at || b.time || 0) - new Date(a.at || a.time || 0));
+      const sorted = events.slice().sort((a, b) => new Date(b.at || b.time || b.createdAt || b.created_at || b.timestamp || 0) - new Date(a.at || a.time || a.createdAt || a.created_at || a.timestamp || 0));
 
       if (sorted.length === 0) {
-        feed.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">No recent activity</div>';
+        feed.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:36px 16px;">No recent activity</div>';
         return;
       }
 
-      feed.innerHTML = sorted.slice(0, 10).map(e => {
-        // Support both pushNotification shape {title,sub,at,meta} and socket-event shape {text,time,icon,loadId}
-        const title   = e.title || e.text || '';
-        const sub     = e.sub   || '';
-        const timeVal = e.at    || e.time || '';
-        const icon    = e.icon  || '🔔';
-        const bg      = e.bg    || '#f1f5f9';
-        const targetId = (e.meta && e.meta.targetId) || e.loadId || '';
-        const action   = e.action || (targetId ? `openLoadModal('${targetId}')` : '');
+      feed.innerHTML = sorted.slice(0, 15).map(e => {
+        const id = e.id || '';
+        let title = e.title || e.text || e.name || e.heading || e.subject || '';
+        let sub = e.sub || e.body || e.description || e.details || e.subtitle || e.message || '';
+        const timeVal = e.at || e.time || e.createdAt || e.created_at || e.timestamp || '';
+        
+        // Contextual icon and badge background
+        let icon = e.icon;
+        let bg = e.bg;
+        const combined = (title + ' ' + sub).toLowerCase();
+
+        if (!icon) {
+          if (combined.includes('approved') || combined.includes('completed') || combined.includes('verified')) {
+            icon = '✅'; bg = '#dcfce7';
+          } else if (combined.includes('rejected') || combined.includes('deleted') || combined.includes('disputed')) {
+            icon = '❌'; bg = '#fee2e2';
+          } else if (combined.includes('upload') || combined.includes('bol') || combined.includes('pod') || combined.includes('doc')) {
+            icon = '📄'; bg = '#dbeafe';
+          } else if (combined.includes('booked') || combined.includes('new load') || combined.includes('assigned')) {
+            icon = '📝'; bg = '#fef3c7';
+          } else if (combined.includes('transit') || combined.includes('pickup') || combined.includes('delivery')) {
+            icon = '🚚'; bg = '#ffedd5';
+          } else if (combined.includes('paid') || combined.includes('payment') || combined.includes('settlement')) {
+            icon = '💰'; bg = '#f3e8ff';
+          } else {
+            icon = '🔔'; bg = '#f1f5f9';
+          }
+        }
+        if (!bg) bg = '#f1f5f9';
+
+        // Robust fallback for title if not set
+        if (!title) {
+          if (sub) {
+            title = 'Activity Alert';
+          } else if (e.meta && e.meta.targetId) {
+            title = `Load Update — #${e.meta.targetId}`;
+          } else {
+            title = 'Notification';
+          }
+        }
+
+        // Robust fallback for subtitle if not set but load metadata is available
+        if (!sub && e.meta && e.meta.targetId) {
+          const matchedLoad = (STATE.loads || []).find(l => String(l.id) === String(e.meta.targetId) || String(l.loadNumber) === String(e.meta.targetId));
+          if (matchedLoad) {
+            const brokerPart = matchedLoad.brokerName ? matchedLoad.brokerName + ' · ' : '';
+            const lanePart = typeof formatCityStateLane === 'function' ? formatCityStateLane(matchedLoad.pickup, matchedLoad.dropoff) : `${matchedLoad.pickup || ''} → ${matchedLoad.dropoff || ''}`;
+            sub = `${brokerPart}${lanePart}`;
+          }
+        }
+
+        const clickAction = id ? `onNotificationClicked('${escapeAttr(id)}')` : (e.action || ((e.meta && e.meta.targetId) ? `openLoadModal('${escapeAttr(e.meta.targetId)}')` : ''));
+
         return `
-        <div style="display:flex;gap:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;align-items:center;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='#f8fafc'" onclick="${action}">
-          <div style="width:36px;height:36px;border-radius:10px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">
+        <div onclick="${clickAction}" style="display:flex;gap:12px;padding:12px 14px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;align-items:flex-start;cursor:pointer;transition:all 0.15s ease;box-shadow:0 1px 3px rgba(0,0,0,0.03);" onmouseenter="this.style.background='#f8fafc';this.style.borderColor='#cbd5e1'" onmouseleave="this.style.background='#ffffff';this.style.borderColor='#e2e8f0'">
+          <div style="width:34px;height:34px;border-radius:8px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:2px;">
             ${icon}
           </div>
-          <div style="flex:1;">
-            <div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.4;">${escapeHtml(title)}</div>
-            ${sub ? `<div style="font-size:11px;color:#64748b;margin-top:2px;">${escapeHtml(sub)}</div>` : ''}
-            <div style="font-size:11px;color:#64748b;margin-top:2px;">${timeVal ? timeAgo(timeVal) : 'Just now'}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:#0f172a;line-height:1.35;word-break:break-word;">${escapeAttr(title)}</div>
+            ${sub ? `<div style="font-size:11.5px;color:#64748b;margin-top:3px;line-height:1.35;word-break:break-word;">${escapeAttr(sub)}</div>` : ''}
+            <div style="font-size:10.5px;color:#94a3b8;margin-top:6px;display:flex;justify-content:space-between;align-items:center;">
+              <span>${timeVal ? timeAgoShort(timeVal) : 'just now'}</span>
+              <span style="color:#2563eb;font-weight:600;font-size:11.5px;display:inline-flex;align-items:center;gap:3px;">Open →</span>
+            </div>
           </div>
         </div>
-      `}).join('');
+      `;
+      }).join('');
     }
 
     function renderDashboard() {
@@ -3600,7 +3654,7 @@
       load.docs.RC = { name: rcFile.name, data: rcData };
       load.status = computeStatus(load);
       STATE.loads.unshift(load);
-      pushNotification('New load booked — ' + load.loadNumber, (broker ? broker.name + ' · ' : '') + (load.pickup || '') + ' → ' + (load.dropoff || ''));
+      pushNotification('New load booked — ' + load.loadNumber, (broker ? broker.name + ' · ' : '') + (load.pickup || '') + ' → ' + (load.dropoff || ''), { type: 'load', targetId: load.id });
       syncLoadToSheet(load);
       persist();
       // Auto-upload RC to Google Drive on load creation
@@ -6188,7 +6242,7 @@
         status: status,
         gmailThreadId: threadId || (load ? (load.gmail_thread_id || '') : ''),
       });
-      pushNotification(type + ' sent — ' + (load ? load.loadNumber : '—'), 'To ' + (recipient || '—') + (status ? ' · ' + status : ''));
+      pushNotification(type + ' sent — ' + (load ? load.loadNumber : '—'), 'To ' + (recipient || '—') + (status ? ' · ' + status : ''), { type: 'load', targetId: load ? load.id : '' });
       persist();
     }
     function renderEmailLogs() {
