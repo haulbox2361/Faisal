@@ -18,11 +18,17 @@ class SocketService {
   final _typingController = StreamController<Map<String, dynamic>>.broadcast();
   final _readController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
+  final _docApprovedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _docRejectedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _loadUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
   Stream<Map<String, dynamic>> get typingStream => _typingController.stream;
   Stream<Map<String, dynamic>> get readStream => _readController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
+  Stream<Map<String, dynamic>> get docApprovedStream => _docApprovedController.stream;
+  Stream<Map<String, dynamic>> get docRejectedStream => _docRejectedController.stream;
+  Stream<Map<String, dynamic>> get loadUpdatedStream => _loadUpdatedController.stream;
 
   bool get isConnected => _isConnected;
 
@@ -88,6 +94,28 @@ class SocketService {
       _socket!.on('messages_read', (data) {
         if (data != null && data is Map) {
           _readController.add(Map<String, dynamic>.from(data));
+        }
+      });
+
+      // 4. Listen for document approval & rejection events
+      _socket!.on('document:approved', (data) {
+        debugPrint('[SocketService] Real-time document:approved received: $data');
+        if (data != null && data is Map) {
+          _docApprovedController.add(Map<String, dynamic>.from(data));
+        }
+      });
+
+      _socket!.on('document:rejected', (data) {
+        debugPrint('[SocketService] Real-time document:rejected received: $data');
+        if (data != null && data is Map) {
+          _docRejectedController.add(Map<String, dynamic>.from(data));
+        }
+      });
+
+      _socket!.on('load:updated', (data) {
+        debugPrint('[SocketService] Real-time load:updated received: $data');
+        if (data != null && data is Map) {
+          _loadUpdatedController.add(Map<String, dynamic>.from(data));
         }
       });
 

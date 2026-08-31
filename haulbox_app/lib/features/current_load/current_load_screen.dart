@@ -35,6 +35,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
   String _currentEtaText = '04:30 PM';
   String _riskBadge = '🟢 On Time';
   StreamSubscription<DriverLocationUpdate>? _locationSub;
+  Timer? _pendingReviewTimer;
 
   // Verification & Processing States
   bool _isProcessing = false;
@@ -48,13 +49,9 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
         LocationPermissionService.checkInitialLocationPermission(context);
         final load = Provider.of<AuthProvider>(context, listen: false).currentLoad;
         if (load != null) {
-          if (load.status.toUpperCase() == 'ASSIGNED') {
-            _workflowState = LoadWorkflowState.assigned;
-          } else if (load.status.toUpperCase() == 'IN_TRANSIT') {
-            _workflowState = LoadWorkflowState.inTransit;
-          } else if (load.status.toUpperCase() == 'COMPLETED') {
-            _workflowState = LoadWorkflowState.completed;
-          }
+          setState(() {
+            _workflowState = _deriveWorkflowState(load);
+          });
         }
       }
     });
@@ -63,7 +60,107 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
   @override
   void dispose() {
     _locationSub?.cancel();
+    _pendingReviewTimer?.cancel();
     super.dispose();
+  }
+
+  LoadWorkflowState _deriveWorkflowState(LoadModel? load) {
+    if (load == null) return LoadWorkflowState.startTrip;
+    final status = load.status.toUpperCase();
+    final driverProg = load.driverProgress.toUpperCase();
+    final bolStatus = (load.bolStatus ?? '').toUpperCase();
+    final podStatus = (load.podStatus ?? '').toUpperCase();
+    final docs = load.documents ?? {};
+    final bolDocStatus = (docs['BOL'] is Map ? docs['BOL']['status']?.toString() : '')?.toUpperCase() ?? '';
+    final podDocStatus = (docs['POD'] is Map ? docs['POD']['status']?.toString() : '')?.toUpperCase() ?? '';
+
+    // If fully delivered or drop-off
+    if (status == 'DROP-OFF' ||
+        status == 'DELIVERED' ||
+        driverProg == 'DELIVERED' ||
+        podStatus == 'APPROVED' ||
+        podStatus == 'VERIFIED' ||
+        podDocStatus == 'APPROVED') {
+      return LoadWorkflowState.delivered;
+    }
+
+    // If POD rejected
+    if (podStatus == 'REJECTED' || podDocStatus == 'REJECTED') {
+      return LoadWorkflowState.podRejected;
+    }
+
+    // If POD uploaded / pending review
+    if (podStatus == 'PENDING' ||
+        podStatus == 'PENDING_REVIEW' ||
+        podDocStatus.contains('PENDING') ||
+        docs['POD'] != null) {
+      if (status == 'AT DELIVERY' || driverProg == 'AT_DELIVERY' || status == 'IN TRANSIT' || driverProg == 'IN_TRANSIT') {
+        return LoadWorkflowState.podUploaded;
+      }
+    }
+
+    // If in transit / at delivery
+    if (status == 'IN TRANSIT' || driverProg == 'IN_TRANSIT') {
+      return LoadWorkflowState.inTransit;
+    }
+
+    if (status == 'AT DELIVERY' || driverProg == 'AT_DELIVERY') {
+      return LoadWorkflowState.arrivedDelivery;
+    }
+
+    // If loaded / BOL approved
+    if (status == 'LOADED' ||
+        driverProg == 'LOADED' ||
+        bolStatus == 'APPROVED' ||
+        bolStatus == 'VERIFIED' ||
+        bolDocStatus == 'APPROVED') {
+      return LoadWorkflowState.loaded;
+    }
+
+    // If BOL rejected
+    if (bolStatus == 'REJECTED' || bolDocStatus == 'REJECTED') {
+      return LoadWorkflowState.bolRejected;
+    }
+
+    // If BOL uploaded / pending review
+    if (bolStatus == 'PENDING' ||
+        bolStatus == 'PENDING_REVIEW' ||
+        bolDocStatus.contains('PENDING') ||
+        docs['BOL'] != null) {
+      return LoadWorkflowState.bolUploaded;
+    }
+
+    // Pre-pickup states
+    if (status == 'AT PICKUP' || driverProg == 'AT_PICKUP') {
+      return LoadWorkflowState.arrivedPickup;
+    }
+    if (status == 'ASSIGNED' || driverProg == 'ASSIGNED') {
+      return LoadWorkflowState.assigned;
+    }
+    if (status == 'ACCEPTED' || driverProg == 'ACCEPTED') {
+      return LoadWorkflowState.startTrip;
+    }
+
+    return _workflowState;
+  }
+
+  void _startPendingReviewTimerIfNeeded(AuthProvider auth) {
+    if (_workflowState == LoadWorkflowState.bolUploaded ||
+        _workflowState == LoadWorkflowState.podUploaded) {
+      if (_pendingReviewTimer == null || !_pendingReviewTimer!.isActive) {
+        _pendingReviewTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+          if (mounted &&
+              (_workflowState == LoadWorkflowState.bolUploaded ||
+                  _workflowState == LoadWorkflowState.podUploaded)) {
+            auth.syncAllData(silent: true);
+          } else {
+            _pendingReviewTimer?.cancel();
+          }
+        });
+      }
+    } else {
+      _pendingReviewTimer?.cancel();
+    }
   }
 
   // PRIMARY WORKFLOW DISPATCHER ACTION
@@ -113,6 +210,12 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       case LoadWorkflowState.bolUploaded:
       case LoadWorkflowState.bolQualityChecking:
       case LoadWorkflowState.bolVerifying:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('BOL is awaiting Dispatcher approval. You will receive an instant notification once approved.'),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
         break;
 
       case LoadWorkflowState.bolAccepted:
@@ -161,6 +264,12 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       case LoadWorkflowState.podUploaded:
       case LoadWorkflowState.podQualityChecking:
       case LoadWorkflowState.podVerifying:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('POD is awaiting Dispatcher approval. You will receive an instant notification once approved.'),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
         break;
 
       case LoadWorkflowState.podAccepted:
@@ -390,6 +499,13 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
       } else {
         // Outcome: PENDING_REVIEW -> Show confirmation modal, sent to Dispatcher review
         await auth.syncAllData();
+        setState(() {
+          if (isBol) {
+            _workflowState = LoadWorkflowState.bolUploaded;
+          } else {
+            _workflowState = LoadWorkflowState.podUploaded;
+          }
+        });
         if (mounted) {
           showDialog(
             context: context,
@@ -542,6 +658,20 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     final load = auth.currentLoad;
+
+    if (load != null && !_isProcessing) {
+      final derived = _deriveWorkflowState(load);
+      if (derived != _workflowState) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_isProcessing) {
+            setState(() {
+              _workflowState = derived;
+            });
+          }
+        });
+      }
+      _startPendingReviewTimerIfNeeded(auth);
+    }
 
     if (load == null) {
       return Scaffold(

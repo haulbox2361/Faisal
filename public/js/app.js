@@ -6547,9 +6547,11 @@
           console.log('[Socket.IO] document:uploaded', data);
           const loadNum = data.loadNumber || data.loadId || '';
           const docKey  = data.docKey || data.documentType || 'Document';
+          const driverName = data.driverName || 'Driver';
+          const lane = data.pickup && data.dropoff ? `${data.pickup} → ${data.dropoff}` : `Load #${loadNum}`;
           pushNotification(
-            `📄 Document Uploaded — ${docKey}`,
-            `Load #${loadNum} — Pending Dispatcher Review`,
+            `📄 ${driverName} uploaded ${docKey}`,
+            `Load #${loadNum} · ${lane} — Pending Review`,
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
@@ -6560,9 +6562,11 @@
           console.log('[Socket.IO] document:pending_review', data);
           const loadNum = data.loadNumber || data.loadId || '';
           const docKey  = data.docKey || data.documentType || 'Document';
+          const driverName = data.driverName || 'Driver';
+          const lane = data.pickup && data.dropoff ? `${data.pickup} → ${data.dropoff}` : `Load #${loadNum}`;
           pushNotification(
-            `🔍 Pending Review — ${docKey}`,
-            `Load #${loadNum} — Awaiting your approval`,
+            `🔍 ${driverName} uploaded ${docKey}`,
+            `Load #${loadNum} · ${lane} — Awaiting your approval`,
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();

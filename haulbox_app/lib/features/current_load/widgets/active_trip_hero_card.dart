@@ -37,13 +37,14 @@ class ActiveTripHeroCard extends StatelessWidget {
         return 'CONFIRM ARRIVAL AT PICKUP';
       case LoadWorkflowState.arrivedPickup:
       case LoadWorkflowState.bolRequired:
+        return 'UPLOAD BILL OF LADING (BOL)';
       case LoadWorkflowState.bolRejected:
       case LoadWorkflowState.bolQualityFailed:
-        return 'UPLOAD BILL OF LADING (BOL)';
+        return 'RE-UPLOAD BOL (REJECTED)';
       case LoadWorkflowState.bolUploaded:
       case LoadWorkflowState.bolQualityChecking:
       case LoadWorkflowState.bolVerifying:
-        return 'VERIFYING BOL...';
+        return 'BOL PENDING DISPATCH REVIEW';
       case LoadWorkflowState.bolAccepted:
       case LoadWorkflowState.loaded:
         return 'START TRANSIT TO DELIVERY';
@@ -52,13 +53,14 @@ class ActiveTripHeroCard extends StatelessWidget {
         return 'CONFIRM ARRIVAL AT RECEIVER';
       case LoadWorkflowState.arrivedDelivery:
       case LoadWorkflowState.podRequired:
+        return 'UPLOAD PROOF OF DELIVERY (POD)';
       case LoadWorkflowState.podRejected:
       case LoadWorkflowState.podQualityFailed:
-        return 'UPLOAD PROOF OF DELIVERY (POD)';
+        return 'RE-UPLOAD POD (REJECTED)';
       case LoadWorkflowState.podUploaded:
       case LoadWorkflowState.podQualityChecking:
       case LoadWorkflowState.podVerifying:
-        return 'VERIFYING POD...';
+        return 'POD PENDING DISPATCH REVIEW';
       case LoadWorkflowState.podAccepted:
       case LoadWorkflowState.delivered:
         return 'CONFIRM PAYMENT SETTLEMENT';
@@ -122,11 +124,11 @@ class ActiveTripHeroCard extends StatelessWidget {
         return 'Take a clear, flat photo of signed shipper BOL.';
       case LoadWorkflowState.bolRejected:
       case LoadWorkflowState.bolQualityFailed:
-        return 'BOL needs retake: ensure shipper signature is clear.';
+        return 'BOL was rejected by Dispatch. Please take a clearer photo and resubmit.';
       case LoadWorkflowState.bolUploaded:
       case LoadWorkflowState.bolQualityChecking:
       case LoadWorkflowState.bolVerifying:
-        return 'AI system is verifying BOL cargo matches rate con.';
+        return 'BOL submitted to Dispatch for approval. You will be notified once approved.';
       case LoadWorkflowState.bolAccepted:
       case LoadWorkflowState.loaded:
         return 'BOL approved! Ready to depart for ${load.dropoff}.';
@@ -138,11 +140,11 @@ class ActiveTripHeroCard extends StatelessWidget {
         return 'Take photo of signed Delivery Receipt / POD.';
       case LoadWorkflowState.podRejected:
       case LoadWorkflowState.podQualityFailed:
-        return 'POD needs retake: ensure receiver signature is visible.';
+        return 'POD was rejected by Dispatch. Please take a clearer photo and resubmit.';
       case LoadWorkflowState.podUploaded:
       case LoadWorkflowState.podQualityChecking:
       case LoadWorkflowState.podVerifying:
-        return 'AI system is verifying POD consignee stamp.';
+        return 'POD submitted to Dispatch for approval. You will be notified once approved.';
       case LoadWorkflowState.podAccepted:
       case LoadWorkflowState.delivered:
         return 'POD accepted. Confirm settlement to close load.';
@@ -313,7 +315,19 @@ class ActiveTripHeroCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: isCompleted
                     ? const Color(0xFF0F172A)
-                    : (isProcessing ? AppColors.statusInfo : AppColors.emeraldPrimary),
+                    : (isProcessing
+                        ? AppColors.statusInfo
+                        : (workflowState == LoadWorkflowState.bolUploaded ||
+                                workflowState == LoadWorkflowState.podUploaded ||
+                                workflowState == LoadWorkflowState.bolVerifying ||
+                                workflowState == LoadWorkflowState.podVerifying
+                            ? const Color(0xFFD97706)
+                            : (workflowState == LoadWorkflowState.bolRejected ||
+                                    workflowState == LoadWorkflowState.podRejected ||
+                                    workflowState == LoadWorkflowState.bolQualityFailed ||
+                                    workflowState == LoadWorkflowState.podQualityFailed
+                                ? const Color(0xFFDC2626)
+                                : AppColors.emeraldPrimary))),
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(

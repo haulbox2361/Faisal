@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/socket_service.dart';
 import '../../shared/models/driver_model.dart';
 import '../../shared/models/load_model.dart';
 import '../../shared/models/payment_model.dart';
@@ -18,6 +19,9 @@ class AuthProvider extends ChangeNotifier {
   int _unreadChats = 0;
 
   Timer? _autoSyncTimer;
+  StreamSubscription? _docApprovedSub;
+  StreamSubscription? _docRejectedSub;
+  StreamSubscription? _loadUpdatedSub;
 
   AuthProvider() {
     _restorePersistedSession();
@@ -26,7 +30,35 @@ class AuthProvider extends ChangeNotifier {
   @override
   void dispose() {
     _autoSyncTimer?.cancel();
+    _docApprovedSub?.cancel();
+    _docRejectedSub?.cancel();
+    _loadUpdatedSub?.cancel();
     super.dispose();
+  }
+
+  void _initSocketListeners() {
+    _docApprovedSub?.cancel();
+    _docRejectedSub?.cancel();
+    _loadUpdatedSub?.cancel();
+
+    if (_driver != null) {
+      SocketService().connect(driverId: _driver!.id, driverName: _driver!.name);
+
+      _docApprovedSub = SocketService().docApprovedStream.listen((data) {
+        debugPrint('[AuthProvider] Real-time document:approved received -> syncing data');
+        syncAllData(silent: true);
+      });
+
+      _docRejectedSub = SocketService().docRejectedStream.listen((data) {
+        debugPrint('[AuthProvider] Real-time document:rejected received -> syncing data');
+        syncAllData(silent: true);
+      });
+
+      _loadUpdatedSub = SocketService().loadUpdatedStream.listen((data) {
+        debugPrint('[AuthProvider] Real-time load:updated received -> syncing data');
+        syncAllData(silent: true);
+      });
+    }
   }
 
   // 1. Session Restoration on App Launch
@@ -63,6 +95,7 @@ class AuthProvider extends ChangeNotifier {
         );
 
         notifyListeners();
+        _initSocketListeners();
 
         // Immediately perform full live sync from database
         await syncAllData();
@@ -73,10 +106,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 2. Start Automatic Background Polling (Every 12 seconds)
+  // 2. Start Automatic Background Polling (Every 10 seconds)
   void _startAutoSync() {
     _autoSyncTimer?.cancel();
-    _autoSyncTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+    _autoSyncTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (isAuthenticated) {
         syncAllData(silent: true);
       }
@@ -221,6 +254,7 @@ class AuthProvider extends ChangeNotifier {
         }
 
         _startAutoSync();
+        _initSocketListeners();
         // Trigger immediate background sync for payments and docs
         syncAllData(silent: true);
 

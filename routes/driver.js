@@ -1959,7 +1959,12 @@ router.post('/api/driver/verify-document', async (req, res) => {
   if (io) {
     io.emit('document:uploaded', {
       loadId: effectiveLoadId,
+      loadNumber: load.loadNumber || effectiveLoadId,
+      driverName: driver.name || 'Driver',
+      pickup: load.pickup || load.pickupAddress || '',
+      dropoff: load.dropoff || load.dropoffAddress || '',
       documentType: documentType.toUpperCase(),
+      docKey: documentType.toUpperCase(),
       stopType: effStopType,
       stopNumber: effStopNum,
       status: 'PROCESSING',
@@ -2059,17 +2064,28 @@ router.post('/api/driver/verify-document', async (req, res) => {
         const newLoadStatus = load.status;
         io.emit('document:approved', {
           loadId: effectiveLoadId,
+          loadNumber: load.loadNumber || effectiveLoadId,
+          driverName: driver.name || 'Driver',
+          pickup: load.pickup || load.pickupAddress || '',
+          dropoff: load.dropoff || load.dropoffAddress || '',
           documentType: documentType.toUpperCase(),
+          docKey: documentType.toUpperCase(),
           stopType: effStopType,
           stopNumber: effStopNum,
           newLoadStatus,
+          driverProgress: load.driverProgress,
           documentId: result.documentId,
           timestamp: nowIso,
         });
       } else if (status === 'PENDING_REVIEW') {
         io.emit('document:pending_review', {
           loadId: effectiveLoadId,
+          loadNumber: load.loadNumber || effectiveLoadId,
+          driverName: driver.name || 'Driver',
+          pickup: load.pickup || load.pickupAddress || '',
+          dropoff: load.dropoff || load.dropoffAddress || '',
           documentType: documentType.toUpperCase(),
+          docKey: documentType.toUpperCase(),
           stopType: effStopType,
           stopNumber: effStopNum,
           reviewTaskId: result.documentId,
@@ -2078,13 +2094,25 @@ router.post('/api/driver/verify-document', async (req, res) => {
       } else {
         io.emit('document:rejected', {
           loadId: effectiveLoadId,
+          loadNumber: load.loadNumber || effectiveLoadId,
+          driverName: driver.name || 'Driver',
+          pickup: load.pickup || load.pickupAddress || '',
+          dropoff: load.dropoff || load.dropoffAddress || '',
           documentType: documentType.toUpperCase(),
+          docKey: documentType.toUpperCase(),
           stopType: effStopType,
           stopNumber: effStopNum,
           reason: result.reason,
           timestamp: nowIso,
         });
       }
+      io.emit('load:updated', {
+        loadId: effectiveLoadId,
+        loadNumber: load.loadNumber || effectiveLoadId,
+        status: load.status,
+        driverProgress: load.driverProgress,
+        timestamp: nowIso,
+      });
     }
 
     res.json({
@@ -2245,6 +2273,8 @@ async function handleReviewAction(req, res) {
           loadId,
           docKey: docType || 'BOL',
           documentType: docType || 'BOL',
+          stopNumber: req.body?.stopNumber || 1,
+          stopType: req.body?.stopType || (docType === 'BOL' ? 'PICKUP' : 'DELIVERY'),
           approvedBy: reviewerId || 'Dispatcher',
           timestamp: new Date().toISOString(),
         });
@@ -2253,10 +2283,17 @@ async function handleReviewAction(req, res) {
           loadId,
           docKey: docType || 'BOL',
           documentType: docType || 'BOL',
+          stopNumber: req.body?.stopNumber || 1,
+          stopType: req.body?.stopType || (docType === 'BOL' ? 'PICKUP' : 'DELIVERY'),
           reason: reason || 'Document rejected by dispatcher',
           timestamp: new Date().toISOString(),
         });
       }
+      io.emit('load:updated', {
+        loadId,
+        status: action === 'APPROVE' ? (docType === 'BOL' ? 'Loaded' : 'Drop-off') : undefined,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     res.json({ ok: true, action: status, message: `Document marked as ${status}` });
