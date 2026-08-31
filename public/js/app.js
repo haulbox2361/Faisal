@@ -275,6 +275,33 @@
       return false; // Failed to load
     }
 
+    async function refreshStateFromServer(silent = true) {
+      try {
+        const res = await window.storage.get('haulline:state', false);
+        if (res && res.value) {
+          const fresh = typeof res.value === 'string' ? JSON.parse(res.value) : res.value;
+          if (fresh && Array.isArray(fresh.loads)) {
+            STATE.loads = fresh.loads;
+            if (Array.isArray(fresh.drivers)) STATE.drivers = fresh.drivers;
+            if (Array.isArray(fresh.brokers)) STATE.brokers = fresh.brokers;
+            if (Array.isArray(fresh.dispatchers)) STATE.dispatchers = fresh.dispatchers;
+            if (fresh.settings) STATE.settings = Object.assign(STATE.settings || {}, fresh.settings);
+            migrateDrivers();
+            migrateLoads();
+            if (typeof renderDocReview === 'function') renderDocReview();
+            if (typeof renderDocsList === 'function') renderDocsList();
+            if (typeof renderLoadBoard === 'function') renderLoadBoard();
+            if (typeof renderDashboard === 'function') renderDashboard();
+            if (typeof updateDocReviewBadge === 'function') updateDocReviewBadge();
+            if (typeof renderDashboardNotifications === 'function') renderDashboardNotifications();
+          }
+        }
+      } catch (e) {
+        if (!silent) console.warn('[refreshStateFromServer] Sync issue:', e.message);
+      }
+    }
+    window.refreshStateFromServer = refreshStateFromServer;
+
     function showErrorScreen(title, message) {
       document.getElementById('app').style.display = 'none';
       document.getElementById('login-gate').style.display = 'none';
@@ -773,6 +800,7 @@
         IS_SETTINGS_PIN_UNLOCKED = false;
       }
 
+      if (view === 'documents') { view = 'docreview'; }
       if (view === 'dispatchers' && STATE.role !== 'admin') { view = 'dashboard'; }
       if (view === 'driverpay' && STATE.role !== 'admin') { view = 'dashboard'; }
       if (view === 'myaccount' && STATE.role === 'viewonly') { view = 'dashboard'; }
@@ -783,7 +811,7 @@
 
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       if (targetViewEl) targetViewEl.classList.add('active');
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view || (view === 'docreview' && n.dataset.view === 'docreview')));
       if (VIEW_TITLES[view]) document.getElementById('pagetitle').textContent = VIEW_TITLES[view];
 
       try {
@@ -802,13 +830,15 @@
       if (view === 'brokers') renderBrokers();
       if (view === 'dispatchers') renderDispatchersPage();
       if (view === 'statistics') renderStatistics();
-      if (view === 'documents') renderDocsList();
       if (view === 'emaillogs') renderEmailLogs();
       if (view === 'myaccount') renderMyAccount();
       if (view === 'settings') renderSettings();
       if (view === 'chat') { if (typeof initWaChat === 'function') initWaChat(); else loadMainChat(); }
       if (view === 'addload') showLoadStep(1);
-      if (view === 'docreview') { setDocReviewTab(_docReviewTab || 'pending'); }
+      if (view === 'docreview') { 
+        refreshStateFromServer();
+        setDocReviewTab(_docReviewTab || 'pending'); 
+      }
     }
     document.getElementById('mainnav').addEventListener('click', e => {
       const item = e.target.closest('.nav-item');
@@ -997,16 +1027,18 @@
 
       // 1. Explicit meta target
       if (n.meta && n.meta.type) {
+        if (n.meta.type === 'doc') { switchView('docreview'); return; }
         if (n.meta.type === 'load' && n.meta.targetId) return openLoadModal(n.meta.targetId);
         if (n.meta.type === 'chat') { switchView('chat'); return; }
         if (n.meta.type === 'driver') { switchView('drivers'); return; }
         if (n.meta.type === 'payment') { switchView('driverpay'); return; }
-        if (n.meta.type === 'doc') { switchView('documents'); return; }
       }
 
       // 2. Intelligent content detection
       const combined = (n.title + ' ' + (n.sub || '')).toLowerCase();
       
+      if (combined.includes('pod') || combined.includes('bol') || combined.includes('document') || combined.includes('review')) return switchView('docreview');
+
       // Match load numbers e.g. "HL-10420" or "Load #12345" or "#10421" or "10422"
       const loadMatch = (n.title + ' ' + (n.sub || '')).match(/(?:HL-\d+|Load\s*#?\s*(\d+)|#(\d{4,}))/i);
       if (loadMatch) {
@@ -1018,7 +1050,6 @@
 
       if (combined.includes('chat') || combined.includes('message')) return switchView('chat');
       if (combined.includes('payment') || combined.includes('settlement') || combined.includes('paid')) return switchView('driverpay');
-      if (combined.includes('pod') || combined.includes('bol') || combined.includes('document') || combined.includes('expiring')) return switchView('documents');
       if (combined.includes('driver')) return switchView('drivers');
       if (combined.includes('load') || combined.includes('booked') || combined.includes('dispatch')) return switchView('loadboard');
     }
@@ -3670,15 +3701,23 @@
       if (!body) return;
 
       const loads = STATE.loads || [];
-      // Only BOL and POD undergo document review (RC & photos are auto-approved)
-      const docTypes = ['BOL', 'POD'];
       const rows = [];
 
       loads.forEach(load => {
         const docs = load.docs || load.documents || {};
-        docTypes.forEach(docType => {
-          const doc = docs[docType];
-          if (!doc || (!doc.name && !doc.fileName && !doc.data)) return;
+        const allDocKeys = Object.keys(docs).filter(k => 
+          k === 'BOL' || k === 'POD' || k.startsWith('BOL_') || k.startsWith('POD_')
+        );
+
+        // Deduplicate: if both BOL and BOL_1 exist with identical data, prefer single key
+        const uniqueKeys = [];
+        allDocKeys.forEach(k => {
+          if (!uniqueKeys.includes(k)) uniqueKeys.push(k);
+        });
+
+        uniqueKeys.forEach(docKey => {
+          const doc = docs[docKey];
+          if (!doc || (!doc.name && !doc.fileName && !doc.data && !doc.url)) return;
 
           const docStatus = doc.status || 'Pending Verification';
           const statusNorm = docStatus.toLowerCase();
@@ -3691,34 +3730,37 @@
           const uploadedAt = doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString() : '—';
           const statusColor = (statusNorm.includes('pending') || statusNorm.includes('review')) ? '#f59e0b' : statusNorm === 'approved' ? '#16a34a' : '#dc2626';
           const statusLabel = doc.status || 'Pending Verification';
-          const docDataUrl = doc.data || doc.url || '';
-          const docFileName = doc.name || doc.fileName || `${docType}.pdf`;
+          const isStopDoc = docKey.includes('_');
+          const baseType = isStopDoc ? docKey.split('_')[0] : docKey;
+          const stopNum = doc.stopNumber || (isStopDoc ? Number(docKey.split('_')[1]) : 1);
+          const stopType = doc.stopType || (baseType === 'BOL' ? 'PICKUP' : 'DELIVERY');
+          const docLabel = isStopDoc ? `${baseType} (Stop ${stopNum})` : baseType;
 
           let actionHtml = '';
           if (_docReviewTab === 'pending') {
             actionHtml = `
-              <div style="display:flex;gap:8px;justify-content:center;">
-                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docType}')">View</button>
-                <button class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="event.stopPropagation();reviewDocument('${escapeAttr(load.id)}','${docType}','approve','')">Approve</button>
-                <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="event.stopPropagation();openDocRejectModal('${escapeAttr(load.id)}','${docType}')">Reject</button>
+              <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docKey}')">View</button>
+                <button class="btn btn-sm" style="background:#16a34a;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="event.stopPropagation();reviewDocument('${escapeAttr(load.id)}','${docKey}','approve','',${stopNum},'${stopType}')">Approve</button>
+                <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="event.stopPropagation();openDocRejectModal('${escapeAttr(load.id)}','${docKey}',${stopNum},'${stopType}')">Reject</button>
               </div>`;
           } else if (_docReviewTab === 'rejected') {
             actionHtml = `
-              <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
-                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:4px 8px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docType}')">View</button>
-                <div style="font-size:11px;color:#dc2626;font-style:italic;max-width:180px;">${escapeAttr(doc.rejectionReason || 'Flagged by AI check')}</div>
+              <div style="display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:4px 8px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docKey}')">View</button>
+                <div style="font-size:11px;color:#dc2626;font-style:italic;max-width:180px;">${escapeAttr(doc.rejectionReason || 'Rejected by dispatcher')}</div>
               </div>`;
           } else {
             actionHtml = `
-              <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
-                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:4px 8px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docType}')">View</button>
+              <div style="display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn btn-sm" style="background:#0284c7;color:#fff;font-size:12px;font-weight:700;padding:4px 8px;border-radius:8px;" onclick="event.stopPropagation();viewLoadDocument('${escapeAttr(load.id)}','${docKey}')">View</button>
                 <span style="color:#16a34a;font-size:13px;font-weight:700;">🟢 Approved</span>
               </div>`;
           }
 
           rows.push(`
-            <tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="viewLoadDocument('${escapeAttr(load.id)}','${docType}')" title="Click to view document">
-              <td style="padding:12px;font-weight:700;color:#0f172a;text-decoration:underline;">${escapeAttr(docType)}</td>
+            <tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="viewLoadDocument('${escapeAttr(load.id)}','${docKey}')" title="Click to view document">
+              <td style="padding:12px;font-weight:700;color:#0f172a;text-decoration:underline;">${escapeAttr(docLabel)}</td>
               <td style="padding:12px;color:#475569;">${escapeAttr(load.driverName || '—')}</td>
               <td style="padding:12px;color:#0284c7;font-weight:700;" onclick="event.stopPropagation();openLoadModal('${escapeAttr(load.id)}')">#${escapeAttr(load.loadNumber || load.id)}</td>
               <td style="padding:12px;color:#64748b;font-size:12px;">${uploadedAt}</td>
@@ -3728,23 +3770,7 @@
         });
       });
 
-      // Update pending badge count (BOL and POD only)
-      let pendingCount = 0;
-      loads.forEach(load => {
-        const docs = load.docs || load.documents || {};
-        ['BOL','POD'].forEach(dt => {
-          const d = docs[dt];
-          if (d && (d.name || d.fileName || d.data)) {
-            const st = (d.status || 'Pending').toLowerCase();
-            if (st.includes('pending') || st.includes('review')) pendingCount++;
-          }
-        });
-      });
-      const badge = document.getElementById('doc-review-badge');
-      if (badge) {
-        badge.textContent = pendingCount;
-        badge.style.display = pendingCount > 0 ? 'inline' : 'none';
-      }
+      updateDocReviewBadge();
 
       if (rows.length === 0) {
         body.innerHTML = '';
@@ -3755,14 +3781,41 @@
       }
     }
 
-    async function reviewDocument(loadId, docKey, action, rejectionReason) {
+    function updateDocReviewBadge() {
+      let pendingCount = 0;
+      (STATE.loads || []).forEach(load => {
+        const docs = load.docs || load.documents || {};
+        Object.keys(docs).forEach(k => {
+          if (k === 'BOL' || k === 'POD' || k.startsWith('BOL_') || k.startsWith('POD_')) {
+            const d = docs[k];
+            if (d && (d.name || d.fileName || d.data || d.url)) {
+              const st = (d.status || 'Pending').toLowerCase();
+              if (st.includes('pending') || st.includes('review')) pendingCount++;
+            }
+          }
+        });
+      });
+      const badge = document.getElementById('doc-review-badge');
+      if (badge) {
+        badge.textContent = pendingCount;
+        badge.style.display = pendingCount > 0 ? 'inline' : 'none';
+      }
+    }
+
+    async function reviewDocument(loadId, docKey, action, rejectionReason, stopNumber, stopType) {
       try {
+        const baseType = docKey.includes('_') ? docKey.split('_')[0] : docKey;
+        const effStopNum = stopNumber || (docKey.includes('_') ? Number(docKey.split('_')[1]) : 1);
+        const effStopType = stopType || (baseType === 'BOL' ? 'PICKUP' : 'DELIVERY');
+
         const resp = await fetch('/api/documents/review-action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             loadId,
-            docType: docKey,
+            docType: baseType,
+            stopNumber: effStopNum,
+            stopType: effStopType,
             action: action.toUpperCase(),
             reason: rejectionReason,
             reviewerId: (STATE.currentUser && STATE.currentUser.name) || (STATE.role === 'admin' ? 'Admin' : 'Dispatcher'),
@@ -3771,37 +3824,43 @@
         const data = resp.ok ? await resp.json() : null;
 
         // Optimistically update the local STATE
-        const load = (STATE.loads || []).find(l => l.id === loadId);
+        const load = (STATE.loads || []).find(l => String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId));
         if (load) {
           const docs = load.docs || load.documents || {};
           if (docs[docKey]) {
             docs[docKey].status = action.toLowerCase() === 'approve' ? 'Approved' : 'Rejected';
             docs[docKey].rejectionReason = rejectionReason || null;
           }
+          if (docKey.includes('_') && effStopNum === 1 && docs[baseType]) {
+            docs[baseType].status = action.toLowerCase() === 'approve' ? 'Approved' : 'Rejected';
+            docs[baseType].rejectionReason = rejectionReason || null;
+          }
           if (action.toLowerCase() === 'approve') {
-            if (docKey === 'BOL' && (load.status === 'Booked' || load.status === 'Accepted' || load.status === 'At Pickup')) {
+            if (baseType === 'BOL' && (load.status === 'Booked' || load.status === 'Accepted' || load.status === 'At Pickup')) {
               load.status = 'Loaded';
-            } else if (docKey === 'POD' && (load.status === 'Loaded' || load.status === 'In Transit' || load.status === 'At Delivery')) {
+            } else if (baseType === 'POD' && (load.status === 'Loaded' || load.status === 'In Transit' || load.status === 'At Delivery')) {
               load.status = 'Drop-off';
             }
           }
           persist();
         }
         renderDocReview();
+        updateDocReviewBadge();
         toast(
           action.toLowerCase() === 'approve' ? `${docKey} Approved` : `${docKey} Rejected`,
           action.toLowerCase() === 'approve' ? 'Load status advanced & synchronized with driver.' : 'Driver has been notified with retake instructions.',
           action.toLowerCase() === 'approve'
         );
+        refreshStateFromServer();
       } catch (e) {
         toast('Network Error', 'Failed to reach server. Please try again.', false);
       }
     }
 
-    function openDocRejectModal(loadId, docKey) {
+    function openDocRejectModal(loadId, docKey, stopNumber, stopType) {
       const reason = prompt(`Enter rejection reason for ${docKey}:`);
       if (reason === null) return;
-      reviewDocument(loadId, docKey, 'reject', reason || 'No reason provided');
+      reviewDocument(loadId, docKey, 'reject', reason || 'No reason provided', stopNumber, stopType);
     }
 
     /* ================= LOAD BOARD ================= */
@@ -6494,6 +6553,7 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
+          refreshStateFromServer();
         });
 
         appSocket.on('document:pending_review', (data) => {
@@ -6506,6 +6566,7 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
+          refreshStateFromServer();
         });
 
         appSocket.on('document:approved', (data) => {
@@ -6518,8 +6579,7 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
-          // Refresh load board if currently visible so status is current
-          if (typeof renderLoadBoard === 'function') renderLoadBoard();
+          refreshStateFromServer();
         });
 
         appSocket.on('document:rejected', (data) => {
@@ -6533,6 +6593,7 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
+          refreshStateFromServer();
         });
 
         // ── GPS / Live Tracking Map ───────────────────────────────────────────
@@ -6547,6 +6608,16 @@
       } catch (e) {
         console.error('[Socket.IO] Init failed:', e);
       }
+
+      // Auto-refresh dispatcher state on tab focus and every 12 seconds
+      window.addEventListener('focus', () => {
+        refreshStateFromServer(true);
+      });
+      setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          refreshStateFromServer(true);
+        }
+      }, 12000);
     }
 
     function authenticateAppSocket() {
