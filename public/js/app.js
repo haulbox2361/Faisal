@@ -2237,56 +2237,37 @@
       const feed = document.getElementById('dashboard-notifications-feed');
       if (!feed) return;
 
-      // Ensure we have some base state
-      let events = [];
-
-      // Synthesize events from real database data if actual events don't exist
-      if (!STATE.notifications || STATE.notifications.length === 0) {
-        // Collect latest 5 loads
-        const sortedLoads = (STATE.loads || []).slice().sort((a,b) => new Date(b.systemDate) - new Date(a.systemDate)).slice(0, 5);
-        sortedLoads.forEach(l => {
-          if (l.status === 'Delivered' || l.status === 'Completed') {
-            events.push({ icon: '🏁', text: `${l.driverName || 'Driver'} completed Load #${l.loadNumber}`, color: '#16a34a', bg: '#dcfce7', loadId: l.id, time: l.systemDate });
-          } else if (l.status === 'POD Uploaded') {
-            events.push({ icon: '📄', text: `${l.driverName || 'Driver'} uploaded POD for Load #${l.loadNumber}`, color: '#2563eb', bg: '#dbeafe', loadId: l.id, time: l.systemDate });
-          } else if (l.status === 'In Transit' || l.status === 'At Pickup') {
-            events.push({ icon: '🚚', text: `${l.driverName || 'Driver'} is ${l.status} on Load #${l.loadNumber}`, color: '#ea580c', bg: '#ffedd5', loadId: l.id, time: l.systemDate });
-          } else if (l.status === 'Booked') {
-            events.push({ icon: '📝', text: `New Load #${l.loadNumber} assigned to ${l.driverName || 'Driver'}`, color: '#64748b', bg: '#f1f5f9', loadId: l.id, time: l.systemDate });
-          }
-        });
-        
-        // Find recent chats
-        Object.keys(STATE.chat || {}).forEach(k => {
-          const conv = STATE.chat[k];
-          if (conv.messages && conv.messages.length > 0) {
-            const lastMsg = conv.messages[conv.messages.length - 1];
-            events.push({ icon: '💬', text: `${lastMsg.senderName || 'Admin'} sent a message`, color: '#9333ea', bg: '#f3e8ff', action: `switchView('chat'); loadConversation('${k}')`, time: lastMsg.timestamp });
-          }
-        });
-      } else {
-        events = STATE.notifications;
-      }
+      const events = STATE.notifications || [];
 
       // Sort by time descending
-      events.sort((a, b) => new Date(b.time || new Date()) - new Date(a.time || new Date()));
+      const sorted = events.slice().sort((a, b) => new Date(b.at || b.time || 0) - new Date(a.at || a.time || 0));
 
-      if (events.length === 0) {
+      if (sorted.length === 0) {
         feed.innerHTML = '<div style="color:#64748b;font-size:13px;text-align:center;padding:20px;">No recent activity</div>';
         return;
       }
 
-      feed.innerHTML = events.slice(0, 10).map(e => `
-        <div style="display:flex;gap:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;align-items:center;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='#f8fafc'" onclick="${e.action ? e.action : (e.loadId ? `openLoadModal('${e.loadId}')` : '')}">
-          <div style="width:36px;height:36px;border-radius:10px;background:${e.bg || '#f1f5f9'};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">
-            ${e.icon || '🔔'}
+      feed.innerHTML = sorted.slice(0, 10).map(e => {
+        // Support both pushNotification shape {title,sub,at,meta} and socket-event shape {text,time,icon,loadId}
+        const title   = e.title || e.text || '';
+        const sub     = e.sub   || '';
+        const timeVal = e.at    || e.time || '';
+        const icon    = e.icon  || '🔔';
+        const bg      = e.bg    || '#f1f5f9';
+        const targetId = (e.meta && e.meta.targetId) || e.loadId || '';
+        const action   = e.action || (targetId ? `openLoadModal('${targetId}')` : '');
+        return `
+        <div style="display:flex;gap:12px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;align-items:center;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background='#f1f5f9'" onmouseleave="this.style.background='#f8fafc'" onclick="${action}">
+          <div style="width:36px;height:36px;border-radius:10px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">
+            ${icon}
           </div>
           <div style="flex:1;">
-            <div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.4;">${escapeHtml(e.text)}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;">${e.time ? timeAgo(e.time) : 'Just now'}</div>
+            <div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.4;">${escapeHtml(title)}</div>
+            ${sub ? `<div style="font-size:11px;color:#64748b;margin-top:2px;">${escapeHtml(sub)}</div>` : ''}
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">${timeVal ? timeAgo(timeVal) : 'Just now'}</div>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     function renderDashboard() {
@@ -4431,7 +4412,7 @@
       const file = input.files[0];
       let dataUrl = null;
       if (file.size > 1500000) {
-        toast('File too large to store', file.name + ' is over 1.5MB — the filename will be recorded but not the file content. Keep uploads small for this demo storage.', false);
+        toast('File too large to store', file.name + ' is over 1.5MB — the filename will be recorded. Please keep individual attachments under 1.5MB.', false);
       } else {
         try { dataUrl = await readFileAsDataURL(file); } catch (e) { /* still record the filename even if we can't read it */ }
       }
@@ -4503,7 +4484,7 @@
           const base64 = f.data.split(',')[1];
           zip.file(f.name || ('document_' + i), base64, { base64: true });
         } else {
-          zip.file(f.name || ('document_' + i) + '.txt', 'Placeholder — original file content was not captured for this demo record.');
+          zip.file(f.name || ('document_' + i) + '.txt', 'Original file content was stored externally or unavailable.');
         }
       });
       const blob = await zip.generateAsync({ type: 'blob' });
@@ -4646,7 +4627,7 @@
           const base64 = f.data.split(',')[1];
           zip.file(f.name || ('document_' + i), base64, { base64: true });
         } else {
-          zip.file(f.name || ('document_' + i) + '.txt', 'Placeholder — original file content was not captured for this demo record.');
+          zip.file(f.name || ('document_' + i) + '.txt', 'Original file content was stored externally or unavailable.');
         }
       });
       const blob = await zip.generateAsync({ type: 'blob' });
@@ -5088,7 +5069,7 @@
       const file = input.files[0];
       let dataUrl = null;
       if (file.size > 1500000) {
-        toast('File too large to store', file.name + ' is over 1.5MB — the filename will be recorded but not the file content. Keep uploads small for this demo storage.', false);
+        toast('File too large to store', file.name + ' is over 1.5MB — the filename will be recorded. Please keep individual attachments under 1.5MB.', false);
       } else {
         try { dataUrl = await readFileAsDataURL(file); } catch (e) { /* still record the filename even if we can't read it */ }
       }
@@ -5110,7 +5091,7 @@
     /* Downloads a single driver document — available to Admin, Dispatcher, and view-only links alike. */
     function downloadDriverDoc(i) {
       const s = driverDocsDraft[i]; if (!s || !s.fileName) return;
-      if (!s.fileData) { return toast('No file content stored', s.fileName + ' was recorded but its content was over the demo storage size limit.'); }
+      if (!s.fileData) { return toast('File content unavailable', s.fileName + ' was recorded but its file content exceeded the attachment size limit.'); }
       const a = document.createElement('a'); a.href = s.fileData; a.download = s.fileName; a.click();
     }
     /* Downloads every uploaded document for the driver currently open in the modal as a ZIP —
@@ -5125,7 +5106,7 @@
           const base64 = f.fileData.split(',')[1];
           zip.file(f.fileName || ('document_' + i), base64, { base64: true });
         } else {
-          zip.file((f.fileName || ('document_' + i)) + '.txt', 'Placeholder — original file content was not captured for this demo record.');
+          zip.file((f.fileName || ('document_' + i)) + '.txt', 'Original file content was stored externally or unavailable.');
         }
       });
       const blob = await zip.generateAsync({ type: 'blob' });
@@ -6470,6 +6451,71 @@
         appSocket.on('presence_change', (data) => {
           console.log('[Socket.IO] Presence update:', data);
         });
+
+        // ── Document Lifecycle Events ─────────────────────────────────────────
+        // These update the Bell notification count and the Dashboard Live Feed
+        // in real-time without requiring a page refresh.
+
+        appSocket.on('document:uploaded', (data) => {
+          console.log('[Socket.IO] document:uploaded', data);
+          const loadNum = data.loadNumber || data.loadId || '';
+          const docKey  = data.docKey || data.documentType || 'Document';
+          pushNotification(
+            `📄 Document Uploaded — ${docKey}`,
+            `Load #${loadNum} — Pending Dispatcher Review`,
+            { type: 'doc', targetId: data.loadId }
+          );
+          renderDashboardNotifications();
+        });
+
+        appSocket.on('document:pending_review', (data) => {
+          console.log('[Socket.IO] document:pending_review', data);
+          const loadNum = data.loadNumber || data.loadId || '';
+          const docKey  = data.docKey || data.documentType || 'Document';
+          pushNotification(
+            `🔍 Pending Review — ${docKey}`,
+            `Load #${loadNum} — Awaiting your approval`,
+            { type: 'doc', targetId: data.loadId }
+          );
+          renderDashboardNotifications();
+        });
+
+        appSocket.on('document:approved', (data) => {
+          console.log('[Socket.IO] document:approved', data);
+          const loadNum = data.loadNumber || data.loadId || '';
+          const docKey  = data.docKey || data.documentType || 'Document';
+          pushNotification(
+            `✅ Document Approved — ${docKey}`,
+            `Load #${loadNum} — Approved successfully`,
+            { type: 'doc', targetId: data.loadId }
+          );
+          renderDashboardNotifications();
+          // Refresh load board if currently visible so status is current
+          if (typeof renderLoadBoard === 'function') renderLoadBoard();
+        });
+
+        appSocket.on('document:rejected', (data) => {
+          console.log('[Socket.IO] document:rejected', data);
+          const loadNum = data.loadNumber || data.loadId || '';
+          const docKey  = data.docKey || data.documentType || 'Document';
+          const reason  = data.rejectionReason || data.reason || '';
+          pushNotification(
+            `❌ Document Rejected — ${docKey}`,
+            `Load #${loadNum}${reason ? ' — ' + reason : ''}`,
+            { type: 'doc', targetId: data.loadId }
+          );
+          renderDashboardNotifications();
+        });
+
+        // ── GPS / Live Tracking Map ───────────────────────────────────────────
+        // Forwards driver location updates to the Leaflet map when it's active.
+
+        appSocket.on('driver_location_update', (data) => {
+          if (typeof updateDriverMapMarker === 'function') {
+            updateDriverMapMarker(data);
+          }
+        });
+
       } catch (e) {
         console.error('[Socket.IO] Init failed:', e);
       }

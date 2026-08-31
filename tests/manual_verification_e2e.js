@@ -139,7 +139,7 @@ async function runRealVerification() {
   console.log('  ✓ Verified: Stop out-of-bounds rejected.\n');
 
   // Clean up server
-  server.close();
+  await new Promise(resolve => server.close(resolve));
 
   // ----------------------------------------------------
   // TEST D: Multi-Stop Load Advancement (3 Pickups, 2 Deliveries)
@@ -220,12 +220,12 @@ async function runRealVerification() {
 }
 
 if (require.main === module) {
-  runRealVerification().then(() => {
-    process.exit(0);
-  }).catch(err => {
-    console.error('❌ Verification failed:', err);
-    process.exit(1);
-  });
+  runRealVerification()
+    .then(() => setTimeout(() => process.exit(0), 100))
+    .catch(err => {
+      console.error('❌ Verification failed:', err);
+      process.exit(1);
+    });
 }
 
 module.exports = { runRealVerification };

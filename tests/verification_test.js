@@ -5,14 +5,14 @@ const dataStore = require('../lib/dataStore');
 async function runTests() {
   console.log('--- STARTING VERIFICATION TESTS ---');
 
-  // Test 1: BOL AI Optical Verification - Clean Document Auto-Approved
+  // Test 1: BOL AI Optical Verification - Clean Document held for Dispatcher Review (No Auto-Approve)
   const cleanBolResult = validateBolDocument({
     loadData: { pickupAddress: 'Dallas, TX', weight: 42500, loadNumber: '10425' },
     imageMeta: { isBlurry: false, cornersVisible: true, shipperSignaturePresent: true, detectedPickupAddress: 'Dallas, TX', detectedWeight: 42500 },
     base64: 'data:image/jpeg;base64,' + 'A'.repeat(6000)
   });
-  assert.strictEqual(cleanBolResult.overallStatus, 'APPROVED', 'Clean BOL should be APPROVED');
-  console.log('✓ Test 1 Passed: Clean BOL auto-approved (overallStatus = APPROVED)');
+  assert.strictEqual(cleanBolResult.overallStatus, 'PENDING_REVIEW', 'Clean BOL should be PENDING_REVIEW (no auto-approve)');
+  console.log('✓ Test 1 Passed: Clean BOL held for Dispatcher Review (overallStatus = PENDING_REVIEW)');
 
   // Test 2: BOL AI Optical Verification - Blurry Document flagged for Retake/Review
   const blurryBolResult = validateBolDocument({
@@ -32,14 +32,14 @@ async function runTests() {
   assert.strictEqual(noSigBolResult.overallStatus, 'RETAKE_REQUIRED', 'BOL missing signature flagged');
   console.log('✓ Test 3 Passed: BOL with missing signature correctly flagged (overallStatus = RETAKE_REQUIRED)');
 
-  // Test 4: POD AI Optical Verification - Clean Document Auto-Approved
+  // Test 4: POD AI Optical Verification - Clean Document held for Dispatcher Review (No Auto-Approve)
   const cleanPodResult = validatePodDocument({
     loadData: { dropoffAddress: 'Indianapolis, IN', loadNumber: '10425' },
-    imageMeta: { isBlurry: false, cornersVisible: true, receiverSignaturePresent: true, detectedDropoffAddress: 'Indianapolis, IN' },
+    imageMeta: { isBlurry: false, cornersVisible: true, receiverSignaturePresent: true, dateVisible: true, detectedDropoffAddress: 'Indianapolis, IN' },
     base64: 'data:image/jpeg;base64,' + 'A'.repeat(6000)
   });
-  assert.strictEqual(cleanPodResult.overallStatus, 'APPROVED', 'Clean POD should be APPROVED');
-  console.log('✓ Test 4 Passed: Clean POD auto-approved (overallStatus = APPROVED)');
+  assert.strictEqual(cleanPodResult.overallStatus, 'PENDING_REVIEW', 'Clean POD should be PENDING_REVIEW (no auto-approve)');
+  console.log('✓ Test 4 Passed: Clean POD held for Dispatcher Review (overallStatus = PENDING_REVIEW)');
 
   // Test 5: POD Address Mismatch - Flagged for Dispatcher Review
   const mismatchPodResult = validatePodDocument({

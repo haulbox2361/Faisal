@@ -692,6 +692,67 @@ router.get('/api/tracking/live', async (req, res) => {
   }
 });
 
+// Helper to resolve and verify reviewer identity & role from server-trusted session
+async function resolveReviewerRole(req) {
+  // 1. Verify cryptographic Bearer token from web session store (Google OAuth login)
+  try {
+    const authRouter = require('./auth');
+    if (authRouter.verifySessionToken) {
+      const webSession = authRouter.verifySessionToken(req);
+      if (webSession) {
+        const email = (webSession.email || '').toLowerCase().trim();
+        const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'haulbox2361@gmail.com').toLowerCase().trim();
+        const adminEmails = (process.env.ADMIN_EMAILS || superAdminEmail).split(',').map(e => e.trim().toLowerCase());
+
+        if (email === superAdminEmail || adminEmails.includes(email) || webSession.accountId === 'admin') {
+          return { role: 'admin', userId: webSession.accountId || 'admin', email };
+        }
+
+        // Check if accountId belongs to a verified Dispatcher
+        const state = await dataStore.loadFullState().catch(() => null);
+        if (state && state.dispatchers) {
+          const d = state.dispatchers.find(disp => String(disp.id) === String(webSession.accountId) || (disp.email && disp.email.toLowerCase() === email));
+          if (d) {
+            return { role: 'dispatcher', userId: d.id, email: d.email, name: d.name };
+          }
+        }
+        return { role: 'dispatcher', userId: webSession.accountId, email };
+      }
+    }
+  } catch (e) {
+    console.error('[resolveReviewerRole] Error verifying web session:', e.message);
+  }
+
+  // 2. Check if the token belongs to a driver — drivers are strictly prohibited from reviewing documents
+  const authHeader = req.headers['authorization'] || '';
+  if (authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.slice(7).trim();
+      const driverSessions = require('../lib/driverSessions');
+      const driverId = await driverSessions.verify(token).catch(() => null);
+      if (driverId) {
+        return { role: 'driver', userId: driverId };
+      }
+    } catch (_) {}
+  }
+
+  // 3. Check verified Express session (Google OAuth session)
+  if (req.session?.role || req.session?.user) {
+    const role = String(req.session.role || req.session.user?.role || '').toLowerCase();
+    return { role, userId: req.session.userId || req.session.user?.id || 'admin' };
+  }
+
+  // 4. In test / dev environments without auth headers:
+  if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
+    const fallbackRole = String(req.body?.userRole || req.session?.role || '').toLowerCase();
+    if (['dispatcher', 'admin', 'super_admin', 'superadmin'].includes(fallbackRole)) {
+      return { role: fallbackRole, userId: req.body?.userId || 'test_reviewer' };
+    }
+  }
+
+  return null;
+}
+
 // POST /api/documents/review
 // Enforces document approval workflow: Pending Verification -> Approved or Rejected.
 // Approved documents are pushed to Google Drive and transition load status.
@@ -702,122 +763,117 @@ router.post('/api/documents/review', async (req, res) => {
   }
 
   try {
-    const state = (await dataStore.loadFullState()) || {};
-    const loads = state.loads || [];
-    const load = loads.find(l => String(l.id) === String(loadId));
-    if (!load) return res.status(404).json({ error: 'Load not found' });
+    // Permission check: Authenticate session and verify role server-side
+    const reviewer = await resolveReviewerRole(req);
+    if (!reviewer || !['dispatcher', 'admin', 'super_admin', 'superadmin'].includes(reviewer.role)) {
+      return res.status(403).json({ error: 'Forbidden: valid dispatcher or admin session required to review documents' });
+    }
 
-    load.docs = load.docs || {};
-    const doc = load.docs[docKey];
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const { getPool, ensureSchema } = require('../lib/db');
+    await ensureSchema();
+    const pool = getPool();
+
+    // Fetch the document_validation record
+    const { rows: docRows } = await pool.query(
+      `SELECT id, load_id, driver_id FROM document_validations WHERE load_id = $1 AND document_type = $2 ORDER BY created_at DESC LIMIT 1`,
+      [loadId, docKey]
+    );
+    if (docRows.length === 0) {
+      return res.status(404).json({ error: 'Document validation record not found' });
+    }
+    const docRecord = docRows[0];
+    const docValidationId = docRecord.id;
+    const driverId = docRecord.driver_id;
 
     const nowIso = new Date().toISOString();
-    const notifications = require('../lib/notificationStore');
-
+    let overallStatus, dispatcherStatus, rejectionMsg = null;
     if (action === 'approve') {
-      doc.status = 'Approved';
-      doc.rejectionReason = null;
-
-      // Push to Google Drive
-      if (['BOL', 'POD', 'RC'].includes(docKey)) {
-        try {
-          const folderId = driveStore.folderIdFor(docKey);
-          const fileName = driveStore.buildFileName(docKey, {
-            loadNumber: load.loadNumber,
-            driverName: load.driverName || 'Driver',
-            pickup: load.pickup,
-            dropoff: load.dropoff,
-            pickupDate: load.pickupDate,
-            originalName: doc.name || doc.fileName || `${docKey}.pdf`,
-          });
-
-          // Check for duplicate uploads
-          const adminRecord = await store.get('admin');
-          if (adminRecord) {
-            const auth = clientForAccount(adminRecord, store, 'admin');
-            const duplicate = await driveStore.findExistingInFolder(auth, folderId, fileName);
-            
-            if (!duplicate) {
-              const rawBase64 = doc.data ? doc.data.split(',').slice(1).join(',') : '';
-              if (rawBase64) {
-                const result = await driveStore.uploadToFolder(auth, {
-                  folderId,
-                  fileName,
-                  mimeType: 'application/octet-stream',
-                  base64Data: rawBase64,
-                });
-
-                await driveStore.recordUpload({
-                  loadId: load.id,
-                  driverId: load.driverId,
-                  docType: docKey,
-                  driveFileId: result.fileId,
-                  fileName,
-                  folderId,
-                  webViewLink: result.webViewLink,
-                  uploadedBy: 'admin',
-                });
-              }
-            }
-          }
-        } catch (driveErr) {
-          console.error(`Google Drive upload for ${docKey} failed:`, driveErr.message);
-        }
-      }
-
-      // Automated Workflow Transition on Approval
-      if (docKey === 'BOL') {
-        load.driverProgress = 'LOADED';
-        load.timestamps = load.timestamps || {};
-        load.timestamps.loadedAt = nowIso;
-        load.status = 'Loaded';
-      } else if (docKey === 'POD') {
-        load.driverProgress = 'DELIVERED';
-        load.timestamps = load.timestamps || {};
-        load.timestamps.deliveredAt = nowIso;
-        load.status = 'Delivered';
-      }
-
-      // Dispatcher Notification
-      const notifPayload = {
-        type: 'document_approved',
-        title: `Document Approved`,
-        body: `${docKey} for Load #${load.loadNumber || load.id} has been approved.`,
-        data: { loadId: load.id, key: docKey },
-      };
-      if (load.driverId) {
-        await notifications.create('driver', load.driverId, notifPayload);
-      }
-
+      overallStatus = 'APPROVED';
+      dispatcherStatus = 'APPROVED';
     } else if (action === 'reject') {
-      doc.status = 'Rejected';
-      doc.rejectionReason = rejectionReason || 'Rejected by dispatcher/admin';
-
-      const notifPayload = {
-        type: 'document_rejected',
-        title: `Document Rejected`,
-        body: `${docKey} for Load #${load.loadNumber || load.id} was rejected. Reason: ${doc.rejectionReason}`,
-        data: { loadId: load.id, key: docKey, rejectionReason: doc.rejectionReason },
-      };
-      if (load.driverId) {
-        await notifications.create('driver', load.driverId, notifPayload);
-      }
+      overallStatus = 'REJECTED';
+      dispatcherStatus = 'REJECTED';
+      rejectionMsg = rejectionReason || 'Rejected by dispatcher/admin';
     } else {
       return res.status(400).json({ error: 'Invalid action. Must be approve or reject' });
     }
 
-    await dataStore.saveFullState(state);
+    // Update the document_validations row
+    await pool.query(
+      `UPDATE document_validations SET overall_status = $1, dispatcher_review_status = $2, reviewed_by_user_id = $3, reviewed_timestamp = $4, rejection_reason = $5 WHERE id = $6`,
+      [
+        overallStatus,
+        dispatcherStatus,
+        req.session?.userId || req.body?.userId || 'system',
+        nowIso,
+        rejectionMsg,
+        docValidationId,
+      ]
+    );
 
+    // Emit appropriate Socket.IO event
+    const io = req.app.get('io');
+    const eventName = action === 'approve' ? 'document:approved' : 'document:rejected';
+    const socketPayload = {
+      documentValidationId: docValidationId,
+      loadId,
+      driverId,
+      docKey,
+      ...(action === 'reject' ? { rejectionReason: rejectionMsg } : {}),
+    };
+    if (io) {
+      io.emit(eventName, socketPayload);
+    }
+
+    // Preserve legacy in‑memory state updates for UI consistency
+    const state = (await dataStore.loadFullState()) || {};
+    const loads = state.loads || [];
+    const load = loads.find(l => String(l.id) === String(loadId));
+    if (load) {
+      load.docs = load.docs || {};
+      const doc = load.docs[docKey] || {};
+      doc.status = overallStatus === 'APPROVED' ? 'Approved' : 'Rejected';
+      doc.rejectionReason = rejectionMsg;
+      if (action === 'approve') {
+        if (docKey === 'BOL') {
+          load.driverProgress = 'LOADED';
+          load.timestamps = load.timestamps || {};
+          load.timestamps.loadedAt = nowIso;
+          load.status = 'Loaded';
+        } else if (docKey === 'POD') {
+          load.driverProgress = 'DELIVERED';
+          load.timestamps = load.timestamps || {};
+          load.timestamps.deliveredAt = nowIso;
+          load.status = 'Delivered';
+        }
+      }
+    }
+
+    // Create driver notification (Bell + Live Feed)
+    const notifications = require('../lib/notificationStore');
+    const notifPayload = {
+      type: action === 'approve' ? 'document_approved' : 'document_rejected',
+      title: `Document ${action === 'approve' ? 'Approved' : 'Rejected'}`,
+      body: `${docKey} for Load #${loadId} ${action === 'approve' ? 'has been approved' : 'was rejected'}${action === 'reject' ? `. Reason: ${rejectionMsg}` : ''}.`,
+      data: { loadId, key: docKey, ...(action === 'reject' ? { rejectionReason: rejectionMsg } : {}) },
+    };
+    if (driverId) {
+      await notifications.create('driver', driverId, notifPayload);
+    }
+
+    // Audit record
     const auditStore = require('../lib/auditStore');
     await auditStore.record(
       { type: req.body?.userRole || 'admin', id: req.body?.userId || 'admin', name: req.body?.userName || 'Admin' },
       'DOCUMENT_STATUS_CHANGED',
-      { type: 'LOAD_DOCUMENT', id: `${load.id}:${docKey}` },
-      { loadNumber: load.loadNumber, docType: docKey, newStatus: doc.status, reason: doc.rejectionReason || null }
+      { type: 'LOAD_DOCUMENT', id: `${loadId}:${docKey}` },
+      { loadId, docKey, newStatus: overallStatus, reason: rejectionMsg }
     ).catch(() => {});
 
-    res.json({ ok: true, load });
+    // Persist updated in‑memory state
+    await dataStore.saveFullState(state);
 
+    res.json({ ok: true, documentValidationId: docValidationId, status: overallStatus });
   } catch (e) {
     console.error('Document review failed:', e);
     res.status(500).json({ error: e.message || 'Failed to review document' });

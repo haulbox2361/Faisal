@@ -257,5 +257,6 @@ router.get('/auth/status', async (req, res) => {
   }
 });
 
+router.verifySessionToken = verifySessionToken;
 router._webSessions = webSessions;
 module.exports = router;

@@ -53,8 +53,9 @@ async function runTests() {
   assert(missingSigRes.reason.includes('signature is missing'), 'Expected signature rejection reason');
   console.log('  ✓ Unsigned BOL correctly REJECTED.');
 
-  // Test 4: Approval of valid BOL with signature & matching data
-  console.log('\n🧪 4. Testing Valid Signed BOL: APPROVED...');
+  // Test 4: Valid BOL — OCR passes ALL checks but must still produce PENDING_REVIEW.
+  // OCR can never produce APPROVED; only a human Dispatcher/Admin review can approve.
+  console.log('\n🧪 4. Testing Valid Signed BOL: must be PENDING_REVIEW (awaiting human review)...');
   const fakeAiValidBol = {
     isDocument: true,
     detectedType: 'BOL',
@@ -69,8 +70,12 @@ async function runTests() {
     },
   };
   const validBolRes = verifier.evaluateBolVerification(fakeAiValidBol, testLoad, null);
-  assert.strictEqual(validBolRes.status, 'APPROVED', 'Valid BOL must be APPROVED');
-  console.log('  ✓ Valid BOL correctly APPROVED.');
+  assert.strictEqual(validBolRes.status, 'PENDING_REVIEW', 'Valid BOL must be PENDING_REVIEW — OCR cannot auto-approve');
+  assert(validBolRes.reason && validBolRes.reason.length > 0, 'Expected a review reason message');
+  // OCR data must not contain hardcoded fake fallback values
+  assert.strictEqual(validBolRes.ocrData.proNumber, null, 'proNumber must be null when not found in OCR');
+  assert.strictEqual(validBolRes.ocrData.sealNumbers.length, 0, 'sealNumbers must be empty when not found in OCR');
+  console.log('  ✓ Valid BOL correctly produces PENDING_REVIEW (awaiting Dispatcher approval).');
 
   // Test 5: Rejection of POD with missing receiver signature
   console.log('\n🧪 5. Testing POD Missing Consignee Signature: REJECTED...');
@@ -101,6 +106,7 @@ async function runTests() {
 
   console.log('\n====================================================');
   console.log('   ✅ ALL OCR & VERIFICATION TESTS PASSED (6/6)      ');
+  console.log('   (Policy: OCR never auto-approves; human review required)');
   console.log('====================================================');
 }
 

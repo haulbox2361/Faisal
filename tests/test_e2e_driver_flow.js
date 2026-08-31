@@ -84,8 +84,8 @@ async function runEndToEndVerification() {
   assert(unsignedBolOutcome.reason.includes('signature is missing'), 'Expected missing signature reason');
   console.log('  ✓ Unsigned BOL correctly REJECTED.');
 
-  // 5. Test Positive Case: Valid Signed BOL
-  console.log('\n🧪 Step 5: Testing Approval of Valid Signed BOL...');
+  // 5. Test Positive Case: Valid Signed BOL produces PENDING_REVIEW (awaiting human dispatcher review)
+  console.log('\n🧪 Step 5: Testing Processing of Valid Signed BOL (must be PENDING_REVIEW)...');
   const fakeAiValidBol = {
     isDocument: true,
     detectedType: 'BOL',
@@ -101,8 +101,8 @@ async function runEndToEndVerification() {
     },
   };
   const validBolOutcome = verifier.evaluateBolVerification(fakeAiValidBol, sampleLoad, null);
-  assert.strictEqual(validBolOutcome.status, 'APPROVED', 'Valid signed BOL must be APPROVED');
-  console.log('  ✓ Signed BOL correctly APPROVED.');
+  assert.strictEqual(validBolOutcome.status, 'PENDING_REVIEW', 'Valid signed BOL must be PENDING_REVIEW — OCR cannot auto-approve');
+  console.log('  ✓ Signed BOL correctly held for human review (PENDING_REVIEW).');
 
   // 6. Test Document Persistence & Load State Auto-Advancement
   console.log('\n🧪 Step 6: Testing Automatic Load State Advancement to LOADED...');
@@ -149,8 +149,8 @@ async function runEndToEndVerification() {
     },
   };
   const validPodOutcome = verifier.evaluatePodVerification(fakeAiValidPod, sampleLoad, null);
-  assert.strictEqual(validPodOutcome.status, 'APPROVED', 'Valid signed POD must be APPROVED');
-  console.log('  ✓ Signed POD correctly APPROVED.');
+  assert.strictEqual(validPodOutcome.status, 'PENDING_REVIEW', 'Valid signed POD must be PENDING_REVIEW — OCR cannot auto-approve');
+  console.log('  ✓ Signed POD correctly held for human review (PENDING_REVIEW).');
 
   // Complete load with POD
   sampleLoad.docs.POD = {

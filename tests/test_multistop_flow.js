@@ -122,7 +122,7 @@ async function runMultiStopTests() {
     },
   };
   const valStop1 = verifier.evaluateBolVerification(aiPickup1, multiStopLoad, null, { stopType: 'PICKUP', stopNumber: 1 });
-  assert.strictEqual(valStop1.status, 'APPROVED', 'Stop 1 BOL should be APPROVED');
+  assert.strictEqual(valStop1.status, 'PENDING_REVIEW', 'Stop 1 BOL should be PENDING_REVIEW (awaiting human dispatcher review)');
 
   // Attempting to upload Stop 1 BOL (Dallas) for Stop 2 (Fort Worth) -> Address Mismatch FAIL
   const valWrongStop = verifier.evaluateBolVerification(aiPickup1, multiStopLoad, null, { stopType: 'PICKUP', stopNumber: 2 });

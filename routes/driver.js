@@ -1305,54 +1305,28 @@ router.post('/api/driver/upload-doc', async (req, res) => {
   let rejectionReason = null;
   let validationIssues = [];
 
-  // Automatic AI/OCR Document Verification for BOL and POD
+  // Document upload: always starts as PENDING_REVIEW.
+  // OCR output is stored for the dispatcher to review but CANNOT approve or reject the document.
+  // Load status advancement happens ONLY after a human Dispatcher/Admin/Super Admin
+  // reviews the document via /api/documents/review-action.
   if (key === 'BOL') {
     load.timestamps.bolUploadedAt = nowIso;
     const validation = validateBolDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
-    if (validation.overallStatus === 'APPROVED') {
-      docStatus = 'Approved';
-      // Only advance if all pickups approved
-      if (load.pickupStops) {
-        const pStop = load.pickupStops.find(s => (s.stop_number || s.stopNumber) === effStopNum);
-        if (pStop) pStop.status = 'BOL_APPROVED';
-        if (load.pickupStops.every(s => s.status === 'BOL_APPROVED')) {
-          load.status = 'Loaded';
-          load.driverProgress = 'LOADED';
-        }
-      } else {
-        load.status = 'Loaded';
-        load.driverProgress = 'LOADED';
-      }
-    } else {
-      docStatus = 'Pending Verification';
-      rejectionReason = validation.issues && validation.issues.length ? validation.issues.map(i => i.description).join(' ') : 'Flagged for dispatcher review';
-      validationIssues = validation.issues || [];
-    }
+    // Always PENDING_REVIEW after upload — OCR cannot approve
+    docStatus = 'Pending Verification';
+    rejectionReason = validation.issues && validation.issues.length
+      ? validation.issues.map(i => i.description || i).join(' ')
+      : null;
+    validationIssues = validation.issues || [];
   } else if (key === 'POD') {
     load.timestamps.podUploadedAt = nowIso;
     const validation = validatePodDocument({ loadData: load, imageMeta: req.body.imageMeta || {}, base64: data });
-    if (validation.overallStatus === 'APPROVED') {
-      docStatus = 'Approved';
-      if (load.deliveryStops) {
-        const dStop = load.deliveryStops.find(s => (s.stop_number || s.stopNumber) === effStopNum);
-        if (dStop) dStop.status = 'POD_APPROVED';
-        if (load.deliveryStops.every(s => s.status === 'POD_APPROVED')) {
-          load.status = 'POD Uploaded';
-          load.driverProgress = 'POD_UPLOADED';
-          const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
-          if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
-        }
-      } else {
-        load.status = 'POD Uploaded';
-        load.driverProgress = 'POD_UPLOADED';
-        const PAYMENT_STAGES = ['Payment Not Requested', 'Payment Requested', 'Payment Received'];
-        if (!PAYMENT_STAGES.includes(load.payment)) load.payment = 'Payment Not Requested';
-      }
-    } else {
-      docStatus = 'Pending Verification';
-      rejectionReason = validation.issues && validation.issues.length ? validation.issues.map(i => i.description).join(' ') : 'Flagged for dispatcher review';
-      validationIssues = validation.issues || [];
-    }
+    // Always PENDING_REVIEW after upload — OCR cannot approve
+    docStatus = 'Pending Verification';
+    rejectionReason = validation.issues && validation.issues.length
+      ? validation.issues.map(i => i.description || i).join(' ')
+      : null;
+    validationIssues = validation.issues || [];
   } else {
     // Photos and RC are on-file immediately with no review queue required
     docStatus = 'Approved';
@@ -2202,7 +2176,10 @@ async function handleReviewAction(req, res) {
 
       // Sync load state in KV/system state
       try {
-        const state = await loadFullState().catch(() => null);
+        const state = await loadFullState().catch(err => {
+          console.error('[handleReviewAction] Failed to loadFullState:', err.message);
+          return null;
+        });
         if (state && state.loads) {
           const load = state.loads.find(l => String(l.id) === String(loadId) || String(l.loadNumber) === String(loadId));
           if (load) {
@@ -2233,7 +2210,9 @@ async function handleReviewAction(req, res) {
             }
 
             const { updateStopStatus } = require('../lib/db');
-            await updateStopStatus(load.id, effStopType, stopNum, stopStatus).catch(() => {});
+            await updateStopStatus(load.id, effStopType, stopNum, stopStatus).catch(err => {
+              console.error('[handleReviewAction] Failed to updateStopStatus in DB:', err.message);
+            });
 
             // Multi-stop advancement
             if (effStopType === 'PICKUP') {
@@ -2254,23 +2233,25 @@ async function handleReviewAction(req, res) {
             await saveFullState(state);
           }
         }
-      } catch (_) {}
+      } catch (syncErr) {
+        console.error('[handleReviewAction] Failed to sync load state in dataStore:', syncErr);
+      }
     }
 
     const io = req.app.get('io') || global.io;
     if (io) {
       if (action === 'APPROVE') {
-        const newLoadStatus = (docType && docType.toUpperCase() === 'BOL') ? 'LOADED' : 'DELIVERED';
-        io.emit('dispatcher:approved', {
+        io.emit('document:approved', {
           loadId,
+          docKey: docType || 'BOL',
           documentType: docType || 'BOL',
           approvedBy: reviewerId || 'Dispatcher',
-          newLoadStatus,
           timestamp: new Date().toISOString(),
         });
       } else {
-        io.emit('dispatcher:rejected', {
+        io.emit('document:rejected', {
           loadId,
+          docKey: docType || 'BOL',
           documentType: docType || 'BOL',
           reason: reason || 'Document rejected by dispatcher',
           timestamp: new Date().toISOString(),
