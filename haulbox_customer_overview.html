@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HaulBoX Platform Overview</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0f172a;
+      background: #e2e8f0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @page {
+      size: letter portrait;
+      margin: 0;
+    }
+
+    .page {
+      width: 8.5in;
+      height: 11in;
+      margin: 0 auto 20px auto;
+      background: #ffffff;
+      padding: 0.42in 0.48in;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+      overflow: hidden;
+    }
+
+    @media print {
+      body {
+        background: none;
+      }
+      .page {
+        margin: 0;
+        box-shadow: none;
+        width: 8.5in;
+        height: 11in;
+      }
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #059669;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      padding: 8px 14px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(5, 150, 105, 0.25);
+    }
+
+    .logo-text h1 {
+      font-size: 20px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    .logo-text p {
+      font-size: 11px;
+      color: #059669;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .header-badge {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 20px;
+      text-align: right;
+    }
+
+    /* ── Hero Tagline ── */
+    .hero-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hero-banner h2 {
+      font-size: 14.5px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+      margin-bottom: 2px;
+    }
+
+    .hero-banner p {
+      font-size: 11px;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+
+    .hero-pill {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+      color: #34d399;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    /* ── Section Structure ── */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+      padding-bottom: 4px;
+      border-bottom: 1.5px solid #e2e8f0;
+    }
+
+    .section-icon {
+      font-size: 16px;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #cbd5e1;
+    }
+
+    .card-role-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-tag {
+      font-size: 9.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 12px;
+      background: #e2e8f0;
+      color: #475569;
+    }
+
+    .card-tag.driver { background: #e0f2fe; color: #0369a1; }
+    .card-tag.owner { background: #dcfce7; color: #15803d; }
+    .card-tag.dispatcher { background: #fef3c7; color: #b45309; }
+    .card-tag.admin { background: #ede9fe; color: #6d28d9; }
+
+    .bullet-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5.5px;
+    }
+
+    .bullet-list li {
+      font-size: 10.5px;
+      color: #334155;
+      line-height: 1.35;
+      position: relative;
+      padding-left: 14px;
+    }
+
+    .bullet-list li::before {
+      content: "•";
+      position: absolute;
+      left: 2px;
+      color: #059669;
+      font-weight: 900;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    /* ── Highlight Badges ── */
+    .status-chips-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .chip-ready { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .chip-paid { background: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
+    .chip-unpaid { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .chip-disputed { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    /* ── Page 2 Custom Cards ── */
+    .feature-row {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      margin-bottom: 14px;
+    }
+
+    .feature-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #059669;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .feature-card.tracking {
+      border-left-color: #0284c7;
+    }
+
+    .feature-card.payments {
+      border-left-color: #10b981;
+    }
+
+    .feature-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .feature-card-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .feature-bullets {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 14px;
+    }
+
+    .feature-bullets li {
+      font-size: 10px;
+      color: #334155;
+      line-height: 1.35;
+      position: relative;
+      padding-left: 12px;
+    }
+
+    .feature-bullets li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #059669;
+      font-weight: 900;
+      font-size: 10px;
+    }
+
+    /* ── Summary Card ── */
+    .summary-card {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 14px 18px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+    }
+
+    .summary-card h3 {
+      font-size: 13.5px;
+      font-weight: 900;
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+
+    .summary-card p {
+      font-size: 11px;
+      color: #d1fae5;
+      font-weight: 500;
+      line-height: 1.4;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 8px;
+      font-size: 9px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .footer-brand {
+      font-weight: 800;
+      color: #0f172a;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= PAGE 1 ================= -->
+  <div class="page">
+    <div>
+      <!-- Header -->
+      <div class="header">
+        <div class="logo-container">
+          <div class="logo-badge">HB</div>
+          <div class="logo-text">
+            <h1>HaulBoX Platform</h1>
+            <p>Complete Trucking Management System</p>
+          </div>
+        </div>
+        <div class="header-badge">
+          Platform Overview &amp; Capabilities
+        </div>
+      </div>
+
+      <!-- Hero Tagline -->
+      <div class="hero-banner">
+        <div>
+          <h2>One Unified System for Your Entire Fleet</h2>
+          <p>Connecting drivers on the road, dispatchers in the office, and business owners on mobile.</p>
+        </div>
+        <div class="hero-pill">
+          Mobile App + Web Portal
+        </div>
+      </div>
+
+      <!-- PILLAR 1: MOBILE APP -->
+      <div class="section-title">
+        <span class="section-icon">📱</span> 1. Mobile App (Drivers &amp; Business Owners)
+      </div>
+
+      <div class="cards-grid">
+        <!-- Driver Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-role-title">🚚 Driver Experience</span>
+            <span class="card-tag driver">Mobile App</span>
+          </div>
+          <ul class="bullet-list">
+            <li><strong>Simple, Secure Login:</strong> Driver logs in using their own unique ID and PIN.</li>
+            <li><strong>Assigned Loads at a Glance:</strong> View complete load information, pickup dates, and drop-off instructions.</li>
+            <li><strong>Camera Document Upload:</strong> Snap and upload Bills of Lading (BOL) and Proof of Delivery (POD) directly from phone.</li>
+            <li><strong>Multi-Stop Support:</strong> Easily upload separate paperwork for each stop on multi-pickup or multi-delivery loads.</li>
+            <li><strong>Smart Quality Check:</strong> The app instantly ensures photos are clear, readable, and complete before accepting.</li>
+            <li><strong>Live ETA Updates:</strong> Real-time location sharing automatically keeps dispatch and brokers informed.</li>
+            <li><strong>Track Earnings:</strong> Drivers can check payment status on completed trips anytime.</li>
+          </ul>
+        </div>
+
+        <!-- Owner Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-role-title">💼 Business Owner Experience</span>
+            <span class="card-tag owner">Dedicated View</span>
+          </div>
+          <ul class="bullet-list">
+            <li><strong>Dedicated Owner View:</strong> Logging into the same mobile app automatically opens a private executive dashboard.</li>
+            <li><strong>Business Snapshot:</strong> See revenue, driver pay, estimated profits, active loads, and available drivers at a glance.</li>
+            <li><strong>One-Tap Payments:</strong> Review loads ready to pay and mark driver settlements as paid with a single tap.</li>
+            <li><strong>Fleet-Wide Visibility:</strong> View all loads and their lifecycle status in real time (read-only for security).</li>
+            <li><strong>Performance Reports:</strong> Review daily, weekly, and monthly business summaries on the go.</li>
+            <li><strong>Trend Analytics:</strong> Track fleet revenue trends and driver volume with clear visual charts.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- PILLAR 2: WEB PORTAL -->
+      <div class="section-title">
+        <span class="section-icon">💻</span> 2. Web Portal (Dispatchers, Managers &amp; Admins)
+      </div>
+
+      <div class="cards-grid">
+        <!-- Dispatcher Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-role-title">🎧 Dispatcher Command</span>
+            <span class="card-tag dispatcher">Daily Operations</span>
+          </div>
+          <ul class="bullet-list">
+            <li><strong>Focused Driver Management:</strong> Dispatchers see only their own assigned drivers, keeping work organized and clear.</li>
+            <li><strong>Document Verification:</strong> Review uploaded driver BOLs and PODs side-by-side with load details.</li>
+            <li><strong>Live Tracking Map:</strong> Watch truck positions and accurate estimated arrival times on an easy-to-read map.</li>
+            <li><strong>End-of-Day Driver Notes:</strong> Submit a quick daily update for each driver with a friendly 4–5 PM reminder.</li>
+          </ul>
+        </div>
+
+        <!-- Manager / Admin Card -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-role-title">🏢 Manager &amp; Admin Hub</span>
+            <span class="card-tag admin">Full Control</span>
+          </div>
+          <ul class="bullet-list">
+            <li><strong>Complete Operational Control:</strong> Full visibility across all dispatchers, drivers, fleet trucks, and active loads.</li>
+            <li><strong>User Account Management:</strong> Quickly create and manage accounts for dispatchers, drivers, and fleet owners.</li>
+            <li><strong>Company-Wide Daily Reports:</strong> View daily driver status notes organized by dispatcher to ensure complete daily reporting.</li>
+            <li><strong>End-to-End Oversight:</strong> Oversee loads from booking and dispatch through document delivery and final payment.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Page 1 -->
+    <div class="footer">
+      <div><span class="footer-brand">HaulBoX</span> • Complete Trucking Management Platform</div>
+      <div>Page 1 of 2</div>
+    </div>
+  </div>
+
+  <!-- ================= PAGE 2 ================= -->
+  <div class="page">
+    <div>
+      <!-- Header Page 2 -->
+      <div class="header">
+        <div class="logo-container">
+          <div class="logo-badge">HB</div>
+          <div class="logo-text">
+            <h1>HaulBoX Platform</h1>
+            <p>Automated Operations, Tracking &amp; Financials</p>
+          </div>
+        </div>
+        <div class="header-badge">
+          Core Features &amp; Workflow
+        </div>
+      </div>
+
+      <!-- Feature Rows -->
+      <div class="feature-row">
+        <!-- PILLAR 3: AUTOMATED DOCUMENT HANDLING -->
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <span class="feature-card-title">📄 3. Automated Document Handling (Zero Data Entry)</span>
+            <span class="card-tag owner">Hands-Free Automation</span>
+          </div>
+          <ul class="feature-bullets">
+            <li><strong>Instant Rate Confirmation Reading:</strong> Upload a Rate Confirmation and key load details (stops, rates, dates) are read automatically.</li>
+            <li><strong>Automatic Multi-Stop Detection:</strong> The system identifies all pickup and delivery stops from the document without manual entry.</li>
+            <li><strong>Organized Cloud Storage:</strong> Rate Confirmations, BOLs, and PODs are filed automatically into Google Drive folders by load.</li>
+            <li><strong>Instant Broker Emailing:</strong> Once a BOL is approved, it is automatically emailed to the broker without manual effort.</li>
+            <li><strong>Automated Spreadsheet Logging:</strong> Every load's key details are instantly logged into a Google Sheet for easy record-keeping.</li>
+            <li><strong>Paperless Fleet:</strong> Eliminates lost paperwork, manual typing mistakes, and billing delays.</li>
+          </ul>
+        </div>
+
+        <!-- PILLAR 4: LIVE TRACKING & ETA -->
+        <div class="feature-card tracking">
+          <div class="feature-card-header">
+            <span class="feature-card-title">📍 4. Live Tracking &amp; Accurate Arrival Times</span>
+            <span class="card-tag driver">Live Operations</span>
+          </div>
+          <ul class="feature-bullets">
+            <li><strong>Clean Status Map:</strong> View driver locations with simple pins for pickup and drop-off stops—no confusing turn-by-turn clutter.</li>
+            <li><strong>Real GPS Arrival Times:</strong> ETAs are calculated using the truck's real GPS position and refreshed automatically.</li>
+            <li><strong>Multi-Stop Progress:</strong> Clearly shows the exact next stop in the journey, whether it's pickup #2 or final delivery.</li>
+            <li><strong>Fewer Check Calls:</strong> Brokers and dispatchers stay informed with live status, saving time on phone calls.</li>
+          </ul>
+        </div>
+
+        <!-- PILLAR 5: PAYMENTS -->
+        <div class="feature-card payments">
+          <div class="feature-card-header">
+            <span class="feature-card-title">💰 5. Transparent Driver Payments</span>
+            <span class="card-tag owner">Financial Clarity</span>
+          </div>
+          <ul class="feature-bullets">
+            <li><strong>Clear Payment Tracking:</strong> Every load is clearly categorized so you always know where money stands:</li>
+            <li><strong>One-Tap Settlements:</strong> Owners can approve and mark driver payments as paid with a single tap on their phone.</li>
+            <li><strong>Complete Payment History:</strong> Comprehensive records show every past load, payment date, and driver payout.</li>
+            <li><strong>Dispute Flagging:</strong> Any payment questions or disputes are highlighted immediately for fast resolution.</li>
+          </ul>
+          <div style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; padding-top: 6px; border-top: 1px dashed #cbd5e1;">
+            <span style="font-size: 10px; font-weight: 700; color: #475569;">Payment Stages:</span>
+            <div class="status-chips-row" style="margin-top: 0;">
+              <span class="chip chip-ready">Ready to Pay (Delivered)</span>
+              <span class="chip chip-unpaid">Unpaid (In Transit)</span>
+              <span class="chip chip-paid">Paid &amp; Confirmed</span>
+              <span class="chip chip-disputed">Dispute Flagged</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUMMARY VALUE PROPOSITION -->
+      <div class="summary-card">
+        <h3>Why Trucking Companies Choose HaulBoX</h3>
+        <p>“HaulBoX automates the paperwork, keeps everyone updated in real time, and gives you full visibility into your business — all in one place.”</p>
+      </div>
+    </div>
+
+    <!-- Footer Page 2 -->
+    <div class="footer">
+      <div><span class="footer-brand">HaulBoX</span> • Complete Trucking Management Platform</div>
+      <div>Page 2 of 2</div>
+    </div>
+  </div>
+
+</body>
+</html>

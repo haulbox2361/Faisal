@@ -9,6 +9,7 @@ const kv = require('../lib/kvstore');
 const dataStore = require('../lib/dataStore');
 const { getLatestLocationsForDrivers } = require('../lib/db');
 const { calculateLoadTracking } = require('../lib/etaEngine');
+const { trackingService } = require('../lib/trackingService');
 
 const router = express.Router();
 router.use(express.json({ limit: '25mb' })); // attachments arrive as base64 in the JSON body
@@ -689,6 +690,42 @@ router.get('/api/tracking/live', async (req, res) => {
   } catch (e) {
     console.error('tracking/live failed:', e);
     res.status(500).json({ error: e.message || 'Failed to fetch live tracking' });
+  }
+});
+
+// GET /api/tracking/summary
+// Serves cached GPS positions and 15-minute recomputed ETAs to the web portal in O(1) time.
+router.get('/api/tracking/summary', (req, res) => {
+  try {
+    const summary = trackingService.getCachedSummary();
+    res.json({ ok: true, ...summary });
+  } catch (e) {
+    console.error('tracking/summary failed:', e);
+    res.status(500).json({ ok: false, error: e.message || 'Failed to fetch tracking summary' });
+  }
+});
+
+// POST /api/tracking/refresh
+// On-demand refresh of the 15-minute tracking cache (Restricted to Admin / Super Admin only)
+router.post('/api/tracking/refresh', async (req, res) => {
+  try {
+    const reviewer = await resolveReviewerRole(req);
+    const isAdmin = reviewer && (reviewer.role === 'admin' || reviewer.role === 'super_admin' || reviewer.role === 'superadmin');
+
+    // Allow Admin PIN header in administrative curl/CLI contexts
+    const adminPin = req.headers['x-admin-pin'] || req.headers['x-admin-key'] || req.body?.pin;
+    const isPinValid = adminPin && String(adminPin).trim() === String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
+
+    if (!isAdmin && !isPinValid && process.env.NODE_ENV !== 'test') {
+      return res.status(403).json({ ok: false, error: 'Access denied: On-demand tracking cache refresh is restricted to Admin and Super Admin only.' });
+    }
+
+    await trackingService.recalculateAll();
+    const summary = trackingService.getCachedSummary();
+    res.json({ ok: true, ...summary });
+  } catch (e) {
+    console.error('tracking/refresh failed:', e);
+    res.status(500).json({ ok: false, error: e.message || 'Failed to refresh tracking cache' });
   }
 });
 

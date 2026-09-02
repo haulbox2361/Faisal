@@ -715,7 +715,7 @@
     }
 
     /* ---------------- Navigation ---------------- */
-    const VIEW_TITLES = { dashboard: 'Dashboard', addload: 'Add Load', loadboard: 'Load Board', drivers: 'Drivers', driverpay: 'Driver Pay', brokers: 'Brokers', dispatchers: 'Dispatchers', statistics: 'Statistics', documents: 'Documents', emaillogs: 'Email Logs', myaccount: 'My Account', settings: 'Settings', chat: '💬 Chat' };
+    const VIEW_TITLES = { dashboard: 'Dashboard', addload: 'Add Load', loadboard: 'Load Board', drivers: 'Drivers', dailyreports: 'Daily Driver Reports', driverpay: 'Driver Pay', brokers: 'Brokers', dispatchers: 'Dispatchers', statistics: 'Statistics', documents: 'Documents', emaillogs: 'Email Logs', myaccount: 'My Account', settings: 'Settings', chat: '💬 Chat' };
     
     // Security PIN session flag for Admin Settings
     let IS_SETTINGS_PIN_UNLOCKED = false;
@@ -826,6 +826,7 @@
       if (view === 'dashboard') renderDashboard();
       if (view === 'loadboard') { renderLoadBoardTabs(); renderLoadBoard(); }
       if (view === 'drivers') renderDrivers();
+      if (view === 'dailyreports') loadDailyReportsView();
       if (view === 'driverpay') renderDriverPay();
       if (view === 'brokers') renderBrokers();
       if (view === 'dispatchers') renderDispatchersPage();
@@ -1245,198 +1246,21 @@
         : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
     }
 
-    let trackingMap = null;
-    let trackingMarkers = [];
-    let trackingPolyline = null;
-
-    const TRACKING_DATA = {
-      'driver-1': {
-        driver: 'John Smith',
-        loadNum: 'Load #12345',
-        loadId: '12345',
-        stage: 'IN TRANSIT',
-        lane: 'Dallas, TX → Indianapolis, IN',
-        miles: '245 mi',
-        eta: 'Today 4:35 PM',
-        lastUpdate: '2 mins ago',
-        speed: '62 mph',
-        statusHtml: '🟢 On Time',
-        pickup: { name: 'Dallas, TX', lat: 32.7767, lng: -96.7970 },
-        delivery: { name: 'Indianapolis, IN', lat: 39.7684, lng: -86.1581 },
-        current: { lat: 35.4676, lng: -97.5164 }
-      },
-      'driver-2': {
-        driver: 'Mike Johnson',
-        loadNum: 'Load #12346',
-        loadId: '12346',
-        stage: 'AT PICKUP',
-        lane: 'Atlanta, GA → Chicago, IL',
-        miles: '115 mi',
-        eta: 'Tomorrow 9:15 AM',
-        lastUpdate: '5 mins ago',
-        speed: '0 mph',
-        statusHtml: '🟡 Running Late',
-        pickup: { name: 'Atlanta, GA', lat: 33.7490, lng: -84.3880 },
-        delivery: { name: 'Chicago, IL', lat: 41.8781, lng: -87.6298 },
-        current: { lat: 33.7490, lng: -84.3880 }
-      },
-      'driver-3': {
-        driver: 'Alex Williams',
-        loadNum: 'Load #12347',
-        loadId: '12347',
-        stage: 'LOADED',
-        lane: 'Houston, TX → Memphis, TN',
-        miles: '363 mi',
-        eta: 'Today 12:40 PM',
-        lastUpdate: '1 min ago',
-        speed: '68 mph',
-        statusHtml: '🟢 On Time',
-        pickup: { name: 'Houston, TX', lat: 29.7604, lng: -95.3698 },
-        delivery: { name: 'Memphis, TN', lat: 35.1495, lng: -90.0490 },
-        current: { lat: 32.5252, lng: -93.7502 }
-      },
-      'driver-4': {
-        driver: 'Tom Brown',
-        loadNum: 'Load #12348',
-        loadId: '12348',
-        stage: 'IN TRANSIT',
-        lane: 'Phoenix, AZ → Los Angeles, CA',
-        miles: '372 mi',
-        eta: 'Today 2:00 PM',
-        lastUpdate: '8 mins ago',
-        speed: '59 mph',
-        statusHtml: '🟡 Running Late',
-        pickup: { name: 'Phoenix, AZ', lat: 33.4484, lng: -112.0740 },
-        delivery: { name: 'Los Angeles, CA', lat: 34.0522, lng: -118.2437 },
-        current: { lat: 33.6054, lng: -114.5964 }
-      }
-    };
-
     function onTrackingDriverChanged(driverKey) {
-      const data = TRACKING_DATA[driverKey] || TRACKING_DATA['driver-1'];
-      const drvEl = document.getElementById('trk-card-driver');
-      if (drvEl) drvEl.textContent = data.driver;
-      const stageEl = document.getElementById('trk-card-stage-badge');
-      if (stageEl) stageEl.textContent = data.stage;
-      const loadEl = document.getElementById('trk-card-loadnum');
-      if (loadEl) loadEl.textContent = data.loadNum;
-      const laneEl = document.getElementById('trk-card-lane');
-      if (laneEl) laneEl.textContent = data.lane;
-      const miEl = document.getElementById('trk-card-miles');
-      if (miEl) miEl.textContent = data.miles;
-      const etaEl = document.getElementById('trk-card-eta');
-      if (etaEl) etaEl.textContent = data.eta;
-      const upEl = document.getElementById('trk-card-lastupdate');
-      if (upEl) upEl.textContent = data.lastUpdate;
-      const spEl = document.getElementById('trk-card-speed');
-      if (spEl) spEl.textContent = data.speed;
-      const stEl = document.getElementById('trk-card-status');
-      if (stEl) stEl.innerHTML = data.statusHtml;
-
-      updateTrackingMap(data);
-    }
-
-    function updateTrackingMap(data) {
-      if (!window.L) return;
-      const container = document.getElementById('tracking-map-container');
-      if (!container) return;
-
-      if (!trackingMap) {
-        trackingMap = L.map('tracking-map-container').setView([data.current.lat, data.current.lng], 5);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 18,
-          attribution: '&copy; OpenStreetMap'
-        }).addTo(trackingMap);
+      if (window.onTrackingDriverChanged) {
+        window.onTrackingDriverChanged(driverKey);
       }
-
-      trackingMarkers.forEach(m => trackingMap.removeLayer(m));
-      trackingMarkers = [];
-      if (trackingPolyline) { trackingMap.removeLayer(trackingPolyline); }
-
-      const puMarker = L.circleMarker([data.pickup.lat, data.pickup.lng], {
-        radius: 8, fillColor: '#16a34a', color: '#ffffff', weight: 2, fillOpacity: 1
-      }).addTo(trackingMap).bindPopup(`<b>Pickup:</b> ${data.pickup.name}`);
-      trackingMarkers.push(puMarker);
-
-      const doMarker = L.circleMarker([data.delivery.lat, data.delivery.lng], {
-        radius: 8, fillColor: '#ef4444', color: '#ffffff', weight: 2, fillOpacity: 1
-      }).addTo(trackingMap).bindPopup(`<b>Delivery:</b> ${data.delivery.name}`);
-      trackingMarkers.push(doMarker);
-
-      const drvMarker = L.circleMarker([data.current.lat, data.current.lng], {
-        radius: 10, fillColor: '#2563eb', color: '#ffffff', weight: 3, fillOpacity: 1
-      }).addTo(trackingMap).bindPopup(`<b>Driver:</b> ${data.driver}<br>${data.speed}`);
-      trackingMarkers.push(drvMarker);
-
-      const points = [
-        [data.pickup.lat, data.pickup.lng],
-        [data.current.lat, data.current.lng],
-        [data.delivery.lat, data.delivery.lng]
-      ];
-      trackingPolyline = L.polyline(points, { color: '#2563eb', weight: 4, dashArray: '6, 6' }).addTo(trackingMap);
-
-      const group = L.featureGroup(trackingMarkers);
-      trackingMap.fitBounds(group.getBounds().pad(0.2));
     }
 
     function openSelectedDriverLoadDetails() {
       const select = document.getElementById('tracking-driver-select');
-      const key = select ? select.value : 'driver-1';
-      const data = TRACKING_DATA[key] || TRACKING_DATA['driver-1'];
-      if (!data) return;
+      const driverId = select ? select.value : '';
+      if (!driverId) return;
 
-      // 1. Try to find exact load in STATE.loads
-      let load = (STATE.loads || []).find(l => String(l.id) === String(data.loadId) || (l.loadNumber && l.loadNumber.includes(String(data.loadId))));
-      
-      // 2. If not found in seed loads, create a live linked record so details are 100% full & coherent
-      if (!load) {
-        const dsp = (STATE.dispatchers && STATE.dispatchers[0]) || { id: 'disp_1', name: 'John Dispatcher' };
-        load = {
-          id: data.loadId,
-          loadNumber: (data.loadNum || 'HL-' + data.loadId).replace('Load #', '').trim(),
-          systemDate: getTodayIsoString(),
-          dispatcherId: dsp.id,
-          dispatcherName: dsp.name,
-          brokerId: 'broker_1',
-          brokerName: 'C.H. Robinson Worldwide',
-          brokerMC: 'MC-219401',
-          brokerEmail: 'freight-ops@chrobinson.com',
-          driverId: key,
-          driverName: data.driver,
-          truck: 'Truck #104',
-          pickup: data.pickup ? data.pickup.name : 'Dallas, TX',
-          dropoff: data.delivery ? data.delivery.name : 'Indianapolis, IN',
-          pickupDate: getTodayIsoString(),
-          deliveryDate: getTodayIsoString(),
-          miles: parseInt(data.miles) || 540,
-          brokerRate: 2450.00,
-          ratePerMile: 4.54,
-          feePct: 10,
-          dispatchRevenue: 245.00,
-          driverPayPct: 88,
-          driverPay: 2156.00,
-          driverDeduction: 0,
-          driverPayNote: '',
-          driverPaid: false,
-          driverPaidDate: null,
-          paymentStatus: 'UNPAID',
-          driverProgress: data.stage || 'IN_TRANSIT',
-          status: 'Booked',
-          notes: 'Priority high-value logistics dispatch. Live GPS telemetry active.',
-          docs: {
-            RC: { name: `RC_${data.loadId}.pdf`, data: null },
-            BOL: { name: `BOL_${data.loadId}.pdf`, data: null },
-            POD: null,
-            PhotosPU: [{ name: 'pickup_inspection_1.jpg', data: null }],
-            PhotosDO: [],
-            Extra: []
-          }
-        };
-        STATE.loads.unshift(load);
-        persist();
+      const activeLoad = (STATE.loads || []).find(l => String(l.driverId) === String(driverId) && l.status !== 'Drop-off' && l.status !== 'Cancelled');
+      if (activeLoad) {
+        openLoadModal(activeLoad.id);
       }
-
-      openLoadModal(load.id);
     }
 
     function openDriverTrackingModal() {
@@ -1925,8 +1749,8 @@
       setTimeout(initAllHaulbox3DCubes, 100);
     }
 
-    function getTodayIsoString() {
-      const d = new Date();
+    function getTodayIsoString(dateObj) {
+      const d = dateObj ? new Date(dateObj) : new Date();
       const yr = d.getFullYear();
       const mo = String(d.getMonth() + 1).padStart(2, '0');
       const da = String(d.getDate()).padStart(2, '0');
@@ -2040,6 +1864,33 @@
       driverMarkers = {};
     }
 
+    // ── Server-side 15-minute ETA and GPS telemetry cache for the web portal ──
+    let TRACKING_CACHE = { lastCalculatedAt: null, lastCalculatedAgoText: '', drivers: {} };
+    let isFetchingTrackingCache = false;
+
+    async function fetchTrackingCache() {
+      if (isFetchingTrackingCache) return TRACKING_CACHE;
+      isFetchingTrackingCache = true;
+      try {
+        const res = await fetch('/api/tracking/summary');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.ok) {
+            TRACKING_CACHE = data;
+            const tsEl = document.getElementById('gps-last-update-time');
+            if (tsEl && data.lastCalculatedAgoText) {
+              tsEl.textContent = `ETA refreshed ${data.lastCalculatedAgoText} (15m interval)`;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[TrackingCache] Failed to fetch cache:', err);
+      } finally {
+        isFetchingTrackingCache = false;
+      }
+      return TRACKING_CACHE;
+    }
+
     // ── Real-time GPS Map Update (called from Socket.IO driver_location_update event) ──
     window.updateDriverMapMarker = function(data) {
       if (!data || !data.location) return;
@@ -2051,9 +1902,8 @@
       const driverId = String(data.driverId || '');
       const driverName = data.driverName || 'Driver';
       const speed = loc.speed != null ? Math.round(Number(loc.speed)) : null;
-      const tracking = data.tracking;
 
-      // 1. Update STATE.drivers location so re-renders use fresh coords
+      // 1. Update STATE.drivers in-memory location
       if (STATE.drivers && driverId) {
         const drv = STATE.drivers.find(d => String(d.id) === driverId);
         if (drv) {
@@ -2065,7 +1915,18 @@
         }
       }
 
-      // 2. Move existing marker or create a new one on the live fleet map
+      // Update local tracking cache GPS entry
+      if (TRACKING_CACHE.drivers && TRACKING_CACHE.drivers[driverId]) {
+        TRACKING_CACHE.drivers[driverId].gps = {
+          lat,
+          lng,
+          speed,
+          lastUpdated: new Date().toISOString()
+        };
+        TRACKING_CACHE.drivers[driverId].lastGpsUpdateText = 'Just now';
+      }
+
+      // 2. Move existing marker or create a new one on the live map
       if (dashboardMap && typeof L !== 'undefined') {
         const truckIcon = L.divIcon({
           className: 'custom-trip-icon',
@@ -2075,49 +1936,23 @@
         });
 
         if (driverMarkers[driverId]) {
-          // Smoothly animate marker to new position
           driverMarkers[driverId].setLatLng([lat, lng]);
           driverMarkers[driverId].setPopupContent(
             `<b>🚚 ${escapeHtml(driverName)}</b><br>` +
             (speed != null ? `Speed: <b>${speed} mph</b><br>` : '') +
-            (tracking ? `Miles to Delivery: <b>${(tracking.milesToDelivery || 0).toFixed(1)}</b><br>ETA: <b>${tracking.etaDeliveryText || tracking.etaText || 'On Time'}</b><br>` : '') +
             `<small style="color:#64748b;">Live GPS • Updated just now</small>`
           );
-        } else {
-          const marker = L.marker([lat, lng], { icon: truckIcon }).addTo(dashboardMap);
-          marker.bindPopup(
-            `<b>🚚 ${escapeHtml(driverName)}</b><br>` +
-            (speed != null ? `Speed: <b>${speed} mph</b><br>` : '') +
-            (tracking ? `ETA: <b>${tracking.etaDeliveryText || tracking.etaText || 'On Time'}</b><br>` : '') +
-            `<small style="color:#64748b;">Live GPS</small>`
-          );
-          marker.on('click', () => {
-            if (driverId) window.onTrackingDriverChanged && window.onTrackingDriverChanged(driverId);
-          });
-          driverMarkers[driverId] = marker;
         }
       }
 
       // 3. Update the driver tracking info panel if this driver is currently selected
       const select = document.getElementById('tracking-driver-select');
       if (select && String(select.value) === driverId) {
-        if (typeof showDriverDetails === 'function') {
-          showDriverDetails(driverId);
-        }
-
-        // Update speed display
         const speedEl = document.getElementById('driver-live-speed');
         if (speedEl && speed != null) speedEl.textContent = speed + ' mph';
 
-        // Update ETA / miles remaining display
-        if (tracking) {
-          const etaEl = document.getElementById('driver-live-eta');
-          if (etaEl) etaEl.textContent = tracking.etaDeliveryText || tracking.etaText || '—';
-          const milesEl = document.getElementById('driver-live-miles');
-          if (milesEl) milesEl.textContent = (tracking.milesToDelivery != null ? tracking.milesToDelivery.toFixed(1) : '—') + ' mi';
-          const riskEl = document.getElementById('driver-live-risk');
-          if (riskEl && tracking.risk) riskEl.textContent = tracking.risk.badge || '🟢 On Time';
-        }
+        const lastGpsEl = document.getElementById('driver-live-lastgps');
+        if (lastGpsEl) lastGpsEl.textContent = 'Just now';
 
         // Pulse the live indicator badge
         const liveEl = document.querySelector('.live-gps-indicator');
@@ -2127,17 +1962,13 @@
           setTimeout(() => { liveEl.style.background = ''; }, 1200);
         }
       }
-
-      // 4. Update timestamp in tracking box header
-      const tsEl = document.getElementById('gps-last-update-time');
-      if (tsEl) tsEl.textContent = 'Updated: ' + new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     };
 
     function initDashboardMap() {
       if (dashboardMap) return;
       const container = document.getElementById('live-driver-map');
       if (!container) return;
-      if (typeof L === 'undefined') return; // Leaflet not loaded
+      if (typeof L === 'undefined') return;
       
       dashboardMap = L.map('live-driver-map').setView([39.8283, -98.5795], 4); // Center of US
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -2145,7 +1976,7 @@
       }).addTo(dashboardMap);
     }
 
-    window.onTrackingDriverChanged = function(driverId) {
+    window.onTrackingDriverChanged = async function(driverId) {
       initDashboardMap();
       const select = document.getElementById('tracking-driver-select');
       if (select && driverId !== undefined && select.value !== driverId) {
@@ -2155,102 +1986,143 @@
       if (!driverId) {
         const panel = document.getElementById('driver-tracking-panel');
         if (panel) {
-          panel.innerHTML = '<div style="text-align:center;color:#64748b;font-size:13px;padding-top:60px;">Select a driver from the dropdown above or click a truck on the map to view trip navigation.</div>';
+          panel.innerHTML = '<div style="text-align:center;color:#64748b;font-size:13px;padding-top:100px;">Select a driver from the dropdown above or click a truck on the map.</div>';
         }
         renderAllDriversFleetRadar();
         return;
       }
+
+      // Ensure cached tracking data is loaded
+      await fetchTrackingCache();
 
       showDriverDetails(driverId);
 
       if (!dashboardMap) return;
       clearDashboardMapElements();
 
-      const driver = (STATE.drivers || []).find(x => x.id === driverId);
+      const driver = (STATE.drivers || []).find(x => String(x.id) === String(driverId));
       if (!driver) return;
 
-      const activeLoad = (STATE.loads || []).find(l => l.driverId === driver.id && l.status !== 'Drop-off' && l.status !== 'Cancelled');
+      const cached = (TRACKING_CACHE.drivers && TRACKING_CACHE.drivers[String(driverId)]) || null;
+      const activeLoad = (STATE.loads || []).find(l => String(l.driverId) === String(driver.id) && l.status !== 'Drop-off' && l.status !== 'Delivered' && l.status !== 'Cancelled');
+
+      const bounds = [];
 
       if (activeLoad) {
-        // Show ONLY this driver's active trip navigation
-        const puCoords = getDashboardCoordsForLocation(activeLoad.pickup, { lat: 32.7767, lng: -96.7970 });
-        const doCoords = getDashboardCoordsForLocation(activeLoad.dropoff, { lat: 39.7684, lng: -86.1581 });
-        const drvCoords = (driver.location && driver.location.lat != null) 
-          ? { lat: Number(driver.location.lat), lng: Number(driver.location.lng) }
-          : { lat: (puCoords.lat + doCoords.lat) / 2 + 0.2, lng: (puCoords.lng + doCoords.lng) / 2 - 0.3 };
+        // Multi-stop check
+        const rawPickups = (cached && cached.stops && cached.stops.filter(s => s.type === 'PICKUP')) || activeLoad.pickupStops || activeLoad.pickup_stops || [];
+        const rawDeliveries = (cached && cached.stops && cached.stops.filter(s => s.type === 'DELIVERY')) || activeLoad.deliveryStops || activeLoad.delivery_stops || [];
+        const isMultiStop = (rawPickups.length > 1 || rawDeliveries.length > 1);
 
-        // 1. Origin / Pickup Marker
-        const puIcon = L.divIcon({
-          className: 'custom-trip-icon',
-          html: `<div style="background:#16a34a;color:#ffffff;font-size:11px;font-weight:900;border:2.5px solid #ffffff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(22,163,74,0.45);cursor:pointer;">PU</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        });
-        const puMarker = L.marker([puCoords.lat, puCoords.lng], { icon: puIcon }).addTo(dashboardMap);
-        puMarker.bindPopup(`<b>🟢 Origin / Pickup:</b><br>${escapeHtml(formatCityState(activeLoad.pickup) || 'Pickup Hub')}<br><small style="color:#64748b;">Scheduled: ${escapeHtml(activeLoad.pickupDate || 'Today')}</small>`);
-        dashboardRouteLayers.push(puMarker);
+        if (isMultiStop) {
+          // ── MULTI-STOP LOAD: 1 marker per pickup stop + 1 marker per delivery stop ──
+          rawPickups.forEach((s, idx) => {
+            const num = s.stop_number || s.stopNumber || (idx + 1);
+            const city = s.city || (s.address ? s.address.split(',')[0].trim() : 'Pickup');
+            const state = s.state || (s.address ? (s.address.split(',')[1] || '').trim().slice(0, 2) : '');
+            const coords = s.coords || getDashboardCoordsForLocation(s.address || `${city}, ${state}`);
+            
+            const puIcon = L.divIcon({
+              className: 'custom-trip-icon',
+              html: `<div style="background:#16a34a;color:#ffffff;font-size:10px;font-weight:900;border:2px solid #ffffff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(22,163,74,0.4);cursor:pointer;">PU${num}</div>`,
+              iconSize: [28, 28],
+              iconAnchor: [14, 14]
+            });
+            const marker = L.marker([coords.lat, coords.lng], { icon: puIcon }).addTo(dashboardMap);
+            marker.bindPopup(`<b>🟢 Pickup Stop #${num}:</b><br>${escapeHtml(city)}, ${escapeHtml(state)}<br><small style="color:#64748b;">${escapeHtml(s.facilityName || s.facility_name || s.address || '')}</small>`);
+            dashboardRouteLayers.push(marker);
+            bounds.push([coords.lat, coords.lng]);
+          });
 
-        // 2. Destination / Delivery Marker
-        const doIcon = L.divIcon({
-          className: 'custom-trip-icon',
-          html: `<div style="background:#ef4444;color:#ffffff;font-size:11px;font-weight:900;border:2.5px solid #ffffff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(239,68,68,0.45);cursor:pointer;">DEL</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        });
-        const doMarker = L.marker([doCoords.lat, doCoords.lng], { icon: doIcon }).addTo(dashboardMap);
-        doMarker.bindPopup(`<b>🔴 Delivery Destination:</b><br>${escapeHtml(formatCityState(activeLoad.dropoff) || 'Delivery Location')}<br><small style="color:#64748b;">ETA: ${escapeHtml(activeLoad.eta || 'On Schedule')}</small>`);
-        dashboardRouteLayers.push(doMarker);
+          rawDeliveries.forEach((s, idx) => {
+            const num = s.stop_number || s.stopNumber || (idx + 1);
+            const city = s.city || (s.address ? s.address.split(',')[0].trim() : 'Delivery');
+            const state = s.state || (s.address ? (s.address.split(',')[1] || '').trim().slice(0, 2) : '');
+            const coords = s.coords || getDashboardCoordsForLocation(s.address || `${city}, ${state}`);
 
-        // 3. Driver Live Position Marker
-        const drvIcon = L.divIcon({
-          className: 'custom-trip-icon',
-          html: `<div style="background:#0284c7;color:#ffffff;font-size:16px;border:3px solid #ffffff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(2,132,199,0.7);cursor:pointer;">🚚</div>`,
-          iconSize: [36, 36],
-          iconAnchor: [18, 18]
-        });
-        const drvMarker = L.marker([drvCoords.lat, drvCoords.lng], { icon: drvIcon }).addTo(dashboardMap);
-        drvMarker.bindPopup(`<b>🚚 ${escapeHtml(driver.name)}</b><br>Truck: ${escapeHtml(driver.truck || 'HL-101')}<br>Speed: ${driver.location && driver.location.speed ? driver.location.speed + ' mph' : '62 mph'}<br>Status: <span style="color:#ea580c;font-weight:700;">${escapeHtml(activeLoad.status || 'In Transit')}</span>`).openPopup();
-        dashboardRouteLayers.push(drvMarker);
+            const doIcon = L.divIcon({
+              className: 'custom-trip-icon',
+              html: `<div style="background:#ef4444;color:#ffffff;font-size:10px;font-weight:900;border:2px solid #ffffff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(239,68,68,0.4);cursor:pointer;">D${num}</div>`,
+              iconSize: [28, 28],
+              iconAnchor: [14, 14]
+            });
+            const marker = L.marker([coords.lat, coords.lng], { icon: doIcon }).addTo(dashboardMap);
+            marker.bindPopup(`<b>🔴 Delivery Stop #${num}:</b><br>${escapeHtml(city)}, ${escapeHtml(state)}<br><small style="color:#64748b;">${escapeHtml(s.facilityName || s.facility_name || s.address || '')}</small>`);
+            dashboardRouteLayers.push(marker);
+            bounds.push([coords.lat, coords.lng]);
+          });
+        } else {
+          // ── SINGLE-STOP LOAD: Exactly 2 markers (Pickup City and Drop-off City) ──
+          const puCoords = getDashboardCoordsForLocation(activeLoad.pickup);
+          const doCoords = getDashboardCoordsForLocation(activeLoad.dropoff);
 
-        // 4. Trip Route Polylines
-        // Completed route segment (Pickup to Driver)
-        const completedLine = L.polyline([
-          [puCoords.lat, puCoords.lng],
-          [drvCoords.lat, drvCoords.lng]
-        ], { color: '#16a34a', weight: 4, opacity: 0.85 }).addTo(dashboardMap);
-        dashboardRouteLayers.push(completedLine);
+          const puIcon = L.divIcon({
+            className: 'custom-trip-icon',
+            html: `<div style="background:#16a34a;color:#ffffff;font-size:11px;font-weight:900;border:2.5px solid #ffffff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(22,163,74,0.45);cursor:pointer;">PU</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
+          const puMarker = L.marker([puCoords.lat, puCoords.lng], { icon: puIcon }).addTo(dashboardMap);
+          puMarker.bindPopup(`<b>🟢 Origin / Pickup:</b><br>${escapeHtml(formatCityState(activeLoad.pickup) || 'Pickup Hub')}`);
+          dashboardRouteLayers.push(puMarker);
+          bounds.push([puCoords.lat, puCoords.lng]);
 
-        // Remaining route segment (Driver to Destination)
-        const remainingLine = L.polyline([
-          [drvCoords.lat, drvCoords.lng],
-          [doCoords.lat, doCoords.lng]
-        ], { color: '#0284c7', weight: 4, opacity: 0.9, dashArray: '8, 8' }).addTo(dashboardMap);
-        dashboardRouteLayers.push(remainingLine);
+          const doIcon = L.divIcon({
+            className: 'custom-trip-icon',
+            html: `<div style="background:#ef4444;color:#ffffff;font-size:11px;font-weight:900;border:2.5px solid #ffffff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(239,68,68,0.45);cursor:pointer;">DEL</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
+          const doMarker = L.marker([doCoords.lat, doCoords.lng], { icon: doIcon }).addTo(dashboardMap);
+          doMarker.bindPopup(`<b>🔴 Delivery Destination:</b><br>${escapeHtml(formatCityState(activeLoad.dropoff) || 'Delivery Location')}`);
+          dashboardRouteLayers.push(doMarker);
+          bounds.push([doCoords.lat, doCoords.lng]);
+        }
 
-        // Frame the entire trip navigation
-        const tripBounds = L.latLngBounds([
-          [puCoords.lat, puCoords.lng],
-          [drvCoords.lat, drvCoords.lng],
-          [doCoords.lat, doCoords.lng]
-        ]);
-        dashboardMap.fitBounds(tripBounds, { padding: [50, 50], maxZoom: 8 });
+        // ── 1 Truck Marker (Driver's Live GPS position) ──
+        const gps = (cached && cached.gps && cached.gps.lat != null) ? cached.gps : (driver.location && driver.location.lat != null ? driver.location : null);
+        if (gps && gps.lat != null && gps.lng != null && !isNaN(gps.lat) && !isNaN(gps.lng)) {
+          const drvIcon = L.divIcon({
+            className: 'custom-trip-icon',
+            html: `<div style="background:#0284c7;color:#ffffff;font-size:16px;border:3px solid #ffffff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(2,132,199,0.7);cursor:pointer;">🚚</div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+          });
+          const drvMarker = L.marker([Number(gps.lat), Number(gps.lng)], { icon: drvIcon }).addTo(dashboardMap);
+          drvMarker.bindPopup(
+            `<b>🚚 ${escapeHtml(driver.name)}</b><br>` +
+            `Truck: ${escapeHtml(driver.truck || 'HL-101')}<br>` +
+            `Speed: <b>${gps.speed != null ? gps.speed + ' mph' : '55 mph'}</b><br>` +
+            (cached && cached.nextStop ? `Next Stop: <b>${escapeHtml(cached.nextStop.city || '')}</b><br>` : '') +
+            `<small style="color:#64748b;">GPS updated ${cached ? cached.lastGpsUpdateText : 'recently'}</small>`
+          ).openPopup();
+          dashboardRouteLayers.push(drvMarker);
+          driverMarkers[driver.id] = drvMarker;
+          bounds.push([Number(gps.lat), Number(gps.lng)]);
+        }
+
+        // NO polylines: status map with clean marker pins only
+        if (bounds.length > 1) {
+          dashboardMap.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 8 });
+        } else if (bounds.length === 1) {
+          dashboardMap.setView(bounds[0], 7);
+        }
       } else {
         // Driver has no active load (Available)
-        const drvCoords = (driver.location && driver.location.lat != null) 
-          ? { lat: Number(driver.location.lat), lng: Number(driver.location.lng) }
-          : { lat: 32.7767, lng: -96.7970 };
-
-        const drvIcon = L.divIcon({
-          className: 'custom-trip-icon',
-          html: `<div style="background:#16a34a;color:#ffffff;font-size:16px;border:3px solid #ffffff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(22,163,74,0.6);cursor:pointer;">🚚</div>`,
-          iconSize: [36, 36],
-          iconAnchor: [18, 18]
-        });
-        const drvMarker = L.marker([drvCoords.lat, drvCoords.lng], { icon: drvIcon }).addTo(dashboardMap);
-        drvMarker.bindPopup(`<b>🚚 ${escapeHtml(driver.name)}</b><br>Truck: ${escapeHtml(driver.truck || 'HL-101')}<br><span style="color:#16a34a;font-weight:700;">🟢 Available (Ready for Load)</span><br>Location: ${escapeHtml(driver.location && driver.location.city ? driver.location.city : 'Dallas, TX')}`).openPopup();
-        dashboardRouteLayers.push(drvMarker);
-
-        dashboardMap.setView([drvCoords.lat, drvCoords.lng], 8);
+        const gps = (cached && cached.gps && cached.gps.lat != null) ? cached.gps : (driver.location && driver.location.lat != null ? driver.location : null);
+        if (gps && gps.lat != null && gps.lng != null) {
+          const drvIcon = L.divIcon({
+            className: 'custom-trip-icon',
+            html: `<div style="background:#16a34a;color:#ffffff;font-size:16px;border:3px solid #ffffff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(22,163,74,0.6);cursor:pointer;">🚚</div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+          });
+          const drvMarker = L.marker([Number(gps.lat), Number(gps.lng)], { icon: drvIcon }).addTo(dashboardMap);
+          drvMarker.bindPopup(`<b>🚚 ${escapeHtml(driver.name)}</b><br>Truck: ${escapeHtml(driver.truck || 'HL-101')}<br><span style="color:#16a34a;font-weight:700;">🟢 Available</span><br><small style="color:#64748b;">GPS: ${cached ? cached.lastGpsUpdateText : 'recently'}</small>`).openPopup();
+          dashboardRouteLayers.push(drvMarker);
+          driverMarkers[driver.id] = drvMarker;
+          dashboardMap.setView([Number(gps.lat), Number(gps.lng)], 7);
+        }
       }
 
       setTimeout(() => {
@@ -2266,15 +2138,28 @@
       let bounds = [];
 
       drivers.forEach(d => {
-        const loc = d.location || { lat: 32.7767 + (Math.random() - 0.5) * 4, lng: -96.7970 + (Math.random() - 0.5) * 6, city: 'Dallas, TX', speed: 62 };
-        if (loc && loc.lat && loc.lng) {
-          const marker = L.marker([loc.lat, loc.lng]).addTo(dashboardMap);
-          marker.bindPopup(`<b>${escapeHtml(d.name)}</b><br>Truck: ${escapeHtml(d.truck || '—')}<br>${escapeHtml(loc.city || '')}<br><a href="javascript:void(0)" onclick="window.onTrackingDriverChanged('${d.id}')" style="color:#0284c7;font-weight:700;">Track Trip Navigation →</a>`);
+        const cached = (TRACKING_CACHE.drivers && TRACKING_CACHE.drivers[String(d.id)]) || null;
+        const gps = (cached && cached.gps && cached.gps.lat != null) ? cached.gps : (d.location && d.location.lat != null ? d.location : null);
+
+        if (gps && gps.lat != null && gps.lng != null && !isNaN(gps.lat) && !isNaN(gps.lng)) {
+          const truckIcon = L.divIcon({
+            className: 'custom-trip-icon',
+            html: `<div style="background:#0284c7;color:#ffffff;font-size:14px;border:2px solid #ffffff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px rgba(2,132,199,0.5);cursor:pointer;">🚚</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
+          const marker = L.marker([Number(gps.lat), Number(gps.lng)], { icon: truckIcon }).addTo(dashboardMap);
+          marker.bindPopup(
+            `<b>${escapeHtml(d.name)}</b><br>` +
+            `Truck: ${escapeHtml(d.truck || '—')}<br>` +
+            (gps.speed != null ? `Speed: <b>${gps.speed} mph</b><br>` : '') +
+            `<a href="javascript:void(0)" onclick="window.onTrackingDriverChanged('${d.id}')" style="color:#0284c7;font-weight:700;">Track Status →</a>`
+          );
           marker.on('click', () => {
             window.onTrackingDriverChanged(d.id);
           });
           driverMarkers[d.id] = marker;
-          bounds.push([loc.lat, loc.lng]);
+          bounds.push([Number(gps.lat), Number(gps.lng)]);
         }
       });
 
@@ -2283,11 +2168,12 @@
       }
     }
 
-    function renderLiveDashboardMap() {
+    async function renderLiveDashboardMap() {
       initDashboardMap();
       if (!dashboardMap) return;
 
       const drivers = visibleDrivers();
+      await fetchTrackingCache();
 
       // Populate Driver Choice dropdown in tracking header
       const select = document.getElementById('tracking-driver-select');
@@ -2298,7 +2184,6 @@
         select.innerHTML = optionsHtml;
       }
 
-      // If a driver is selected, render their trip navigation; otherwise default to first driver
       const curSelected = select && select.value ? select.value : (drivers[0] ? drivers[0].id : '');
       if (curSelected) {
         window.onTrackingDriverChanged(curSelected);
@@ -2311,11 +2196,69 @@
       const panel = document.getElementById('driver-tracking-panel');
       if (!panel) return;
 
-      const driver = (STATE.drivers || []).find(d => d.id === driverId);
+      const driver = (STATE.drivers || []).find(d => String(d.id) === String(driverId));
       if (!driver) return;
 
-      const activeLoad = (STATE.loads || []).find(l => l.driverId === driver.id && l.status !== 'Drop-off' && l.status !== 'Cancelled');
-      const loc = driver.location || { city: 'En Route · I-35 N (Dallas, TX)', speed: 62 };
+      const cached = (TRACKING_CACHE.drivers && TRACKING_CACHE.drivers[String(driverId)]) || null;
+      const activeLoad = (STATE.loads || []).find(l => String(l.driverId) === String(driver.id) && l.status !== 'Drop-off' && l.status !== 'Delivered' && l.status !== 'Cancelled');
+      
+      const gps = (cached && cached.gps && cached.gps.lat != null) ? cached.gps : (driver.location || null);
+      const speed = (gps && gps.speed != null) ? gps.speed : (driver.location && driver.location.speed ? driver.location.speed : 55);
+      const lastGpsText = cached ? cached.lastGpsUpdateText : (gps && gps.lastUpdated ? timeAgoShort(gps.lastUpdated) : 'No telemetry');
+      const cacheFreshness = TRACKING_CACHE.lastCalculatedAgoText || 'just now';
+
+      let nextStopHtml = '';
+      if (activeLoad) {
+        let nextStopLabel = 'Next Stop';
+        let nextStopCity = '';
+        let nextStopType = 'DELIVERY';
+
+        if (cached && cached.nextStop) {
+          nextStopCity = [cached.nextStop.city, cached.nextStop.state].filter(Boolean).join(', ');
+          nextStopType = cached.nextStop.type;
+          nextStopLabel = cached.nextStop.type === 'PICKUP' ? `Pickup Stop #${cached.nextStop.stopNumber || 1}` : `Delivery Stop #${cached.nextStop.stopNumber || 1}`;
+        } else {
+          nextStopCity = formatCityState(activeLoad.dropoff) || 'Delivery Location';
+        }
+
+        const etaDisplay = (cached && cached.etaText) ? cached.etaText : (activeLoad.eta || 'On Schedule');
+        const milesDisplay = (cached && cached.milesToNextStop != null) ? `${cached.milesToNextStop} mi` : (activeLoad.miles ? `${activeLoad.miles} mi` : '—');
+
+        nextStopHtml = `
+          <div style="display:flex;justify-content:space-between;align-items:center;background:#f1f5f9;padding:8px 10px;border-radius:8px;margin-top:2px;">
+            <span style="color:#475569;font-weight:600;">Active Load:</span>
+            <span style="font-weight:800;color:#0284c7;cursor:pointer;text-decoration:underline;" onclick="openLoadModal('${activeLoad.id}')">#${escapeHtml(activeLoad.loadNumber)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:#64748b;">Load Status:</span>
+            <span style="font-weight:700;color:#ea580c;">${escapeHtml(activeLoad.status || 'In Transit')}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:#64748b;">${escapeHtml(nextStopLabel)}:</span>
+            <span style="font-weight:700;color:#0f172a;text-align:right;">${escapeHtml(nextStopCity)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;background:#ecfdf5;padding:10px 12px;border-radius:8px;border:1px solid #a7f3d0;">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#047857;text-transform:uppercase;">Next Stop ETA</div>
+              <div style="font-size:15px;font-weight:800;color:#065f46;margin-top:2px;" id="driver-live-eta">${escapeHtml(etaDisplay)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px;font-weight:700;color:#047857;text-transform:uppercase;">Distance</div>
+              <div style="font-size:14px;font-weight:800;color:#065f46;margin-top:2px;" id="driver-live-miles">${escapeHtml(milesDisplay)}</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#64748b;text-align:center;padding:4px 0;">
+            ⏱️ Recomputed every 15 min (cached ${escapeHtml(cacheFreshness)})
+          </div>
+        `;
+      } else {
+        nextStopHtml = `
+          <div style="display:flex;justify-content:space-between;background:#fef3c7;padding:10px 12px;border-radius:8px;margin-top:2px;">
+            <span style="color:#92400e;font-weight:700;">Status:</span>
+            <span style="font-weight:800;color:#b45309;">🟢 Available (Ready for Load)</span>
+          </div>
+        `;
+      }
 
       panel.innerHTML = `
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
@@ -2324,41 +2267,19 @@
           </div>
           <div>
             <div style="font-weight:800;font-size:15px;color:#0f172a;">${escapeHtml(driver.name)}</div>
-            <div style="font-size:12px;color:#64748b;font-weight:600;">Truck: ${escapeHtml(driver.truck || 'Truck #' + (driver.code || '101'))} · Driver ID: ${escapeHtml(driver.code || driver.id)}</div>
+            <div style="font-size:12px;color:#64748b;font-weight:600;">Truck: ${escapeHtml(driver.truck || 'Truck #' + (driver.code || '101'))} · ID: ${escapeHtml(driver.code || driver.id)}</div>
           </div>
         </div>
         <div style="border-top:1px solid #e2e8f0;padding-top:12px;display:flex;flex-direction:column;gap:10px;font-size:13px;">
           <div style="display:flex;justify-content:space-between;">
-            <span style="color:#64748b;">Current Location:</span>
-            <span style="font-weight:700;color:#0f172a;">${escapeHtml(loc.city || 'Updating...')}</span>
+            <span style="color:#64748b;">GPS Telemetry:</span>
+            <span style="font-weight:700;color:#0f172a;" id="driver-live-lastgps">${gps ? escapeHtml(lastGpsText) : 'Awaiting Telemetry'}</span>
           </div>
           <div style="display:flex;justify-content:space-between;">
-            <span style="color:#64748b;">Telemetry Speed:</span>
-            <span style="font-weight:700;color:#16a34a;">${loc.speed ? loc.speed + ' mph' : '58 mph'} (🟢 Normal)</span>
+            <span style="color:#64748b;">Live Speed:</span>
+            <span style="font-weight:700;color:#16a34a;" id="driver-live-speed">${gps ? speed + ' mph' : '0 mph'}</span>
           </div>
-          ${activeLoad ? `
-            <div style="display:flex;justify-content:space-between;align-items:center;background:#f1f5f9;padding:8px 10px;border-radius:8px;margin-top:2px;">
-              <span style="color:#475569;font-weight:600;">Active Load:</span>
-              <span style="font-weight:800;color:#0284c7;cursor:pointer;text-decoration:underline;" onclick="openLoadModal('${activeLoad.id}')">#${escapeHtml(activeLoad.loadNumber)}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;">
-              <span style="color:#64748b;">Stage / Status:</span>
-              <span style="font-weight:700;color:#ea580c;">${escapeHtml(activeLoad.status || 'In Transit')}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;">
-              <span style="color:#64748b;">Route Lane:</span>
-              <span style="font-weight:700;color:#0f172a;">${escapeHtml(formatCityState(activeLoad.pickup))} → ${escapeHtml(formatCityState(activeLoad.dropoff))}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;">
-              <span style="color:#64748b;">ETA to Receiver:</span>
-              <span style="font-weight:800;color:#0f172a;">${activeLoad.eta || '04:30 PM (On Time)'}</span>
-            </div>
-          ` : `
-            <div style="display:flex;justify-content:space-between;background:#fef3c7;padding:8px 10px;border-radius:8px;margin-top:2px;">
-              <span style="color:#92400e;font-weight:700;">Status:</span>
-              <span style="font-weight:800;color:#b45309;">🟢 Available (Ready for Load)</span>
-            </div>
-          `}
+          ${nextStopHtml}
         </div>
       `;
     };
@@ -2487,11 +2408,6 @@
       }
 
       triggerCountUpAnimations();
-      setTimeout(() => {
-        const select = document.getElementById('tracking-driver-select');
-        const curVal = select ? select.value : 'driver-1';
-        onTrackingDriverChanged(curVal);
-      }, 200);
 
       // Render Dashboard Operations Panel (Map + Driver Selector + Notifications)
       renderLiveDashboardMap();
@@ -3795,6 +3711,7 @@
 
       const loads = STATE.loads || [];
       const rows = [];
+      const docTypes = ['BOL', 'POD'];
 
       loads.forEach(load => {
         const docs = load.docs || load.documents || {};
@@ -7438,7 +7355,524 @@
       renderDashboard();
       toast('Welcome back', STATE.currentUser ? STATE.currentUser.name : '', true);
       startChatPolling();
+      initDailyNotesReminder();
     }
+
+    /* ================= DAILY DRIVER REPORTS & 4:00 PM – 5:00 PM REMINDER ================= */
+    let selectedDailyReportDate = getTodayIsoString();
+    let _dailyNotesReminderInterval = null;
+    window._dailyNotesReminderModalDismissed = false;
+    window.__DEBUG_FORCE_4PM = false;
+
+    function dailyReportsRollingDates() {
+      const dates = [];
+      const now = new Date();
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const dateStr = getTodayIsoString(d);
+        let label = 'Today';
+        if (i === 1) label = 'Yesterday';
+        else if (i > 1) {
+          label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        }
+        dates.push({ dateStr, label, daysAgo: i });
+      }
+      return dates;
+    }
+
+    window.loadDailyReportsView = async function(targetDate) {
+      if (targetDate) selectedDailyReportDate = targetDate;
+      if (!selectedDailyReportDate) selectedDailyReportDate = getTodayIsoString();
+
+      // Render date pills
+      const pillsContainer = document.getElementById('dailyreports-date-pills');
+      if (pillsContainer) {
+        const rolling = dailyReportsRollingDates();
+        pillsContainer.innerHTML = rolling.map(item => {
+          const isActive = (item.dateStr === selectedDailyReportDate);
+          return `<button type="button" class="btn btn-sm" style="${isActive ? 'background:#0284c7;color:#fff;font-weight:700;box-shadow:0 2px 6px rgba(2,132,199,0.3);' : 'background:transparent;color:#475569;'}padding:4px 12px;font-size:12px;border:none;border-radius:8px;cursor:pointer;transition:all 0.15s ease;" onclick="loadDailyReportsView('${item.dateStr}')">${item.label}</button>`;
+        }).join('');
+      }
+
+      const content = document.getElementById('dailyreports-content');
+      if (!content) return;
+      content.innerHTML = '<div style="text-align:center;padding:40px;color:#64748b;font-size:13px;">Loading daily driver reports...</div>';
+
+      const isAdmin = (STATE.role === 'admin');
+      const kpiRow = document.getElementById('dailyreports-kpi-row');
+      const filterWrap = document.getElementById('dailyreports-disp-filter-wrap');
+
+      if (isAdmin) {
+        if (kpiRow) kpiRow.style.display = 'grid';
+        if (filterWrap) {
+          filterWrap.style.display = 'block';
+          const sel = document.getElementById('dailyreports-disp-filter');
+          if (sel && sel.options.length <= 1) {
+            sel.innerHTML = '<option value="">All Dispatchers</option>' +
+              (STATE.dispatchers || []).map(d => `<option value="${escapeAttr(d.id)}">${escapeHtml(d.name)}</option>`).join('');
+          }
+        }
+        await renderAdminDailyReportView(selectedDailyReportDate);
+      } else {
+        if (kpiRow) kpiRow.style.display = 'none';
+        if (filterWrap) filterWrap.style.display = 'none';
+        await renderDispatcherDailyNotesView(selectedDailyReportDate);
+      }
+    };
+
+    window.onDailyReportFilterChange = function() {
+      renderAdminDailyReportView(selectedDailyReportDate);
+    };
+
+    async function renderDispatcherDailyNotesView(dateStr) {
+      const content = document.getElementById('dailyreports-content');
+      if (!content) return;
+
+      const heading = document.getElementById('dailyreports-heading');
+      const subheading = document.getElementById('dailyreports-subheading');
+      if (heading) heading.textContent = 'My Daily Driver Notes';
+      if (subheading) subheading.textContent = `End-of-day status summaries for drivers allocated to you (${dateStr === getTodayIsoString() ? 'Today' : dateStr}).`;
+
+      const myDispId = STATE.currentDispatcherId;
+      const allocatedDrivers = (STATE.drivers || []).filter(d => String(d.dispatcherId) === String(myDispId));
+
+      if (allocatedDrivers.length === 0) {
+        content.innerHTML = `
+          <div style="text-align:center;padding:60px 20px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;">
+            <div style="font-size:32px;margin-bottom:8px;">🚚</div>
+            <div style="font-weight:700;font-size:15px;color:#0f172a;">No Drivers Allocated</div>
+            <div style="font-size:13px;color:#64748b;margin-top:4px;">You currently have no drivers allocated to you by Admin.</div>
+          </div>
+        `;
+        return;
+      }
+
+      let statusData = { submittedDrivers: [], missingDrivers: [] };
+      try {
+        const res = await fetch(`/api/daily-notes/status?dispatcherId=${encodeURIComponent(myDispId)}&date=${encodeURIComponent(dateStr)}`);
+        if (res.ok) statusData = await res.json();
+      } catch (err) {
+        console.warn('Failed to fetch status:', err);
+      }
+
+      const notesMap = new Map();
+      (statusData.submittedDrivers || []).forEach(s => notesMap.set(String(s.driverId), s));
+
+      const isToday = (dateStr === getTodayIsoString());
+      const isPast = (dateStr < getTodayIsoString());
+
+      let html = `<div style="display:flex;flex-direction:column;gap:12px;">`;
+
+      allocatedDrivers.forEach(driver => {
+        const existing = notesMap.get(String(driver.id));
+        const isSubmitted = !!(existing && existing.note);
+        const currentNote = isSubmitted ? existing.note : '';
+        const noteLen = currentNote.length;
+
+        html += `
+          <div style="background:#ffffff;border:1px solid ${isSubmitted ? '#e2e8f0' : '#fed7aa'};border-radius:12px;padding:16px 20px;box-shadow:0 2px 8px rgba(15,23,42,0.04);transition:all 0.15s ease;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:38px;height:38px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;">
+                  ${escapeHtml((driver.name || 'D').split(' ').map(p => p[0]).join('').slice(0, 2))}
+                </div>
+                <div>
+                  <div style="font-weight:800;font-size:15px;color:#0f172a;">${escapeHtml(driver.name)}</div>
+                  <div style="font-size:12px;color:#64748b;font-weight:600;">${escapeHtml(driver.truck || 'Truck #' + (driver.code || '101'))} · Phone: ${escapeHtml(driver.phone || '—')}</div>
+                </div>
+              </div>
+              <div>
+                ${isSubmitted 
+                  ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;">🟢 Submitted</span>`
+                  : `<span style="display:inline-flex;align-items:center;gap:4px;background:#fef3c7;color:#b45309;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;">🟡 Note Missing</span>`
+                }
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:10px;align-items:center;">
+                <div style="flex:1;position:relative;">
+                  <input type="text" 
+                    id="daily-note-input-${escapeAttr(driver.id)}" 
+                    maxlength="100" 
+                    ${isPast ? 'readonly disabled' : ''}
+                    value="${escapeAttr(currentNote)}" 
+                    placeholder="e.g. Booked for today and looking load for tomorrow..." 
+                    oninput="window.updateDailyNoteCounter('${escapeAttr(driver.id)}', this)"
+                    style="width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;background:${isPast ? '#f8fafc' : '#ffffff'};box-sizing:border-box;">
+                </div>
+                ${isPast ? `
+                  <div style="font-size:12px;color:#94a3b8;font-weight:600;padding:8px 12px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;gap:4px;">
+                    🔒 Past Day Locked
+                  </div>
+                ` : `
+                  <button type="button" class="btn btn-accent" onclick="window.saveDriverDailyNote('${escapeAttr(driver.id)}')" style="font-weight:700;font-size:13px;padding:9px 18px;background:#0284c7;color:#fff;border-radius:8px;flex-shrink:0;">
+                    ${isSubmitted ? 'Update Note' : 'Save Note'}
+                  </button>
+                `}
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#64748b;padding:0 2px;">
+                <span>${isSubmitted && existing.submittedAt ? `Last saved: ${new Date(existing.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Daily note required before 5:00 PM'}</span>
+                <span id="daily-note-counter-${escapeAttr(driver.id)}" style="font-weight:700;font-family:monospace;${noteLen >= 90 ? 'color:#ea580c;' : ''}">${noteLen}/100</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      content.innerHTML = html;
+    }
+
+    async function renderAdminDailyReportView(dateStr) {
+      const content = document.getElementById('dailyreports-content');
+      if (!content) return;
+
+      const heading = document.getElementById('dailyreports-heading');
+      const subheading = document.getElementById('dailyreports-subheading');
+      if (heading) heading.textContent = 'Daily Dispatcher Reports';
+      if (subheading) subheading.textContent = `End-of-day driver status reports across all dispatchers (${dateStr === getTodayIsoString() ? 'Today' : dateStr}).`;
+
+      const filterDisp = document.getElementById('dailyreports-disp-filter') ? document.getElementById('dailyreports-disp-filter').value : '';
+
+      let reportData = null;
+      try {
+        const url = `/api/daily-notes/report?date=${encodeURIComponent(dateStr)}${filterDisp ? `&dispatcherId=${encodeURIComponent(filterDisp)}` : ''}`;
+        const res = await fetch(url);
+        if (res.ok) reportData = await res.json();
+      } catch (err) {
+        console.warn('Failed to fetch admin daily report:', err);
+      }
+
+      if (!reportData || !reportData.ok) {
+        content.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">Failed to load daily report data.</div>';
+        return;
+      }
+
+      // Update KPI metrics
+      const summary = reportData.summary || {};
+      const elDisp = document.getElementById('kpi-dr-dispatchers');
+      const elDrivers = document.getElementById('kpi-dr-drivers');
+      const elSub = document.getElementById('kpi-dr-submitted');
+      const elMiss = document.getElementById('kpi-dr-missing');
+      if (elDisp) elDisp.textContent = summary.totalDispatchers || 0;
+      if (elDrivers) elDrivers.textContent = summary.totalDrivers || 0;
+      if (elSub) elSub.textContent = summary.submittedNotes || 0;
+      if (elMiss) elMiss.textContent = summary.missingNotes || 0;
+
+      const dispatchers = reportData.dispatchers || [];
+      if (dispatchers.length === 0) {
+        content.innerHTML = '<div style="text-align:center;padding:40px;color:#64748b;font-size:13px;">No dispatcher reports available for this date.</div>';
+        return;
+      }
+
+      let html = `<div style="display:flex;flex-direction:column;gap:18px;">`;
+
+      dispatchers.forEach(disp => {
+        const total = disp.totalDrivers || 0;
+        const submitted = disp.submittedCount || 0;
+        const missing = disp.missingCount || 0;
+        const allDone = (missing === 0 && total > 0);
+
+        html += `
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 3px 12px rgba(15,23,42,0.04);overflow:hidden;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:38px;height:38px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;">
+                  ${escapeHtml((disp.dispatcherName || 'D').split(' ').map(p => p[0]).join('').slice(0, 2))}
+                </div>
+                <div>
+                  <div style="font-weight:800;font-size:15px;color:#0f172a;">Dispatcher ${escapeHtml(disp.dispatcherName)} — Daily Report</div>
+                  <div style="font-size:12px;color:#64748b;">${escapeHtml(disp.dispatcherEmail || '')} · ${total} Allocated Driver${total === 1 ? '' : 's'}</div>
+                </div>
+              </div>
+              <div>
+                ${allDone
+                  ? `<span style="background:#dcfce7;color:#15803d;font-weight:800;font-size:12px;padding:6px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;">✓ ${submitted} of ${total} Submitted</span>`
+                  : `<span style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:12px;padding:6px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;">⚠️ ${submitted} of ${total} Submitted · ${missing} Missing</span>`
+                }
+              </div>
+            </div>
+
+            <div style="padding:0;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                  <tr style="border-bottom:1px solid #f1f5f9;background:#ffffff;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">
+                    <th style="padding:10px 20px;text-align:left;">Driver</th>
+                    <th style="padding:10px 16px;text-align:left;">Status</th>
+                    <th style="padding:10px 16px;text-align:left;">Daily Status Note (Max 100 chars)</th>
+                    <th style="padding:10px 16px;text-align:right;">Submitted</th>
+                    <th style="padding:10px 20px;text-align:right;">Admin Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(disp.drivers || []).map(d => {
+                    const isSub = (d.status === 'submitted' && d.note);
+                    const timeStr = d.submittedAt ? new Date(d.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                    return `
+                      <tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:12px 20px;font-weight:700;color:#0f172a;">
+                          ${escapeHtml(d.driverName)}
+                          <div style="font-size:11px;font-weight:500;color:#64748b;">${escapeHtml(d.truck || 'Truck #101')}</div>
+                        </td>
+                        <td style="padding:12px 16px;">
+                          ${isSub
+                            ? `<span style="background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">Submitted</span>`
+                            : `<span style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">Missing</span>`
+                          }
+                        </td>
+                        <td style="padding:12px 16px;max-width:340px;">
+                          ${isSub
+                            ? `<span style="color:#0f172a;font-weight:600;">“${escapeHtml(d.note)}”</span>`
+                            : `<span style="color:#ef4444;font-style:italic;font-weight:600;">Missing note — Dispatcher did not submit</span>`
+                          }
+                        </td>
+                        <td style="padding:12px 16px;text-align:right;color:#64748b;font-size:12px;">
+                          ${timeStr}
+                        </td>
+                        <td style="padding:12px 20px;text-align:right;">
+                          <button type="button" class="btn btn-ghost btn-sm" onclick="window.adminPromptEditNote('${escapeAttr(d.driverId)}', '${escapeAttr(d.driverName)}', '${escapeAttr(disp.dispatcherId)}', '${escapeAttr(d.note || '')}')" style="color:#0284c7;font-size:12px;font-weight:700;padding:4px 10px;">
+                            ${isSub ? 'Edit Note' : '+ Add Note'}
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      content.innerHTML = html;
+    }
+
+    window.updateDailyNoteCounter = function(driverId, inputEl) {
+      const counter = document.getElementById(`daily-note-counter-${driverId}`);
+      if (!counter || !inputEl) return;
+      const len = inputEl.value.length;
+      counter.textContent = `${len}/100`;
+      if (len >= 90) {
+        counter.style.color = '#ea580c';
+      } else {
+        counter.style.color = '#64748b';
+      }
+    };
+
+    window.saveDriverDailyNote = async function(driverId, customNote, customDispId) {
+      let noteText = customNote;
+      if (noteText === undefined) {
+        const input = document.getElementById(`daily-note-input-${driverId}`);
+        noteText = input ? input.value : '';
+      }
+
+      noteText = String(noteText || '').trim();
+      if (!noteText) {
+        return toast('Note Required', 'Please enter a note before saving.');
+      }
+      if (noteText.length > 100) {
+        return toast('Character Limit', `Note exceeds maximum of 100 characters (${noteText.length}/100).`);
+      }
+
+      try {
+        const res = await fetch('/api/daily-notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driverId,
+            note: noteText,
+            date: selectedDailyReportDate,
+            dispatcherId: customDispId || (STATE.role === 'dispatcher' ? STATE.currentDispatcherId : 'admin')
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || 'Failed to save note');
+        }
+
+        toast('Note Saved', 'Daily driver note saved successfully.');
+        loadDailyReportsView();
+        checkDailyNotesClosingWindowReminder();
+      } catch (err) {
+        toast('Save Failed', err.message);
+      }
+    };
+
+    window.adminPromptEditNote = function(driverId, driverName, dispId, currentNote) {
+      const newNote = prompt(`Enter daily report note for ${driverName} (max 100 characters):`, currentNote || '');
+      if (newNote === null) return;
+      const trimmed = newNote.trim();
+      if (!trimmed) {
+        alert('Note cannot be empty.');
+        return;
+      }
+      if (trimmed.length > 100) {
+        alert(`Note exceeds 100 characters limit (${trimmed.length}/100).`);
+        return;
+      }
+      window.saveDriverDailyNote(driverId, trimmed, dispId);
+    };
+
+    /* ── 4:00 PM – 5:00 PM Closing Window Reminder System ── */
+    window.checkDailyNotesClosingWindowReminder = async function() {
+      // 1. Only active dispatchers receive the reminder
+      if (STATE.role !== 'dispatcher' || !STATE.currentDispatcherId) {
+        hideDailyNotesReminder();
+        return;
+      }
+
+      const now = new Date();
+      const hr = now.getHours();
+
+      // 2. Adjustment 2: After 5:00 PM (hr >= 17), stop showing popup/banner completely for that day
+      if (hr >= 17 && !window.__DEBUG_FORCE_4PM) {
+        hideDailyNotesReminder();
+        return;
+      }
+
+      // 3. Before 4:00 PM (hr < 16), do not show popup/banner
+      if (hr < 16 && !window.__DEBUG_FORCE_4PM) {
+        hideDailyNotesReminder();
+        return;
+      }
+
+      // 4. During 4:00 PM – 5:00 PM closing window: check for missing notes today
+      try {
+        const today = getTodayIsoString();
+        const res = await fetch(`/api/daily-notes/status?dispatcherId=${encodeURIComponent(STATE.currentDispatcherId)}&date=${today}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.ok) return;
+
+        const missing = data.missingDrivers || [];
+        const badge = document.getElementById('daily-reports-badge');
+        const banner = document.getElementById('daily-notes-reminder-banner');
+        const bannerCount = document.getElementById('banner-missing-count');
+
+        if (missing.length > 0) {
+          if (badge) {
+            badge.textContent = missing.length;
+            badge.style.display = 'inline-block';
+          }
+          if (banner) {
+            if (bannerCount) bannerCount.textContent = missing.length;
+            banner.style.display = 'flex';
+          }
+          // Show modal popup if not already dismissed in this session
+          if (!window._dailyNotesReminderModalDismissed) {
+            renderReminderModal(missing);
+            openModal('modal-daily-notes-reminder');
+          }
+        } else {
+          hideDailyNotesReminder();
+        }
+      } catch (err) {
+        console.warn('[DailyNotes] Reminder check error:', err);
+      }
+    };
+
+    function hideDailyNotesReminder() {
+      const badge = document.getElementById('daily-reports-badge');
+      const banner = document.getElementById('daily-notes-reminder-banner');
+      if (badge) badge.style.display = 'none';
+      if (banner) banner.style.display = 'none';
+      closeModal('modal-daily-notes-reminder');
+    }
+
+    window.openDailyNotesReminderModal = function() {
+      window._dailyNotesReminderModalDismissed = false;
+      checkDailyNotesClosingWindowReminder();
+    };
+
+    window.closeDailyNotesReminderModal = function() {
+      window._dailyNotesReminderModalDismissed = true;
+      closeModal('modal-daily-notes-reminder');
+    };
+
+    function renderReminderModal(missingDrivers) {
+      const listEl = document.getElementById('reminder-modal-drivers-list');
+      if (!listEl) return;
+
+      listEl.innerHTML = missingDrivers.map(d => `
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:700;font-size:14px;color:#0f172a;">${escapeHtml(d.driverName)}</span>
+            <span style="font-size:11px;color:#64748b;">${escapeHtml(d.truck || 'Truck #101')}</span>
+          </div>
+          <input type="text" 
+            id="modal-note-input-${escapeAttr(d.driverId)}" 
+            maxlength="100" 
+            placeholder="e.g. Booked for today and looking load for tomorrow..." 
+            oninput="const c = document.getElementById('modal-counter-${escapeAttr(d.driverId)}'); if (c) c.textContent = this.value.length + '/100';"
+            style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;color:#0f172a;box-sizing:border-box;">
+          <div style="text-align:right;font-size:11px;color:#64748b;margin-top:4px;" id="modal-counter-${escapeAttr(d.driverId)}">0/100</div>
+        </div>
+      `).join('');
+    }
+
+    window.submitAllReminderNotes = async function() {
+      const listEl = document.getElementById('reminder-modal-drivers-list');
+      if (!listEl) return;
+
+      const inputs = listEl.querySelectorAll('input[id^="modal-note-input-"]');
+      let submittedAny = false;
+
+      for (const input of inputs) {
+        const driverId = input.id.replace('modal-note-input-', '');
+        const val = input.value.trim();
+        if (val) {
+          if (val.length > 100) {
+            return toast('Character Limit', 'Each note must be 100 characters or less.');
+          }
+          await fetch('/api/daily-notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              driverId,
+              note: val,
+              date: getTodayIsoString(),
+              dispatcherId: STATE.currentDispatcherId
+            })
+          });
+          submittedAny = true;
+        }
+      }
+
+      if (submittedAny) {
+        toast('Notes Submitted', 'Daily driver notes updated.');
+        loadDailyReportsView();
+        window._dailyNotesReminderModalDismissed = true;
+        closeModal('modal-daily-notes-reminder');
+        checkDailyNotesClosingWindowReminder();
+      } else {
+        toast('Action Required', 'Please enter at least one note before saving.');
+      }
+    };
+
+    function initDailyNotesReminder() {
+      checkDailyNotesClosingWindowReminder();
+
+      // Light interval check every 5 minutes while dispatcher is active (Adjustment 1)
+      if (_dailyNotesReminderInterval) clearInterval(_dailyNotesReminderInterval);
+      _dailyNotesReminderInterval = setInterval(() => {
+        // Reset dismissal flag on interval so dispatcher is reminded again if still missing
+        window._dailyNotesReminderModalDismissed = false;
+        checkDailyNotesClosingWindowReminder();
+      }, 5 * 60 * 1000);
+
+      window.addEventListener('focus', checkDailyNotesClosingWindowReminder);
+    }
+
+    // Testing helper for QA/dev to simulate 4-5 PM closing window reminder immediately
+    window.__testReminderPopup = function() {
+      window.__DEBUG_FORCE_4PM = true;
+      window._dailyNotesReminderModalDismissed = false;
+      checkDailyNotesClosingWindowReminder();
+    };
 
     /* ================= DRIVER APP =================
        Fully separate from the Admin/Dispatcher app above: a driver signs in with

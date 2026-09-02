@@ -11,6 +11,7 @@ import '../../shared/models/payment_model.dart';
 class AuthProvider extends ChangeNotifier {
   DriverModel? _driver;
   String? _token;
+  String _role = 'DRIVER';
   String _companyName = 'HaulBoX';
   List<LoadModel> _loads = [];
   List<PaymentModel> _payments = [];
@@ -86,9 +87,14 @@ class AuthProvider extends ChangeNotifier {
       final savedCdlExp = prefs.getString('driverCdlExp');
       final savedAddress = prefs.getString('driverAddress');
       final savedServerUrl = prefs.getString('serverUrl');
+      final savedRole = prefs.getString('userRole');
 
       if (savedServerUrl != null && savedServerUrl.isNotEmpty) {
         ApiClient.setBaseUrl(savedServerUrl);
+      }
+
+      if (savedRole != null && savedRole.isNotEmpty) {
+        _role = savedRole.toUpperCase();
       }
 
       if (savedToken != null && savedToken.isNotEmpty && savedDriverId != null) {
@@ -106,11 +112,13 @@ class AuthProvider extends ChangeNotifier {
         );
 
         notifyListeners();
-        _initSocketListeners();
 
-        // Immediately perform full live sync from database
-        await syncAllData();
-        _startAutoSync();
+        if (!isOwner) {
+          _initSocketListeners();
+          // Immediately perform full live sync from database
+          await syncAllData();
+          _startAutoSync();
+        }
       }
     } catch (e) {
       debugPrint('Session restore error: $e');
@@ -130,6 +138,8 @@ class AuthProvider extends ChangeNotifier {
   // Getters
   DriverModel? get driver => _driver;
   String? get token => _token;
+  String get role => _role;
+  bool get isOwner => _role == 'OWNER';
   String get companyName => _companyName;
   List<LoadModel> get loads => _loads;
   List<PaymentModel> get payments => _payments;
@@ -264,20 +274,24 @@ class AuthProvider extends ChangeNotifier {
       final result = await ApiClient.login(driverId, pin);
       if (result['success'] == true) {
         _token = result['token'];
+        _role = (result['role'] ?? 'DRIVER').toString().toUpperCase();
         _driver = result['driver'];
         _loads = result['loads'] ?? [];
         _companyName = result['companyName'] ?? 'HaulBoX';
 
         final prefs = await SharedPreferences.getInstance();
         if (_token != null) await prefs.setString('token', _token!);
+        await prefs.setString('userRole', _role);
         if (_driver != null) {
           await _persistDriverLocally(_driver!);
         }
 
-        _startAutoSync();
-        _initSocketListeners();
-        // Trigger immediate background sync for payments and docs
-        syncAllData(silent: true);
+        if (!isOwner) {
+          _startAutoSync();
+          _initSocketListeners();
+          // Trigger immediate background sync for payments and docs
+          syncAllData(silent: true);
+        }
 
         _isLoading = false;
         notifyListeners();
@@ -445,12 +459,14 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _autoSyncTimer?.cancel();
     _token = null;
+    _role = 'DRIVER';
     _driver = null;
     _loads = [];
     _payments = [];
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('token');
+      await prefs.remove('userRole');
       await prefs.remove('driverId');
       await prefs.remove('driverName');
       await prefs.remove('driverTruck');

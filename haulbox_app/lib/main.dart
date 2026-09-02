@@ -7,6 +7,8 @@ import 'features/auth/auth_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'features/chat/chat_provider.dart';
 import 'features/main_navigation_screen.dart';
+import 'features/owner/owner_navigation_screen.dart';
+import 'features/owner/owner_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,7 @@ class HaulBoxApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => OwnerProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -56,6 +59,9 @@ class RootGate extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
 
     if (authProvider.isAuthenticated) {
+      if (authProvider.isOwner) {
+        return const OwnerNavigationScreen();
+      }
       return const MainNavigationScreen();
     } else {
       return const LoginScreen();

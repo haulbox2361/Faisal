@@ -10,6 +10,7 @@ const store = require('../lib/store');
 const { clientForAccount } = require('../lib/googleClient');
 const { recordDriverLocation, getLatestDriverLocation, saveDocumentValidation, getDocumentValidations } = require('../lib/db');
 const { calculateLoadTracking } = require('../lib/etaEngine');
+const { trackingService } = require('../lib/trackingService');
 const { validateBolDocument, validatePodDocument } = require('../lib/docValidator');
 const notificationService = require('../lib/notificationService');
 const security = require('../lib/security');
@@ -608,6 +609,56 @@ router.post('/api/driver/login', async (req, res) => {
       });
     }
 
+    // 0. Check if credentials belong to an OWNER account
+    const db = require('../lib/db');
+    let owner = await db.getOwnerByCode(driverId).catch(() => null);
+    if (!owner && state.owners) {
+      owner = state.owners.find(o => String(o.ownerCode || o.owner_code || '').toUpperCase() === driverKey);
+    }
+    if (owner) {
+      const pinValid = dataStore.verifyPin(pin, owner.pin_hash || owner.pinHash);
+      if (pinValid) {
+        if (owner.active === false) {
+          return res.status(401).json({ error: 'Owner account disabled. Contact administrator.' });
+        }
+        resetFailedAttempts(driverKey, clientIp);
+        let token = await sessions.issue(owner.id, 'OWNER').catch(() => null);
+        if (!token) token = 'token_owner_' + owner.id + '_' + Date.now();
+        await audit.record({ type: 'owner', id: owner.id, name: owner.name }, 'owner.login', { type: 'owner', id: owner.id }).catch(() => {});
+        return res.json({
+          ok: true,
+          role: 'OWNER',
+          token,
+          owner: {
+            id: owner.id,
+            ownerCode: owner.owner_code || owner.ownerCode,
+            name: owner.name,
+            phone: owner.phone,
+            email: owner.email,
+            role: 'OWNER'
+          },
+          user: {
+            id: owner.id,
+            name: owner.name,
+            role: 'OWNER'
+          },
+          companyName: (state.settings && state.settings.companyName) || 'HaulBoX'
+        });
+      } else {
+        // Owner code matched but PIN was invalid: record failed attempt for rate-limiting and lockout
+        recordFailedAttempt(driverKey, failedAttemptsByDriver);
+        recordFailedAttempt(clientIp, failedAttemptsByIp);
+
+        await audit.record(
+          { type: 'system', id: 'login' },
+          'owner.login_failed_invalid_credentials',
+          { ownerCode: owner.owner_code || owner.ownerCode, clientIp, attempts: (failedAttemptsByDriver.get(driverKey)?.count || 1) }
+        ).catch(() => {});
+
+        return res.status(401).json({ error: 'Invalid Owner Code or PIN. Contact administrator if you need assistance.' });
+      }
+    }
+
     // Require pre-registered drivers; do not auto-seed or auto-create
     if (!state.drivers) {
       state.drivers = [];
@@ -625,7 +676,7 @@ router.post('/api/driver/login', async (req, res) => {
         { driverId, clientIp, attempts: (failedAttemptsByDriver.get(driverKey)?.count || 1) }
       ).catch(() => {});
 
-      return res.status(401).json({ error: 'Invalid Driver Code or PIN. Contact your dispatcher if you need assistance.' });
+      return res.status(401).json({ error: 'Invalid Driver/Owner Code or PIN. Contact your dispatcher if you need assistance.' });
     }
 
     if (isDisabled(driver)) {
@@ -642,7 +693,7 @@ router.post('/api/driver/login', async (req, res) => {
 
     let token = null;
     try {
-      token = await sessions.issue(driver.id);
+      token = await sessions.issue(driver.id, 'DRIVER');
     } catch (sessionErr) {
       console.warn('Session table issue, using token fallback:', sessionErr.message);
       token = 'token_' + driver.id + '_' + Date.now();
@@ -652,6 +703,7 @@ router.post('/api/driver/login', async (req, res) => {
 
     res.json({
       ok: true,
+      role: 'DRIVER',
       token,
       driver: { id: driver.id, name: driver.name, truck: driver.truck, phone: driver.phone, company: driver.company },
       permissions: permissionsFor(driver),
@@ -830,22 +882,42 @@ router.post('/api/driver/location', async (req, res) => {
   }
 
   try {
-    const loc = await recordDriverLocation({
+    const locRecord = await recordDriverLocation({
       driverId: ctx.driver.id,
-      loadId,
-      latitude,
-      longitude,
-      speed,
-      heading,
+      loadId: loadId || null,
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      speed: speed != null ? Number(speed) : null,
+      heading: heading != null ? Number(heading) : null,
       sharingMode: sharingMode || 'ACTIVE_LOAD',
     });
 
-    // Calculate real-time tracking metrics if an active load is associated
-    const currentLoad = loadId
-      ? (ctx.state.loads || []).find((l) => String(l.id) === String(loadId))
-      : currentActiveLoad(ctx.state, ctx.driver.id);
+    const effectiveLoadId = loadId || (currentActiveLoad(ctx.state, ctx.driver.id)?.id);
+    const currentLoad = effectiveLoadId
+      ? (ctx.state.loads || []).find((l) => String(l.id) === String(effectiveLoadId))
+      : null;
 
-    const tracking = currentLoad ? calculateLoadTracking(currentLoad, loc) : null;
+    // Calculate real-time tracking metrics if an active load is associated
+    const tracking = currentLoad ? calculateLoadTracking(currentLoad, locRecord) : null;
+    let arrivalEvent = null;
+
+    // Geofencing arrival detection & alerts if associated with an active load
+    if (currentLoad && tracking) {
+      if (tracking.milesToNextStop != null && tracking.milesToNextStop <= 0.3) {
+        if (tracking.nextStop && tracking.nextStop.type === 'PICKUP' && (currentLoad.driverProgress === 'EN_ROUTE_TO_PICKUP' || currentLoad.status === 'EN_ROUTE_TO_PICKUP')) {
+          arrivalEvent = { type: 'AT_PICKUP', message: `Driver ${ctx.driver.name} arrived at pickup location: ${tracking.nextStop.city || currentLoad.pickup}` };
+          await notificationService.notifyDispatcherDriverArrivedPickup(currentLoad.dispatcherId || 'admin', currentLoad, ctx.driver).catch(() => {});
+        } else if (tracking.nextStop && tracking.nextStop.type === 'DELIVERY' && (currentLoad.driverProgress === 'IN_TRANSIT' || currentLoad.status === 'IN_TRANSIT')) {
+          arrivalEvent = { type: 'AT_DELIVERY', message: `Driver ${ctx.driver.name} arrived at delivery location: ${tracking.nextStop.city || currentLoad.dropoff}` };
+          await notificationService.notifyDispatcherDriverArrivedDelivery(currentLoad.dispatcherId || 'admin', currentLoad, ctx.driver).catch(() => {});
+        }
+      }
+
+      // Automated Delay Detection Alert
+      if (tracking.risk && (tracking.risk.riskCode === 'RUNNING_LATE' || tracking.risk.riskCode === 'DELAYED')) {
+        await notificationService.notifyAdminCriticalDelay(currentLoad, ctx.driver, tracking.risk.diffMinutes || 35).catch(() => {});
+      }
+    }
 
     // Update in-memory driver location state
     if (ctx.state && ctx.state.drivers) {
@@ -856,11 +928,19 @@ router.post('/api/driver/location', async (req, res) => {
           lng: Number(longitude),
           speed: speed != null ? Number(speed) : null,
           heading: heading != null ? Number(heading) : null,
-          city: (tracking && tracking.currentCity) || d.location?.city || 'En Route',
+          city: (tracking && tracking.nextStop && tracking.nextStop.city) ? `En Route · near ${tracking.nextStop.city}` : d.location?.city || 'En Route',
           lastUpdated: new Date().toISOString(),
         };
       }
     }
+
+    // Immediately record coordinates into trackingService cache
+    trackingService.recordLiveGpsUpdate(ctx.driver.id, {
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      speed: speed != null ? Number(speed) : null,
+      heading: heading != null ? Number(heading) : null,
+    }, currentLoad ? currentLoad.id : null);
 
     // ── Broadcast live GPS update over Socket.IO to all connected dispatchers ──
     const io = req.app.get('io') || global.io;
@@ -869,7 +949,7 @@ router.post('/api/driver/location', async (req, res) => {
         driverId: ctx.driver.id,
         driverName: ctx.driver.name,
         driverTruck: ctx.driver.truck || ctx.driver.truckId || null,
-        loadId: loadId || (currentLoad ? currentLoad.id : null),
+        loadId: currentLoad ? currentLoad.id : null,
         location: {
           latitude: Number(latitude),
           longitude: Number(longitude),
@@ -879,10 +959,11 @@ router.post('/api/driver/location', async (req, res) => {
           heading: heading != null ? Number(heading) : null,
         },
         tracking,
+        arrivalEvent,
       });
     }
 
-    res.json({ ok: true, location: loc, tracking });
+    res.json({ ok: true, location: locRecord, tracking, arrivalEvent });
   } catch (e) {
     console.error('driver location update failed:', e);
     res.status(500).json({ error: 'Failed to record location' });
@@ -2496,78 +2577,8 @@ router.post('/api/driver/loads/:id/status/skip', async (req, res) => {
 });
 
 // =========================================================================
-// GPS TRACKING, ETA & GEOFENCE ARRIVAL DETECTION
+// GPS TRACKING HISTORY
 // =========================================================================
-
-// POST /api/driver/location { latitude, longitude, speed, heading, loadId, sharingMode }
-router.post('/api/driver/location', async (req, res) => {
-  const ctx = await requireDriver(req, res);
-  if (!ctx) return;
-  const { latitude, longitude, speed, heading, loadId, sharingMode } = req.body || {};
-  if (latitude == null || longitude == null) {
-    return res.status(400).json({ error: 'Missing latitude/longitude coordinates.' });
-  }
-
-  try {
-    const locRecord = await recordDriverLocation({
-      driverId: ctx.driver.id,
-      loadId: loadId || null,
-      latitude: Number(latitude),
-      longitude: Number(longitude),
-      speed: speed != null ? Number(speed) : null,
-      heading: heading != null ? Number(heading) : null,
-      sharingMode: sharingMode || 'ACTIVE_LOAD',
-    });
-
-    let trackingData = null;
-    let arrivalEvent = null;
-
-    if (loadId) {
-      const state = ctx.state;
-      const load = (state.loads || []).find((l) => l.id === loadId);
-      if (load) {
-        trackingData = calculateLoadTracking(load, locRecord);
-
-        // Geofence Arrival Detection (within 0.25 miles / ~400m)
-        if (trackingData.milesToPickup <= 0.3 && (load.driverProgress === 'EN_ROUTE_TO_PICKUP' || load.status === 'EN_ROUTE_TO_PICKUP')) {
-          arrivalEvent = { type: 'AT_PICKUP', message: `Driver ${ctx.driver.name} arrived at pickup location: ${load.pickup}` };
-          await notificationService.notifyDispatcherDriverArrivedPickup(load.dispatcherId || 'admin', load, ctx.driver);
-        } else if (trackingData.milesToDelivery <= 0.3 && (load.driverProgress === 'IN_TRANSIT' || load.status === 'IN_TRANSIT')) {
-          arrivalEvent = { type: 'AT_DELIVERY', message: `Driver ${ctx.driver.name} arrived at delivery location: ${load.dropoff}` };
-          await notificationService.notifyDispatcherDriverArrivedDelivery(load.dispatcherId || 'admin', load, ctx.driver);
-        }
-
-        // Automated Delay Detection Alert
-        if (trackingData.risk && (trackingData.risk.riskCode === 'RUNNING_LATE' || trackingData.risk.riskCode === 'DELAYED')) {
-          await notificationService.notifyAdminCriticalDelay(load, ctx.driver, trackingData.risk.diffMinutes || 35);
-        }
-      }
-    }
-
-    // Broadcast live location over Socket.IO directly to connected dispatchers (0 DB dual-write load)
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('driver_location_update', {
-        driverId: ctx.driver.id,
-        driverName: ctx.driver.name,
-        loadId: loadId || null,
-        location: locRecord,
-        tracking: trackingData,
-        arrivalEvent,
-      });
-    }
-
-    res.json({
-      ok: true,
-      location: locRecord,
-      tracking: trackingData,
-      arrivalEvent,
-    });
-  } catch (err) {
-    console.error('Failed to record driver location:', err);
-    res.status(500).json({ error: 'Failed to record location.' });
-  }
-});
 
 // GET /api/driver/location/history?limit=50
 router.get('/api/driver/location/history', async (req, res) => {

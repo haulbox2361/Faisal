@@ -42,13 +42,25 @@ class ApiClient {
       }
       
       if (response.statusCode == 200 && data['ok'] == true) {
-        final driver = DriverModel.fromJson(data['driver'] ?? {});
+        final role = (data['role'] ?? 'DRIVER').toString().toUpperCase();
+        final profileMap = (data['driver'] ?? data['owner'] ?? data['user'] ?? {}) as Map<String, dynamic>;
+        final driver = DriverModel(
+          id: profileMap['id']?.toString() ?? 'user',
+          name: profileMap['name']?.toString() ?? 'User',
+          truck: profileMap['truck']?.toString(),
+          phone: profileMap['phone']?.toString(),
+          email: profileMap['email']?.toString(),
+          cdlNumber: profileMap['cdlNumber']?.toString(),
+          cdlExpiration: profileMap['cdlExpiration']?.toString(),
+          address: profileMap['address']?.toString(),
+        );
         final loadsList = (data['loads'] as List<dynamic>?)
                 ?.map((l) => LoadModel.fromJson(l))
                 .toList() ??
             [];
         return {
           'success': true,
+          'role': role,
           'token': data['token'],
           'driver': driver,
           'companyName': data['companyName'] ?? 'HaulBoX',
@@ -432,6 +444,139 @@ class ApiClient {
       }
     } catch (e) {
       debugPrint('updateProfile error: $e');
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // OWNER DASHBOARD APIS (Phases 5 & 6)
+  // ---------------------------------------------------------------------------
+
+  // 16. Owner Home Summary
+  static Future<Map<String, dynamic>?> fetchOwnerSummary(
+    String token, {
+    String period = 'all',
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{
+      'period': period,
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    };
+    final uri = Uri.parse('$baseUrl/api/owner/summary').replace(queryParameters: query);
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('fetchOwnerSummary error: $e');
+    }
+    return null;
+  }
+
+  // 17. Owner Loads List
+  static Future<Map<String, dynamic>?> fetchOwnerLoads(
+    String token, {
+    String status = 'ALL',
+    String? search,
+    String period = 'all',
+  }) async {
+    final query = <String, String>{
+      'status': status,
+      'period': period,
+      if (search != null && search.isNotEmpty) 'search': search,
+    };
+    final uri = Uri.parse('$baseUrl/api/owner/loads').replace(queryParameters: query);
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('fetchOwnerLoads error: $e');
+    }
+    return null;
+  }
+
+  // 18. Owner Payments & Settlements
+  static Future<Map<String, dynamic>?> fetchOwnerPayments(
+    String token, {
+    String filter = 'all',
+    String? search,
+  }) async {
+    final query = <String, String>{
+      'filter': filter,
+      if (search != null && search.isNotEmpty) 'search': search,
+    };
+    final uri = Uri.parse('$baseUrl/api/owner/payments').replace(queryParameters: query);
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('fetchOwnerPayments error: $e');
+    }
+    return null;
+  }
+
+  // 19. Mark Payment as Paid
+  static Future<Map<String, dynamic>> markPaymentPaid(String token, String loadId) async {
+    final uri = Uri.parse('$baseUrl/api/owner/payments/mark-paid');
+    try {
+      final response = await http.post(
+        uri,
+        headers: authHeaders(token),
+        body: jsonEncode({'loadId': loadId}),
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['ok'] == true) {
+        return {'success': true, 'message': data['message'] ?? 'Payment marked as paid'};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Failed to mark payment as paid'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  // 20. Owner Reports
+  static Future<Map<String, dynamic>?> fetchOwnerReports(
+    String token, {
+    String period = 'this_month',
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, String>{
+      'period': period,
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    };
+    final uri = Uri.parse('$baseUrl/api/owner/reports').replace(queryParameters: query);
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('fetchOwnerReports error: $e');
+    }
+    return null;
+  }
+
+  // 21. Owner Analytics
+  static Future<Map<String, dynamic>?> fetchOwnerAnalytics(String token, {String range = '30d'}) async {
+    final uri = Uri.parse('$baseUrl/api/owner/analytics').replace(queryParameters: {'range': range});
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('fetchOwnerAnalytics error: $e');
     }
     return null;
   }

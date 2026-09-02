@@ -19,15 +19,19 @@ class StatusBadge extends StatelessWidget {
     Color textColor = AppColors.navyLight;
     Color dotColor = AppColors.navyLight;
 
-    if (['ACTIVE', 'PAID', 'COMPLETED', 'VERIFIED', 'VALID', 'SUCCESS', 'DELIVERED'].contains(s)) {
+    if (['ACTIVE', 'PAID', 'PAID_CONFIRMED', 'COMPLETED', 'VERIFIED', 'VALID', 'SUCCESS', 'DELIVERED'].contains(s)) {
       bgColor = AppColors.statusSuccessSoft;
       textColor = AppColors.statusSuccess;
       dotColor = AppColors.statusSuccess;
-    } else if (['PENDING', 'WAITING', 'LOADED', 'PROCESSING', 'EXPIRING'].contains(s)) {
+    } else if (['READY_TO_PAY'].contains(s)) {
+      bgColor = const Color(0xFFE0F2FE);
+      textColor = const Color(0xFF0284C7);
+      dotColor = const Color(0xFF0284C7);
+    } else if (['PENDING', 'UNPAID', 'WAITING', 'LOADED', 'PROCESSING', 'EXPIRING'].contains(s)) {
       bgColor = AppColors.statusWarningSoft;
       textColor = const Color(0xFFB45309);
       dotColor = AppColors.statusWarning;
-    } else if (['CANCELLED', 'REJECTED', 'FAILED', 'EXPIRED', 'ERROR'].contains(s)) {
+    } else if (['CANCELLED', 'REJECTED', 'FAILED', 'EXPIRED', 'ERROR', 'PAYMENT_DISPUTED', 'DISPUTED'].contains(s)) {
       bgColor = AppColors.statusDangerSoft;
       textColor = AppColors.statusDanger;
       dotColor = AppColors.statusDanger;
@@ -35,6 +39,19 @@ class StatusBadge extends StatelessWidget {
       bgColor = AppColors.statusInfoSoft;
       textColor = AppColors.statusInfo;
       dotColor = AppColors.statusInfo;
+    }
+
+    String label = status;
+    if (s == 'READY_TO_PAY') {
+      label = 'Ready to Pay';
+    } else if (s == 'PAID_CONFIRMED') {
+      label = 'Paid Confirmed';
+    } else if (s == 'PAYMENT_DISPUTED') {
+      label = 'Disputed';
+    } else if (s == 'UNPAID') {
+      label = 'Unpaid';
+    } else if (s == 'IN TRANSIT') {
+      label = 'In Transit';
     }
 
     return Container(
@@ -58,14 +75,13 @@ class StatusBadge extends StatelessWidget {
               shape: BoxShape.circle,
             ),
           ),
-          SizedBox(width: isSmall ? 4 : 6),
+          const SizedBox(width: 5),
           Text(
-            status.replaceAll('_', ' '),
+            label,
             style: TextStyle(
               color: textColor,
-              fontWeight: FontWeight.w800,
-              fontSize: isSmall ? 10.5 : 12,
-              letterSpacing: 0.3,
+              fontSize: isSmall ? 10 : 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

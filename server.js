@@ -9,8 +9,11 @@ const driverRoutes = require('./routes/driver');
 const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const mistralRoutes = require('./routes/mistral');
-const { ensureSchema } = require('./lib/db');
+const dailyNotesRoutes = require('./routes/dailyNotes');
+const ownerRoutes = require('./routes/owner');
+const { ensureSchema, purgeOldDailyNotes } = require('./lib/db');
 const { consistencyWorker } = require('./lib/consistencyWorker');
+const { trackingService } = require('./lib/trackingService');
 
 // Admin and Super Admin Google accounts allowed to sign in.
 // Supports comma-separated emails or SUPER_ADMIN_EMAIL / ADMIN_EMAIL env vars.
@@ -65,6 +68,8 @@ app.use(driverRoutes);
 app.use(chatRoutes);
 app.use(notificationRoutes);
 app.use(mistralRoutes);
+app.use('/api/daily-notes', dailyNotesRoutes);
+app.use('/api/owner', ownerRoutes);
 
 // Health check & monitoring endpoint for load balancers and uptime monitors
 app.get('/api/health', async (req, res) => {
@@ -331,13 +336,17 @@ server.listen(PORT, () => {
     console.log('⚠️  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set — Google sign-in will fail until you fill in .env (see README.md).');
   }
   if (!process.env.DATABASE_URL) {
-    console.log('⚠️  DATABASE_URL is not set — the app will fail to load/save data until your Supabase connection string is in .env (see README.md).');
-  } else {
-    ensureSchema()
-      .then(() => {
-        console.log('Database schema ready.');
-        consistencyWorker.start();
-      })
-      .catch((e) => console.error('⚠️  Failed to reach the database:', e.message));
+    console.log('⚠️  DATABASE_URL is not set — running with in-memory MockPool.');
   }
+  ensureSchema()
+    .then(async () => {
+      console.log('Database schema ready.');
+      await purgeOldDailyNotes(5);
+      consistencyWorker.start();
+      trackingService.start();
+    })
+    .catch((e) => {
+      console.error('⚠️  Failed to reach the database:', e.message);
+      trackingService.start();
+    });
 });
