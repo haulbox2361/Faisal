@@ -2843,6 +2843,8 @@
         <button type="button" class="btn btn-accent" id="btn-save-reminder-notes" onclick="submitAllReminderNotes()" style="background:#0284c7;color:#fff;font-weight:700;">Save All Notes</button>
       </div>
     </div>
+  </div>
+
   <!-- ============ ADD COMPANY MODAL ============ -->
   <div class="modal-overlay" id="modal-company">
     <div class="modal" style="max-width:540px;">
@@ -2850,7 +2852,7 @@
         <h3 id="company-modal-title">Add Trucking Company Fleet</h3>
         <div class="modal-close" onclick="closeModal('modal-company')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
       </div>
-      <form onsubmit="return submitCompanyForm(event)">
+      <form onsubmit="submitCompanyForm(event); return false;">
         <div class="modal-body" style="padding:22px;">
           <div class="form-section-title" style="margin-top:0;">Fleet Company Information</div>
           <div class="field" style="margin-bottom:12px;">

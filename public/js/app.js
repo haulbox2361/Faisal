@@ -6177,42 +6177,55 @@
       }).join('');
     }
 
-    function openAddCompanyModal() {
-      document.getElementById('fc-name').value = '';
-      document.getElementById('fc-phone').value = '';
-      document.getElementById('fc-email').value = '';
-      document.getElementById('fc-owner-name').value = '';
-      document.getElementById('fc-owner-code').value = '';
-      document.getElementById('fc-owner-pin').value = '';
-      openModal('modal-company');
-    }
+    window.openAddCompanyModal = function() {
+      const nameEl = document.getElementById('fc-name');
+      const phoneEl = document.getElementById('fc-phone');
+      const emailEl = document.getElementById('fc-email');
+      const ownerNameEl = document.getElementById('fc-owner-name');
+      const ownerCodeEl = document.getElementById('fc-owner-code');
+      const ownerPinEl = document.getElementById('fc-owner-pin');
+      const btn = document.getElementById('fc-save-btn');
 
-    async function submitCompanyForm(e) {
-      e.preventDefault();
-      const name = document.getElementById('fc-name').value.trim();
-      const phone = document.getElementById('fc-phone').value.trim();
-      const email = document.getElementById('fc-email').value.trim();
-      const ownerName = document.getElementById('fc-owner-name').value.trim();
-      const ownerCode = document.getElementById('fc-owner-code').value.trim().toUpperCase();
-      const pin = document.getElementById('fc-owner-pin').value.trim();
+      if (nameEl) nameEl.value = '';
+      if (phoneEl) phoneEl.value = '';
+      if (emailEl) emailEl.value = '';
+      if (ownerNameEl) ownerNameEl.value = '';
+      if (ownerCodeEl) ownerCodeEl.value = '';
+      if (ownerPinEl) ownerPinEl.value = '';
+      if (btn) { btn.disabled = false; btn.textContent = 'Create Company & Owner'; }
+
+      openModal('modal-company');
+    };
+
+    window.submitCompanyForm = async function(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      const name = (document.getElementById('fc-name')?.value || '').trim();
+      const phone = (document.getElementById('fc-phone')?.value || '').trim();
+      const email = (document.getElementById('fc-email')?.value || '').trim();
+      const ownerName = (document.getElementById('fc-owner-name')?.value || '').trim();
+      const ownerCode = (document.getElementById('fc-owner-code')?.value || '').trim().toUpperCase();
+      const pin = (document.getElementById('fc-owner-pin')?.value || '').trim();
 
       if (!name || !ownerName || !ownerCode || !pin) {
-        return toast('Missing fields', 'Company name, owner name, owner code, and PIN are required.');
+        toast('Missing fields', 'Company name, owner name, owner code, and PIN are required.');
+        return false;
       }
       if (pin.length < 4 || pin.length > 6) {
-        return toast('Invalid PIN', 'Security PIN must be 4 to 6 digits.');
+        toast('Invalid PIN', 'Security PIN must be 4 to 6 digits.');
+        return false;
       }
 
       const btn = document.getElementById('fc-save-btn');
       if (btn) { btn.disabled = true; btn.textContent = 'Creating Fleet...'; }
 
       try {
+        const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
         const res = await fetch('/api/companies', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-admin-pin': '8483',
-            'Authorization': STATE.sessionToken ? `Bearer ${STATE.sessionToken}` : ''
+            'Authorization': token ? `Bearer ${token}` : ''
           },
           body: JSON.stringify({ name, phone, email, ownerName, ownerCode, pin, contactName: ownerName })
         });
@@ -6222,19 +6235,22 @@
           toast('Company Created', `Fleet "${name}" and Owner ${ownerCode} successfully provisioned.`, true);
           await renderCompanies();
           populateCompanyDropdowns();
-          refreshStateFromServer();
+          if (typeof refreshStateFromServer === 'function') {
+            await refreshStateFromServer();
+          }
         } else {
           toast('Failed to create company', data.error || 'Server rejected creation.');
         }
       } catch (err) {
+        console.error('submitCompanyForm error:', err);
         toast('Error', 'Network or server error while creating company.');
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Create Company & Owner'; }
       }
       return false;
-    }
+    };
 
-    async function openCompanyDetailsModal(companyId) {
+    window.openCompanyDetailsModal = async function(companyId) {
       const modalBody = document.getElementById('cd-body');
       if (modalBody) {
         modalBody.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">Loading fleet overview and performance...</div>';
@@ -6242,10 +6258,11 @@
       openModal('modal-company-details');
 
       try {
+        const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
         const res = await fetch(`/api/companies/${encodeURIComponent(companyId)}`, {
           headers: {
             'x-admin-pin': '8483',
-            'Authorization': STATE.sessionToken ? `Bearer ${STATE.sessionToken}` : ''
+            'Authorization': token ? `Bearer ${token}` : ''
           }
         });
         const data = await res.json();
@@ -6284,42 +6301,50 @@
             </div>
           </div>
 
-          <!-- Owner Card -->
-          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:0.04em;">Linked Executive Owner Account</div>
-              <div style="font-size:16px;font-weight:800;color:#0c4a6e;margin-top:2px;">${owner ? escapeHtml(owner.name) : 'No Owner Account Linked'}</div>
-              <div style="font-size:12px;color:#0284c7;margin-top:2px;">${owner ? `Mobile App Login Code: <b>${escapeHtml(owner.ownerCode)}</b> · Phone: ${escapeHtml(owner.phone || '—')}` : 'Admin can provision an owner account'}</div>
+          <!-- Owner Account Information -->
+          <div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:12px;padding:16px;margin-bottom:20px;">
+            <div style="font-weight:800;font-size:14px;color:#0f172a;margin-bottom:6px;">Linked Fleet Owner Profile</div>
+            <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:#334155;">
+              <div><b>Name:</b> ${escapeHtml((owner && owner.name) || c.contactName || '—')}</div>
+              <div><b>Owner Code:</b> <span style="font-family:monospace;font-weight:700;color:#0284c7;">${escapeHtml((owner && owner.ownerCode) || '—')}</span></div>
+              <div><b>Phone:</b> ${escapeHtml(c.phone || (owner && owner.phone) || '—')}</div>
+              <div><b>Email:</b> ${escapeHtml(c.email || (owner && owner.email) || '—')}</div>
             </div>
-            <button class="btn btn-sm btn-ghost" onclick="closeModal('modal-company-details'); switchView('settings');" style="background:#fff;border:1px solid #0284c7;color:#0284c7;font-weight:700;border-radius:8px;">
-              Admin Settings
-            </button>
           </div>
 
-          <!-- Assigned Drivers -->
+          <!-- Drivers Scoped to this Fleet -->
           <div style="margin-bottom:20px;">
             <div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
-              <span>Assigned Fleet Drivers (${drivers.length})</span>
+              <span>Assigned Drivers (${drivers.length})</span>
               <button class="btn btn-sm btn-ghost" onclick="closeModal('modal-company-details'); filterDriversByCompany('${escapeAttr(c.id)}');" style="color:#0284c7;font-size:12px;font-weight:700;">View in Drivers Tab →</button>
             </div>
             ${drivers.length ? `
-              <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:10px;">
-                ${drivers.map(d => `
-                  <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;">
-                    <div style="width:32px;height:32px;border-radius:8px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">
-                      ${(d.name || 'D').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div style="font-weight:700;font-size:13px;color:#0f172a;">${escapeHtml(d.name)}</div>
-                      <div style="font-size:11px;color:#64748b;">${escapeHtml(d.truck || 'Truck —')} · ${escapeHtml(d.phone || '—')}</div>
-                    </div>
-                  </div>
-                `).join('')}
+              <div class="table-wrap" style="max-height:180px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;">
+                <table class="data" style="margin:0;">
+                  <thead>
+                    <tr>
+                      <th style="padding:8px 12px;">Driver</th>
+                      <th style="padding:8px 12px;">Truck</th>
+                      <th style="padding:8px 12px;">Phone</th>
+                      <th style="padding:8px 12px;">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${drivers.map(d => `
+                      <tr>
+                        <td class="cell-strong" style="padding:8px 12px;">${escapeHtml(d.name)}</td>
+                        <td style="padding:8px 12px;color:#64748b;">${escapeHtml(d.truck || '—')}</td>
+                        <td style="padding:8px 12px;">${escapeHtml(d.phone || '—')}</td>
+                        <td style="padding:8px 12px;"><span class="status-pill ${d.active ? 'sp-green' : 'sp-gray'}">${d.active ? 'Active' : 'Inactive'}</span></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
               </div>
-            ` : '<div style="color:#94a3b8;font-size:13px;padding:12px;background:#f8fafc;border-radius:8px;">No drivers assigned to this company yet.</div>'}
+            ` : '<div style="color:#94a3b8;font-size:13px;padding:12px;background:#f8fafc;border-radius:8px;">No drivers assigned to this company fleet yet.</div>'}
           </div>
 
-          <!-- Recent Loads -->
+          <!-- Loads Scoped to this Fleet -->
           <div>
             <div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
               <span>Company Loads (${loads.length})</span>
@@ -6358,9 +6383,9 @@
       } catch (err) {
         if (modalBody) modalBody.innerHTML = '<div style="color:#ef4444;text-align:center;padding:30px;">Error loading company details.</div>';
       }
-    }
+    };
 
-    async function toggleCompanyStatusAction(companyId, currentStatus) {
+    window.toggleCompanyStatusAction = async function(companyId, currentStatus) {
       const targetStatus = (currentStatus === 'disabled') ? 'active' : 'disabled';
       const actionText = (targetStatus === 'disabled') 
         ? 'Deactivate this company fleet? Linked drivers and owners will be blocked from logging into the mobile app.'
@@ -6369,28 +6394,29 @@
       if (!confirm(actionText)) return;
 
       try {
+        const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
         const res = await fetch(`/api/companies/${encodeURIComponent(companyId)}/toggle-status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-admin-pin': '8483',
-            'Authorization': STATE.sessionToken ? `Bearer ${STATE.sessionToken}` : ''
+            'Authorization': token ? `Bearer ${token}` : ''
           },
           body: JSON.stringify({ status: targetStatus })
         });
         const data = await res.json();
         if (data.ok) {
           toast('Status Updated', `Company status changed to ${targetStatus}.`, true);
-          await renderCompanies();
-          populateCompanyDropdowns();
-          refreshStateFromServer();
+          if (typeof refreshStateFromServer === 'function') {
+            await refreshStateFromServer();
+          }
         } else {
           toast('Update Failed', data.error || 'Could not toggle status.');
         }
       } catch (err) {
         toast('Error', 'Connection error while updating status.');
       }
-    }
+    };
 
     function filterDriversByCompany(companyId) {
       switchView('drivers');
