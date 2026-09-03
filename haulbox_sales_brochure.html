@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HaulBoX — Executive Sales Overview</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0f172a;
+      background: #cbd5e1;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @page {
+      size: letter portrait;
+      margin: 0;
+    }
+
+    .page {
+      width: 8.5in;
+      height: 11in;
+      margin: 0 auto 20px auto;
+      background: #ffffff;
+      padding: 0.44in 0.48in;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      break-after: page;
+      position: relative;
+      overflow: hidden;
+    }
+
+    @media print {
+      body {
+        background: none;
+      }
+      .page {
+        margin: 0;
+        box-shadow: none;
+        width: 8.5in;
+        height: 11in;
+      }
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #059669;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      padding: 7px 13px;
+      border-radius: 9px;
+      box-shadow: 0 4px 10px rgba(5, 150, 105, 0.22);
+    }
+
+    .logo-text h1 {
+      font-size: 19px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    .logo-text p {
+      font-size: 10px;
+      color: #059669;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .header-tag {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── Section Titles ── */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      font-weight: 900;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 9px;
+      padding-bottom: 4px;
+      border-bottom: 1.5px solid #e2e8f0;
+    }
+
+    .section-icon {
+      font-size: 15px;
+    }
+
+    /* ── Opening Hook ── */
+    .hero-card {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      border-left: 5px solid #10b981;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+    }
+
+    .hero-card h2 {
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .hero-card p {
+      font-size: 10.5px;
+      color: #e2e8f0;
+      line-height: 1.45;
+    }
+
+    .hero-highlight {
+      color: #34d399;
+      font-weight: 700;
+    }
+
+    /* ── What Makes HaulBoX Different Grid ── */
+    .diff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+
+    .diff-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 9px;
+      padding: 10px 12px;
+      border-top: 3px solid #059669;
+    }
+
+    .diff-card.blue { border-top-color: #0284c7; }
+    .diff-card.purple { border-top-color: #7c3aed; }
+    .diff-card.amber { border-top-color: #d97706; }
+    .diff-card.emerald { border-top-color: #10b981; }
+
+    .diff-card h3 {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diff-card p {
+      font-size: 9.8px;
+      color: #475569;
+      line-height: 1.4;
+    }
+
+    .diff-card strong {
+      color: #0f172a;
+    }
+
+    /* ── Role Features Section (Page 2) ── */
+    .role-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .role-panel {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 9px;
+      padding: 10px 14px;
+      position: relative;
+    }
+
+    .role-panel.driver { border-left: 4px solid #0284c7; }
+    .role-panel.dispatcher { border-left: 4px solid #d97706; }
+    .role-panel.admin { border-left: 4px solid #7c3aed; }
+    .role-panel.owner { border-left: 4px solid #059669; }
+
+    .role-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px dashed #cbd5e1;
+    }
+
+    .role-title {
+      font-size: 12px;
+      font-weight: 900;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .role-badge {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .role-badge.driver { background: #e0f2fe; color: #0369a1; }
+    .role-badge.dispatcher { background: #fef3c7; color: #b45309; }
+    .role-badge.admin { background: #ede9fe; color: #6d28d9; }
+    .role-badge.owner { background: #dcfce7; color: #15803d; }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 14px;
+    }
+
+    .role-item {
+      font-size: 9.8px;
+      color: #334155;
+      line-height: 1.35;
+      position: relative;
+      padding-left: 12px;
+    }
+
+    .role-item::before {
+      content: "➔";
+      position: absolute;
+      left: 0;
+      color: #059669;
+      font-size: 9px;
+      font-weight: 800;
+      top: 1px;
+    }
+
+    .role-item strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .role-impact {
+      color: #059669;
+      font-weight: 600;
+    }
+
+    /* ── Page 3 Sections ── */
+    .spotlight-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      border-left: 5px solid #059669;
+    }
+
+    .spotlight-card h3 {
+      font-size: 12.5px;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .spotlight-flow {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+
+    .flow-step {
+      flex: 1;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 7px 8px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .flow-step-icon {
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .flow-step-title {
+      font-size: 9px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 2px;
+      line-height: 1.1;
+    }
+
+    .flow-step-desc {
+      font-size: 8px;
+      color: #64748b;
+      line-height: 1.2;
+    }
+
+    .spotlight-bullets {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 12px;
+      margin-top: 6px;
+    }
+
+    .spotlight-bullets li {
+      font-size: 9.8px;
+      color: #334155;
+      line-height: 1.35;
+      position: relative;
+      padding-left: 12px;
+    }
+
+    .spotlight-bullets li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #059669;
+      font-weight: 900;
+      font-size: 10px;
+    }
+
+    /* Trust & Reliability */
+    .trust-card {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+    }
+
+    .trust-card h3 {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .trust-bullets {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px 12px;
+    }
+
+    .trust-bullets li {
+      font-size: 9.2px;
+      color: #334155;
+      line-height: 1.35;
+      position: relative;
+      padding-left: 11px;
+    }
+
+    .trust-bullets li::before {
+      content: "🔒";
+      position: absolute;
+      left: 0;
+      font-size: 8.5px;
+    }
+
+    /* Closing Banner */
+    .closing-card {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.28);
+    }
+
+    .closing-card h2 {
+      font-size: 14.5px;
+      font-weight: 900;
+      margin-bottom: 5px;
+      letter-spacing: -0.01em;
+    }
+
+    .closing-card p {
+      font-size: 10.8px;
+      color: #d1fae5;
+      line-height: 1.45;
+      max-width: 620px;
+      margin: 0 auto 8px auto;
+    }
+
+    .closing-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 5px 14px;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 8px;
+      font-size: 9px;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .footer-brand {
+      font-weight: 800;
+      color: #0f172a;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ================= PAGE 1: HOOK & ADVANTAGES ================= -->
+  <div class="page">
+    <div>
+      <!-- Header -->
+      <div class="header">
+        <div class="logo-container">
+          <div class="logo-badge">HB</div>
+          <div class="logo-text">
+            <h1>HaulBoX Platform</h1>
+            <p>Smart Trucking Management System</p>
+          </div>
+        </div>
+        <div class="header-tag">Executive Solution Brief</div>
+      </div>
+
+      <!-- Opening / Hook -->
+      <div class="hero-card">
+        <h2>Stop Losing Time and Money to Paperwork and Guesswork</h2>
+        <p>
+          Every day, trucking companies lose valuable hours to manual data entry, misplaced delivery receipts, endless check-in calls, and spreadsheet confusion.
+          <strong>HaulBoX fixes this permanently.</strong> By connecting your drivers, dispatchers, managers, and owners onto a single real-time platform, HaulBoX automates your back-office paperwork, tracks your fleet with live accuracy, and gives you total visibility into every load and every dollar.
+        </p>
+      </div>
+
+      <!-- What Makes HaulBoX Different -->
+      <div class="section-title">
+        <span class="section-icon">⭐</span> Why Choose HaulBoX? Key Competitive Advantages
+      </div>
+
+      <div class="diff-grid">
+        <!-- Advantage 1 -->
+        <div class="diff-card emerald">
+          <h3><span>📱</span> One Platform for Your Whole Operation</h3>
+          <p>
+            Drivers, dispatchers, managers, and business owners all work from the <strong>same real-time system</strong>. No more scattered text messages, phone tag, or lost paperwork in glove compartments.
+          </p>
+        </div>
+
+        <!-- Advantage 2 -->
+        <div class="diff-card blue">
+          <h3><span>⚡</span> Paperwork Handled 100% Automatically</h3>
+          <p>
+            Rate Confirmations are <strong>read automatically the second they are uploaded</strong>. Paperwork is sorted into cloud storage, and signed delivery receipts are emailed straight to brokers without manual effort.
+          </p>
+        </div>
+
+        <!-- Advantage 3 -->
+        <div class="diff-card amber">
+          <h3><span>🛡️</span> Zero Tasks Fall Through the Cracks</h3>
+          <p>
+            Every driver updates their status daily, every document is verified for clarity before acceptance, and every driver payout is tracked from delivery to confirmation.
+          </p>
+        </div>
+
+        <!-- Advantage 4 -->
+        <div class="diff-card purple">
+          <h3><span>📊</span> Real Visibility, Zero Guesswork</h3>
+          <p>
+            Know exactly what is happening in your business at any second: <strong>live truck locations</strong>, accurate arrival times, revenue earned, payouts due, and true business profit margins.
+          </p>
+        </div>
+      </div>
+
+      <!-- Advantage 5 (Full Width) -->
+      <div class="diff-card" style="border-top-color:#059669; margin-bottom: 0;">
+        <h3><span>🛣️</span> Built to Scale: Single-Stop &amp; Complex Multi-Stop Loads</h3>
+        <p>
+          Whether your fleet runs simple point-to-point loads or demanding routes with multiple pickups and drops, HaulBoX <strong>automatically detects stops</strong>, requires separate paperwork for each location, and keeps every leg of the journey organized without extra administrative overhead.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer Page 1 -->
+    <div class="footer">
+      <div><span class="footer-brand">HaulBoX</span> • The All-In-One Trucking Operations Platform</div>
+      <div>Page 1 of 3</div>
+    </div>
+  </div>
+
+
+  <!-- ================= PAGE 2: FEATURES BY ROLE ================= -->
+  <div class="page">
+    <div>
+      <!-- Header -->
+      <div class="header">
+        <div class="logo-container">
+          <div class="logo-badge">HB</div>
+          <div class="logo-text">
+            <h1>HaulBoX Platform</h1>
+            <p>Designed for Every Member of Your Team</p>
+          </div>
+        </div>
+        <div class="header-tag">Features &amp; Direct Business Benefits</div>
+      </div>
+
+      <div class="section-title">
+        <span class="section-icon">👥</span> The Right Experience for Every Role
+      </div>
+
+      <div class="role-container">
+        <!-- 1. DRIVER -->
+        <div class="role-panel driver">
+          <div class="role-header">
+            <span class="role-title">🚚 Driver Role (Mobile App)</span>
+            <span class="role-badge driver">Driver Convenience</span>
+          </div>
+          <div class="role-grid">
+            <div class="role-item"><strong>Simple ID &amp; PIN login:</strong> <span class="role-impact">Fast access, zero confusion, no wasted time.</span></div>
+            <div class="role-item"><strong>Phone camera document upload:</strong> <span class="role-impact">No more faxing, flatbed scanners, or office detours.</span></div>
+            <div class="role-item"><strong>Instant photo quality check:</strong> <span class="role-impact">Eliminates blurry receipts and billing disputes weeks later.</span></div>
+            <div class="role-item"><strong>Built-in multi-stop support:</strong> <span class="role-impact">Easily handle multi-drop routes without app frustration.</span></div>
+            <div class="role-item"><strong>Live payment status visibility:</strong> <span class="role-impact">Drivers always know when they're getting paid.</span></div>
+            <div class="role-item"><strong>Automatic location sharing:</strong> <span class="role-impact">Ends repetitive "where are you" dispatch check calls.</span></div>
+          </div>
+        </div>
+
+        <!-- 2. DISPATCHER -->
+        <div class="role-panel dispatcher">
+          <div class="role-header">
+            <span class="role-title">🎧 Dispatcher Role (Web Command Portal)</span>
+            <span class="role-badge dispatcher">Operations Efficiency</span>
+          </div>
+          <div class="role-grid">
+            <div class="role-item"><strong>One focused dashboard:</strong> <span class="role-impact">Manage assigned drivers and loads without juggling tools.</span></div>
+            <div class="role-item"><strong>Live GPS map &amp; automatic ETA:</strong> <span class="role-impact">Answer customer and broker questions instantly with confidence.</span></div>
+            <div class="role-item"><strong>End-of-day driver status check:</strong> <span class="role-impact">Gentle reminder ensures all daily updates are logged before 5 PM.</span></div>
+            <div class="role-item"><strong>Side-by-side document review:</strong> <span class="role-impact">Catch paperwork issues immediately before loads close.</span></div>
+          </div>
+        </div>
+
+        <!-- 3. MANAGER / ADMIN -->
+        <div class="role-panel admin">
+          <div class="role-header">
+            <span class="role-title">🏢 Manager &amp; Admin Role (Full Oversight)</span>
+            <span class="role-badge admin">Total Control</span>
+          </div>
+          <div class="role-grid">
+            <div class="role-item"><strong>Full operational visibility:</strong> <span class="role-impact">Complete oversight across every dispatcher, driver, and load.</span></div>
+            <div class="role-item"><strong>Consolidated daily driver reports:</strong> <span class="role-impact">Review daily fleet summaries without chasing anyone down.</span></div>
+            <div class="role-item"><strong>Instant account management:</strong> <span class="role-impact">Add new drivers, dispatchers, and owners in under two minutes.</span></div>
+            <div class="role-item"><strong>Standardized load lifecycle:</strong> <span class="role-impact">Every load follows the same verified process from start to finish.</span></div>
+          </div>
+        </div>
+
+        <!-- 4. OWNER -->
+        <div class="role-panel owner">
+          <div class="role-header">
+            <span class="role-title">💼 Business Owner Role (Executive Mobile Dashboard)</span>
+            <span class="role-badge owner">Financial Peace of Mind</span>
+          </div>
+          <div class="role-grid">
+            <div class="role-item"><strong>Executive financial summary:</strong> <span class="role-impact">See gross revenue, driver pay, and estimated profit in real time.</span></div>
+            <div class="role-item"><strong>One-tap driver payment approval:</strong> <span class="role-impact">Approve and mark settlements paid instantly from your phone.</span></div>
+            <div class="role-item"><strong>Auto-generated business reports:</strong> <span class="role-impact">Daily, weekly, and monthly financials ready with zero effort.</span></div>
+            <div class="role-item"><strong>Trend charts &amp; forecast estimates:</strong> <span class="role-impact">Make strategic fleet decisions backed by real operational data.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Page 2 -->
+    <div class="footer">
+      <div><span class="footer-brand">HaulBoX</span> • Complete Role Separation &amp; Streamlined Workflows</div>
+      <div>Page 2 of 3</div>
+    </div>
+  </div>
+
+
+  <!-- ================= PAGE 3: AUTOMATION, TRUST & CLOSING ================= -->
+  <div class="page">
+    <div>
+      <!-- Header -->
+      <div class="header">
+        <div class="logo-container">
+          <div class="logo-badge">HB</div>
+          <div class="logo-text">
+            <h1>HaulBoX Platform</h1>
+            <p>Automated Workflows &amp; Enterprise Reliability</p>
+          </div>
+        </div>
+        <div class="header-tag">Built for Sustainable Growth</div>
+      </div>
+
+      <!-- Standout Feature: Automated Paperwork -->
+      <div class="section-title">
+        <span class="section-icon">📄</span> Standout Capability: 100% Automated Paperwork
+      </div>
+
+      <div class="spotlight-card">
+        <h3>How HaulBoX Eliminates Back-Office Data Entry</h3>
+        <p style="font-size:10px; color:#475569; line-height:1.4;">
+          Paperwork delays are the #1 reason freight payments get delayed. HaulBoX turns hours of weekly document shuffling into an instant, automated flow:
+        </p>
+
+        <div class="spotlight-flow">
+          <div class="flow-step">
+            <div class="flow-step-icon">📥</div>
+            <div class="flow-step-title">1. Upload RC</div>
+            <div class="flow-step-desc">Drop in Rate Confirmation</div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-icon">🤖</div>
+            <div class="flow-step-title">2. Auto-Read</div>
+            <div class="flow-step-desc">Extracts rates, dates &amp; stops</div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-icon">📁</div>
+            <div class="flow-step-title">3. Cloud Filing</div>
+            <div class="flow-step-desc">Organized in Drive by load</div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-icon">📧</div>
+            <div class="flow-step-title">4. Auto Email</div>
+            <div class="flow-step-desc">Approved BOL sent to broker</div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-icon">📊</div>
+            <div class="flow-step-title">5. Auto Records</div>
+            <div class="flow-step-desc">Logged into Google Sheets</div>
+          </div>
+        </div>
+
+        <ul class="spotlight-bullets">
+          <li><strong>Zero manual re-typing:</strong> Rates, pickup facilities, and delivery stops are captured automatically.</li>
+          <li><strong>Multi-stop route intelligence:</strong> Stops are recognized and tracked as separate delivery milestones.</li>
+          <li><strong>Never lose paperwork:</strong> Every document is securely organized and accessible anytime from cloud storage.</li>
+          <li><strong>Faster broker billing:</strong> Approved BOLs are emailed to brokers immediately, speeding up invoice settlement.</li>
+        </ul>
+      </div>
+
+      <!-- Trust & Reliability -->
+      <div class="section-title">
+        <span class="section-icon">🛡️</span> Built on Trust, Security &amp; Accuracy
+      </div>
+
+      <div class="trust-card">
+        <h3>Enterprise-Grade Confidence for Your Fleet</h3>
+        <ul class="trust-bullets">
+          <li><strong>Protected Access:</strong> Role-restricted logins with automatic brute-force lockout safeguards.</li>
+          <li><strong>Auditable Payouts:</strong> Clear payment states (Ready to Pay, Paid, Disputed) ensure zero duplicate payments.</li>
+          <li><strong>Real-World Proven:</strong> Thoroughly validated across all load lifecycles and daily operational conditions.</li>
+        </ul>
+      </div>
+
+      <!-- Closing Call to Value -->
+      <div class="closing-card">
+        <h2>Transform Your Fleet Operations Today</h2>
+        <p>
+          “HaulBoX brings your drivers, dispatchers, managers, and owners onto one connected platform — automating the paperwork, keeping everyone updated in real time, and giving you complete visibility into your business. <strong>Less chasing, less guesswork, more control.</strong>”
+        </p>
+        <div class="closing-badge">
+          Ready to Modernize Your Trucking Business? Let’s Get Started.
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Page 3 -->
+    <div class="footer">
+      <div><span class="footer-brand">HaulBoX</span> • Sales &amp; Platform Inquiries: contact@haulbox.com</div>
+      <div>Page 3 of 3</div>
+    </div>
+  </div>
+
+</body>
+</html>

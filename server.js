@@ -11,6 +11,7 @@ const notificationRoutes = require('./routes/notifications');
 const mistralRoutes = require('./routes/mistral');
 const dailyNotesRoutes = require('./routes/dailyNotes');
 const ownerRoutes = require('./routes/owner');
+const companiesRoutes = require('./routes/companies');
 const { ensureSchema, purgeOldDailyNotes } = require('./lib/db');
 const { consistencyWorker } = require('./lib/consistencyWorker');
 const { trackingService } = require('./lib/trackingService');
@@ -70,6 +71,7 @@ app.use(notificationRoutes);
 app.use(mistralRoutes);
 app.use('/api/daily-notes', dailyNotesRoutes);
 app.use('/api/owner', ownerRoutes);
+app.use('/api/companies', companiesRoutes);
 
 // Health check & monitoring endpoint for load balancers and uptime monitors
 app.get('/api/health', async (req, res) => {

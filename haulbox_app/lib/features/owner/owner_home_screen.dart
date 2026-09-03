@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../shared/widgets/haulbox_card.dart';
 import '../../shared/widgets/status_badge.dart';
+import '../auth/auth_provider.dart';
 import 'owner_provider.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final ownerProvider = Provider.of<OwnerProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final summary = ownerProvider.summary;
     final isLoading = ownerProvider.isLoadingSummary;
 
@@ -56,10 +58,10 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
               child: const Icon(Icons.business_center, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 10),
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Owner Dashboard',
                   style: TextStyle(
                     color: AppColors.textDark,
@@ -68,10 +70,10 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
                   ),
                 ),
                 Text(
-                  'Executive Fleet & Financial Overview',
-                  style: TextStyle(
+                  authProvider.companyName.isNotEmpty ? authProvider.companyName : 'Executive Fleet & Financial Overview',
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                     fontSize: 11,
                   ),
                 ),

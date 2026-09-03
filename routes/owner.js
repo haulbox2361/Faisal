@@ -126,6 +126,12 @@ async function requireOwner(req, res, next) {
         }
         if (ownerObj && ownerObj.active !== false) {
           isOwner = true;
+          // Verify company is active
+          const ownerCompId = ownerObj.company_id || ownerObj.companyId || 'COMP-LEGACY';
+          const comp = await db.getCompanyById(ownerCompId);
+          if (comp && comp.status === 'disabled') {
+            return res.status(403).json({ ok: false, error: 'Access denied: Your company fleet has been deactivated. Please contact dispatch.' });
+          }
         }
       }
     }
@@ -147,13 +153,40 @@ async function requireOwner(req, res, next) {
 
     let state = await dataStore.loadFullState().catch(() => null);
     if (!state) state = { drivers: [], loads: [], dispatchers: [], brokers: [], owners: [], settings: {} };
-    req.owner = ownerObj || { id: session.userId, role: 'OWNER' };
+
+    // STRICT SERVER-SIDE COMPANY DERIVATION
+    const effectiveCompanyId = (ownerObj.id === 'admin')
+      ? (req.query.companyId || null)
+      : (ownerObj.company_id || ownerObj.companyId || 'COMP-LEGACY');
+
+    req.owner = {
+      ...ownerObj,
+      companyId: effectiveCompanyId
+    };
     req.state = state;
     next();
   } catch (err) {
     console.error('requireOwner error:', err);
     res.status(500).json({ error: 'Authorization error: ' + err.message });
   }
+}
+
+/**
+ * Helper to retrieve company-scoped loads and drivers strictly by req.owner.companyId
+ */
+function getScopedEntities(req) {
+  const { state, owner } = req;
+  const ownerCompanyId = owner ? owner.companyId : null;
+
+  let loads = (state.loads || []).filter(l => !l.isDeleted && !l.is_deleted);
+  let drivers = (state.drivers || []).filter(d => d.active !== false && d.status !== 'inactive');
+
+  if (ownerCompanyId) {
+    loads = loads.filter(l => (l.companyId || l.company_id || 'COMP-LEGACY') === ownerCompanyId);
+    drivers = drivers.filter(d => (d.companyId || d.company_id || 'COMP-LEGACY') === ownerCompanyId);
+  }
+
+  return { loads, drivers };
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +197,8 @@ router.get('/summary', requireOwner, (req, res) => {
   const period = req.query.period || 'all';
   const range = parsePeriodFilter(period, req.query.from, req.query.to);
 
-  const allLoads = (state.loads || []).filter(l => !l.isDeleted && !l.is_deleted);
+  const { loads: scopedLoads, drivers: scopedDrivers } = getScopedEntities(req);
+  const allLoads = scopedLoads;
   const periodLoads = allLoads.filter(l => loadMatchesPeriod(l, range));
 
   // Financial KPIs for the period
@@ -189,7 +223,7 @@ router.get('/summary', requireOwner, (req, res) => {
   });
 
   // Drivers availability
-  const allDrivers = (state.drivers || []).filter(d => d.active !== false && d.status !== 'inactive');
+  const allDrivers = scopedDrivers;
   let availableCount = 0;
   let onLoadCount = 0;
   let atPickupCount = 0;
@@ -291,8 +325,8 @@ router.get('/loads', requireOwner, (req, res) => {
   const search = String(req.query.search || '').trim().toLowerCase();
   const range = parsePeriodFilter(req.query.period, req.query.from, req.query.to);
 
-  let loads = (state.loads || []).filter(l => !l.isDeleted && !l.is_deleted);
-  loads = loads.filter(l => loadMatchesPeriod(l, range));
+  const { loads: scopedLoads } = getScopedEntities(req);
+  let loads = scopedLoads.filter(l => loadMatchesPeriod(l, range));
 
   // Filter by lifecycle status
   if (statusFilter !== 'ALL') {
@@ -361,8 +395,9 @@ router.get('/payments', requireOwner, (req, res) => {
   const categoryFilter = String(req.query.filter || 'all').toLowerCase();
   const search = String(req.query.search || '').trim().toLowerCase();
 
-  const drivers = (state.drivers || []).filter(d => d.active !== false);
-  const allLoads = (state.loads || []).filter(l => !l.isDeleted && !l.is_deleted);
+  const { loads: scopedLoads, drivers: scopedDrivers } = getScopedEntities(req);
+  const drivers = scopedDrivers;
+  const allLoads = scopedLoads;
 
   const driverSummaries = drivers.map(d => {
     const dLoads = allLoads.filter(l => String(l.driverId) === String(d.id));
@@ -463,6 +498,14 @@ router.post('/payments/mark-paid', requireOwner, async (req, res) => {
     return res.status(404).json({ error: 'Load record not found' });
   }
 
+  // Cross-tenant data isolation: check company ownership
+  if (owner && owner.companyId) {
+    const loadCompId = load.companyId || load.company_id || 'COMP-LEGACY';
+    if (loadCompId !== owner.companyId) {
+      return res.status(403).json({ ok: false, error: 'Access denied: You are not authorized to manage loads belonging to another company.' });
+    }
+  }
+
   const currentStatus = resolvePaymentStatus(load);
 
   // Strict Validation:
@@ -555,7 +598,8 @@ router.get('/reports', requireOwner, (req, res) => {
   const period = req.query.period || 'this_month';
   const range = parsePeriodFilter(period, req.query.from, req.query.to);
 
-  const allLoads = (state.loads || []).filter(l => !l.isDeleted && !l.is_deleted);
+  const { loads: scopedLoads } = getScopedEntities(req);
+  const allLoads = scopedLoads;
   const periodLoads = allLoads.filter(l => loadMatchesPeriod(l, range));
 
   let totalGross = 0;
@@ -637,7 +681,8 @@ router.get('/analytics', requireOwner, (req, res) => {
   const startDate = new Date(now.getTime() - daysBack * 86400000);
   startDate.setHours(0, 0, 0, 0);
 
-  const allLoads = (state.loads || []).filter(l => !l.isDeleted && !l.is_deleted);
+  const { loads: scopedLoads } = getScopedEntities(req);
+  const allLoads = scopedLoads;
   const relevantLoads = allLoads.filter(l => {
     const dStr = l.deliveryDate || l.pickupDate || l.createdAt;
     if (!dStr) return false;
@@ -752,19 +797,21 @@ router.post('/accounts', async (req, res) => {
     return res.status(403).json({ error: 'Admin access required to create owner accounts.' });
   }
 
-  const { ownerCode, pin, name, phone, email } = req.body || {};
+  const { ownerCode, pin, name, phone, email, companyId } = req.body || {};
   if (!ownerCode || !pin || !name) {
     return res.status(400).json({ error: 'ownerCode, pin, and name are required' });
   }
 
   try {
     const pinHash = dataStore.hashPin(pin);
+    const assignedCompanyId = companyId || 'COMP-LEGACY';
     const owner = await db.saveOwner({
       ownerCode,
       pinHash,
       name,
       phone,
       email,
+      companyId: assignedCompanyId,
       active: true
     });
 
@@ -779,6 +826,7 @@ router.post('/accounts', async (req, res) => {
       name: owner.name,
       phone: owner.phone,
       email: owner.email,
+      companyId: assignedCompanyId,
       active: owner.active !== false
     };
     const existingIdx = state.owners.findIndex(o => o.id === owner.id || o.ownerCode === owner.owner_code);

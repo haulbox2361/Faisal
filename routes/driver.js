@@ -579,7 +579,8 @@ function resetFailedAttempts(driverKey, ip) {
 
 // POST /api/driver/login  { driverId, pin }
 router.post('/api/driver/login', async (req, res) => {
-  const { driverId, pin } = req.body || {};
+  const driverId = (req.body && (req.body.driverId || req.body.driverCode)) || '';
+  const pin = (req.body && req.body.pin) || '';
   try {
     let state = await loadFullState().catch(() => null);
     if (!state) state = { drivers: [], loads: [], settings: {} };
@@ -621,6 +622,13 @@ router.post('/api/driver/login', async (req, res) => {
         if (owner.active === false) {
           return res.status(401).json({ error: 'Owner account disabled. Contact administrator.' });
         }
+        const compId = owner.company_id || owner.companyId || 'COMP-LEGACY';
+        const comp = await db.getCompanyById(compId).catch(() => null);
+        if (comp && comp.status === 'disabled') {
+          return res.status(401).json({ ok: false, error: 'Company fleet deactivated. Contact administrator.' });
+        }
+        const resolvedCompName = comp ? comp.name : ((state.settings && state.settings.companyName) || 'HaulBoX');
+
         resetFailedAttempts(driverKey, clientIp);
         let token = await sessions.issue(owner.id, 'OWNER').catch(() => null);
         if (!token) token = 'token_owner_' + owner.id + '_' + Date.now();
@@ -635,6 +643,8 @@ router.post('/api/driver/login', async (req, res) => {
             name: owner.name,
             phone: owner.phone,
             email: owner.email,
+            companyId: compId,
+            companyName: resolvedCompName,
             role: 'OWNER'
           },
           user: {
@@ -642,7 +652,9 @@ router.post('/api/driver/login', async (req, res) => {
             name: owner.name,
             role: 'OWNER'
           },
-          companyName: (state.settings && state.settings.companyName) || 'HaulBoX'
+          companyId: compId,
+          companyName: resolvedCompName,
+          company: resolvedCompName
         });
       } else {
         // Owner code matched but PIN was invalid: record failed attempt for rate-limiting and lockout
@@ -655,7 +667,7 @@ router.post('/api/driver/login', async (req, res) => {
           { ownerCode: owner.owner_code || owner.ownerCode, clientIp, attempts: (failedAttemptsByDriver.get(driverKey)?.count || 1) }
         ).catch(() => {});
 
-        return res.status(401).json({ error: 'Invalid Owner Code or PIN. Contact administrator if you need assistance.' });
+        return res.status(401).json({ ok: false, error: 'Invalid Owner Code or PIN. Contact administrator if you need assistance.' });
       }
     }
 
@@ -676,12 +688,19 @@ router.post('/api/driver/login', async (req, res) => {
         { driverId, clientIp, attempts: (failedAttemptsByDriver.get(driverKey)?.count || 1) }
       ).catch(() => {});
 
-      return res.status(401).json({ error: 'Invalid Driver/Owner Code or PIN. Contact your dispatcher if you need assistance.' });
+      return res.status(401).json({ ok: false, error: 'Invalid Driver/Owner Code or PIN. Contact your dispatcher if you need assistance.' });
     }
 
     if (isDisabled(driver)) {
-      return res.status(401).json({ error: 'Account disabled. Contact dispatcher.' });
+      return res.status(401).json({ ok: false, error: 'Account disabled. Contact dispatcher.' });
     }
+
+    const driverCompId = driver.companyId || driver.company_id || 'COMP-LEGACY';
+    const comp = await db.getCompanyById(driverCompId).catch(() => null);
+    if (comp && comp.status === 'disabled') {
+      return res.status(401).json({ ok: false, error: 'Company fleet deactivated. Contact dispatcher.' });
+    }
+    const resolvedCompName = comp ? comp.name : (driver.company || (state.settings && state.settings.companyName) || 'HaulBoX');
 
     // Successful login: reset lockout counters
     resetFailedAttempts(driverKey, clientIp);
@@ -705,9 +724,10 @@ router.post('/api/driver/login', async (req, res) => {
       ok: true,
       role: 'DRIVER',
       token,
-      driver: { id: driver.id, name: driver.name, truck: driver.truck, phone: driver.phone, company: driver.company },
+      driver: { id: driver.id, name: driver.name, truck: driver.truck, phone: driver.phone, company: resolvedCompName, companyId: driverCompId },
       permissions: permissionsFor(driver),
-      companyName: (state.settings && state.settings.companyName) || 'HaulBoX',
+      companyId: driverCompId,
+      companyName: resolvedCompName,
       settings: {
         driver_portal_enabled: state.settings?.driver_portal_enabled !== false,
         driver_chat_enabled: state.settings?.driver_chat_enabled !== false,

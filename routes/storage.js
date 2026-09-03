@@ -33,6 +33,13 @@ router.post('/api/storage', async (req, res) => {
   if (!key) return res.status(400).json({ error: 'Missing key' });
   try {
     await kv.set(key, value);
+    if (key === 'haulline:state') {
+      try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        const dataStore = require('../lib/dataStore');
+        dataStore.saveFullState(parsed).catch(err => console.warn('[Storage] dataStore sync warn:', err.message));
+      } catch (e) {}
+    }
     res.json({ key, value, shared: false });
   } catch (e) {
     console.error('storage set failed:', e);

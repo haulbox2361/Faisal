@@ -154,11 +154,15 @@ router.get('/report', async (req, res) => {
     const today = getTodayIsoString();
     const date = req.query.date ? String(req.query.date).slice(0, 10) : today;
     const filterDispId = req.query.dispatcherId ? String(req.query.dispatcherId) : null;
+    const filterCompanyId = req.query.companyId ? String(req.query.companyId) : null;
 
     const rawState = await dataStore.loadFullState().catch(() => null);
     const state = rawState || { drivers: [], dispatchers: [] };
     const dispatchersList = (state && state.dispatchers) || [];
-    const driversList = (state && state.drivers) || [];
+    let driversList = (state && state.drivers) || [];
+    if (filterCompanyId) {
+      driversList = driversList.filter(d => (d.companyId || d.company_id || 'COMP-LEGACY') === filterCompanyId);
+    }
 
     // Fetch all notes submitted for this date
     const notes = await db.getDailyDriverNotes({ date });

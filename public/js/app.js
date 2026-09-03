@@ -159,9 +159,14 @@
     /* Loads visible to the current logged-in user: admins (and view-only links) see everything,
        a dispatcher only ever sees loads assigned to them. */
     function visibleLoads() {
-      if (STATE.role === 'dispatcher') return STATE.loads.filter(l => l.dispatcherId === STATE.currentDispatcherId);
-      if (STATE.viewAs) return STATE.loads.filter(l => l.dispatcherId === STATE.viewAs);
-      return STATE.loads;
+      let list = STATE.loads;
+      if (STATE.role === 'dispatcher') list = list.filter(l => l.dispatcherId === STATE.currentDispatcherId);
+      else if (STATE.viewAs) list = list.filter(l => l.dispatcherId === STATE.viewAs);
+      const cf = document.getElementById('loadboard-company-filter');
+      if (cf && cf.value) {
+        list = list.filter(l => (l.companyId || l.company_id || 'COMP-LEGACY') === cf.value);
+      }
+      return list;
     }
     function canAccessLoad(l) {
       if (!l) return false;
@@ -172,9 +177,14 @@
        driver that Admin has explicitly assigned to them — unassigned drivers stay hidden from
        every dispatcher until Admin assigns them, so nobody sees drivers that aren't theirs. */
     function visibleDrivers() {
-      if (STATE.role === 'dispatcher') return STATE.drivers.filter(d => d.dispatcherId === STATE.currentDispatcherId);
-      if (STATE.viewAs) return STATE.drivers.filter(d => d.dispatcherId === STATE.viewAs);
-      return STATE.drivers;
+      let list = STATE.drivers;
+      if (STATE.role === 'dispatcher') list = list.filter(d => d.dispatcherId === STATE.currentDispatcherId);
+      else if (STATE.viewAs) list = list.filter(d => d.dispatcherId === STATE.viewAs);
+      const cf = document.getElementById('drivers-company-filter');
+      if (cf && cf.value) {
+        list = list.filter(d => (d.companyId || d.company_id || 'COMP-LEGACY') === cf.value);
+      }
+      return list;
     }
 
     /* ---------------- Bootstrap / seed data ---------------- */
@@ -715,7 +725,7 @@
     }
 
     /* ---------------- Navigation ---------------- */
-    const VIEW_TITLES = { dashboard: 'Dashboard', addload: 'Add Load', loadboard: 'Load Board', drivers: 'Drivers', dailyreports: 'Daily Driver Reports', driverpay: 'Driver Pay', brokers: 'Brokers', dispatchers: 'Dispatchers', statistics: 'Statistics', documents: 'Documents', emaillogs: 'Email Logs', myaccount: 'My Account', settings: 'Settings', chat: '💬 Chat' };
+    const VIEW_TITLES = { dashboard: 'Dashboard', addload: 'Add Load', loadboard: 'Load Board', drivers: 'Drivers', companies: 'Companies', dailyreports: 'Daily Driver Reports', driverpay: 'Driver Pay', brokers: 'Brokers', dispatchers: 'Dispatchers', statistics: 'Statistics', documents: 'Documents', emaillogs: 'Email Logs', myaccount: 'My Account', settings: 'Settings', chat: '💬 Chat' };
     
     // Security PIN session flag for Admin Settings
     let IS_SETTINGS_PIN_UNLOCKED = false;
@@ -802,6 +812,7 @@
 
       if (view === 'documents') { view = 'docreview'; }
       if (view === 'dispatchers' && STATE.role !== 'admin') { view = 'dashboard'; }
+      if (view === 'companies' && STATE.role !== 'admin') { view = 'dashboard'; }
       if (view === 'driverpay' && STATE.role !== 'admin') { view = 'dashboard'; }
       if (view === 'myaccount' && STATE.role === 'viewonly') { view = 'dashboard'; }
       if (view === 'chat' && STATE.role === 'viewonly') { view = 'dashboard'; }
@@ -826,6 +837,7 @@
       if (view === 'dashboard') renderDashboard();
       if (view === 'loadboard') { renderLoadBoardTabs(); renderLoadBoard(); }
       if (view === 'drivers') renderDrivers();
+      if (view === 'companies') renderCompanies();
       if (view === 'dailyreports') loadDailyReportsView();
       if (view === 'driverpay') renderDriverPay();
       if (view === 'brokers') renderBrokers();
@@ -2134,7 +2146,11 @@
       if (!dashboardMap) return;
       clearDashboardMapElements();
 
-      const drivers = visibleDrivers();
+      let drivers = visibleDrivers();
+      const compSelect = document.getElementById('tracking-company-select');
+      if (compSelect && compSelect.value) {
+        drivers = drivers.filter(d => (d.companyId || d.company_id || 'COMP-LEGACY') === compSelect.value);
+      }
       let bounds = [];
 
       drivers.forEach(d => {
@@ -2168,11 +2184,37 @@
       }
     }
 
+    window.onTrackingCompanyFilterChanged = function(companyId) {
+      let drivers = visibleDrivers();
+      if (companyId) {
+        drivers = drivers.filter(d => (d.companyId || d.company_id || 'COMP-LEGACY') === companyId);
+      }
+
+      const select = document.getElementById('tracking-driver-select');
+      if (select) {
+        const optionsHtml = '<option value="">-- Choose Driver to Track --</option>' +
+          drivers.map(d => `<option value="${escapeAttr(d.id)}">${escapeHtml(d.name)} (${escapeHtml(d.truck || 'Truck #' + (d.code || '101'))})</option>`).join('');
+        select.innerHTML = optionsHtml;
+        select.value = '';
+      }
+
+      const panel = document.getElementById('driver-tracking-panel');
+      if (panel) {
+        panel.innerHTML = '<div style="text-align:center;color:#64748b;font-size:13px;padding-top:100px;">Select a driver from the dropdown above or click a truck on the map.</div>';
+      }
+
+      renderAllDriversFleetRadar();
+    };
+
     async function renderLiveDashboardMap() {
       initDashboardMap();
       if (!dashboardMap) return;
 
-      const drivers = visibleDrivers();
+      let drivers = visibleDrivers();
+      const compSelect = document.getElementById('tracking-company-select');
+      if (compSelect && compSelect.value) {
+        drivers = drivers.filter(d => (d.companyId || d.company_id || 'COMP-LEGACY') === compSelect.value);
+      }
       await fetchTrackingCache();
 
       // Populate Driver Choice dropdown in tracking header
@@ -2736,8 +2778,36 @@
         if (STATE.dispatchers.some(d => d.id === cur)) sel.value = cur;
       }
     }
+    function populateCompanyDropdowns() {
+      const companies = (STATE.companies && STATE.companies.length) ? STATE.companies : [
+        { id: 'COMP-LEGACY', name: 'HaulBoX Fleet (Default)', status: 'active' }
+      ];
+
+      const populateSelect = (elId, defaultLabel) => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        const cur = el.value;
+        el.innerHTML = `<option value="">${defaultLabel}</option>` +
+          companies.map(c => `<option value="${c.id}">${escapeAttr(c.name)}${c.status === 'disabled' ? ' (Deactivated)' : ''}</option>`).join('');
+        if (cur && companies.some(c => c.id === cur)) el.value = cur;
+      };
+
+      populateSelect('loadboard-company-filter', 'All Fleets');
+      populateSelect('drivers-company-filter', 'All Fleets');
+      populateSelect('dailyreports-company-filter', 'All Fleets');
+      populateSelect('tracking-company-select', 'All Fleets');
+
+      const dComp = document.getElementById('d-company');
+      if (dComp) {
+        const cur = dComp.value;
+        dComp.innerHTML = companies.filter(c => c.status !== 'disabled').map(c => `<option value="${c.id}">${escapeAttr(c.name)}</option>`).join('');
+        if (cur && companies.some(c => c.id === cur)) dComp.value = cur;
+      }
+    }
+
     function populateDropdowns() {
       populateDispatcherField();
+      populateCompanyDropdowns();
       const brokerNameEl = document.getElementById('f-broker');
       document.getElementById('broker-namelist').innerHTML =
         STATE.brokers.map(b => '<option value="' + escapeAttr(b.name) + '">').join('');
@@ -3625,6 +3695,7 @@
         brokerId: broker ? broker.id : null, brokerName: broker ? broker.name : '', brokerMC: broker ? broker.mc : '',
         brokerEmail: broker ? broker.email : '',
         driverId: driver ? driver.id : null, driverName: driver ? driver.name : '', truck: driver ? driver.truck : '',
+        companyId: (driver && (driver.companyId || driver.company_id)) || 'COMP-LEGACY',
         pickup: document.getElementById('f-pickup').value.trim(),
         dropoff: document.getElementById('f-dropoff').value.trim(),
         pickupDate: document.getElementById('f-pickupdate').value,
@@ -5391,6 +5462,12 @@
         dispSel.innerHTML = '<option value="">Unassigned — hidden from every dispatcher</option>' + STATE.dispatchers.map(x => '<option value="' + x.id + '">' + x.name + '</option>').join('');
         dispSel.value = d.dispatcherId || '';
       }
+      const compSel = document.getElementById('d-company');
+      if (compSel) {
+        const companies = (STATE.companies && STATE.companies.length) ? STATE.companies : [{ id: 'COMP-LEGACY', name: 'HaulBoX Fleet (Default)' }];
+        compSel.innerHTML = companies.filter(c => c.status !== 'disabled').map(c => '<option value="' + c.id + '">' + escapeAttr(c.name) + '</option>').join('');
+        compSel.value = d.companyId || 'COMP-LEGACY';
+      }
       driverDocsDraft = (isEdit && d.docs && d.docs.length) ? JSON.parse(JSON.stringify(d.docs)) : blankDriverDocSlots(6);
       applyDriverFormMode(isAdmin);
       renderDriverDocSlots();
@@ -5401,13 +5478,17 @@
       if (STATE.role !== 'admin') { closeModal('modal-driver'); return toast('Admin only', 'Only Admin can add or edit drivers.'); }
       const id = document.getElementById('d-id').value;
       const dispSel = document.getElementById('d-dispatcher');
+      const compSel = document.getElementById('d-company');
+      const selectedCompanyId = compSel ? (compSel.value || 'COMP-LEGACY') : 'COMP-LEGACY';
+      const selectedCompObj = (STATE.companies || []).find(c => c.id === selectedCompanyId);
       const rec = {
         id: id || uid('drv'),
         name: document.getElementById('d-name').value.trim(),
         truck: document.getElementById('d-truck').value.trim(),
         phone: document.getElementById('d-phone').value.trim(),
         email: document.getElementById('d-email').value.trim(),
-        company: document.getElementById('d-company').value.trim(),
+        company: selectedCompObj ? selectedCompObj.name : (document.getElementById('d-company').value.trim() || 'HaulBoX Fleet'),
+        companyId: selectedCompanyId,
         hometown: document.getElementById('d-hometown').value.trim(),
         otrLocal: document.getElementById('d-otr-local').value,
         team: document.getElementById('d-team').value,
@@ -5966,6 +6047,369 @@
       persist(); renderDispatchersPage(); populateDropdowns(); populateStatFilters(); populateViewAsField(); renderChat();
       toast('Dispatcher removed', '', true);
     }
+
+    /* =========================================================================
+       COMPANIES MODULE (Multi-Tenant Fleets & Scoped Owners - Admin Only)
+       ========================================================================= */
+    let cachedCompaniesList = [];
+
+    async function renderCompanies() {
+      if (STATE.role !== 'admin') return;
+      const tbody = document.getElementById('companies-table-body');
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Loading companies...</td></tr>';
+      }
+
+      try {
+        const res = await fetch('/api/companies', {
+          headers: {
+            'x-admin-pin': '8483',
+            'Authorization': STATE.sessionToken ? `Bearer ${STATE.sessionToken}` : ''
+          }
+        });
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.companies)) {
+          cachedCompaniesList = data.companies;
+          STATE.companies = data.companies;
+          populateCompanyDropdowns();
+          updateCompaniesOverviewMetrics(data.companies);
+          filterCompaniesTable();
+        } else {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:#ef4444;">${escapeHtml(data.error || 'Failed to load companies')}</td></tr>`;
+        }
+      } catch (err) {
+        console.error('renderCompanies error:', err);
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#ef4444;">Connection error while loading companies.</td></tr>';
+      }
+    }
+
+    function updateCompaniesOverviewMetrics(list) {
+      const total = list.length;
+      const active = list.filter(c => c.status !== 'disabled').length;
+      const drivers = list.reduce((s, c) => s + (Number(c.driverCount) || 0), 0);
+      const revenue = list.reduce((s, c) => s + (Number(c.totalRevenue) || 0), 0);
+
+      const elTotal = document.getElementById('metric-total-companies');
+      const elActive = document.getElementById('metric-active-companies');
+      const elDrivers = document.getElementById('metric-total-company-drivers');
+      const elRevenue = document.getElementById('metric-total-company-revenue');
+
+      if (elTotal) elTotal.textContent = total;
+      if (elActive) elActive.textContent = active;
+      if (elDrivers) elDrivers.textContent = drivers;
+      if (elRevenue) elRevenue.textContent = money(revenue);
+    }
+
+    function filterCompaniesTable() {
+      const tbody = document.getElementById('companies-table-body');
+      if (!tbody) return;
+
+      const q = (document.getElementById('companies-search') ? document.getElementById('companies-search').value : '').trim().toLowerCase();
+      const statusFilter = (document.getElementById('companies-status-filter') ? document.getElementById('companies-status-filter').value : 'all').toLowerCase();
+
+      let filtered = cachedCompaniesList || [];
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(c => (c.status || 'active').toLowerCase() === statusFilter);
+      }
+      if (q) {
+        filtered = filtered.filter(c =>
+          (c.name || '').toLowerCase().includes(q) ||
+          (c.contactName || '').toLowerCase().includes(q) ||
+          (c.phone || '').toLowerCase().includes(q) ||
+          (c.email || '').toLowerCase().includes(q) ||
+          (c.owner && ((c.owner.name || '').toLowerCase().includes(q) || (c.owner.ownerCode || '').toLowerCase().includes(q)))
+        );
+      }
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:35px;color:#94a3b8;font-size:13px;">No company fleets found matching your criteria.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(c => {
+        const isActive = c.status !== 'disabled';
+        const ownerHtml = c.owner 
+          ? `<div style="font-weight:700;color:#0f172a;">${escapeHtml(c.owner.name)}</div><div style="font-size:11px;font-family:monospace;color:#0284c7;">${escapeHtml(c.owner.ownerCode)}</div>`
+          : `<span style="color:#94a3b8;font-size:12px;font-style:italic;">No Owner Account</span>`;
+
+        return `
+          <tr>
+            <td class="cell-strong" style="padding:14px 16px;">
+              <div style="font-weight:800;color:#0f172a;font-size:14px;">${escapeHtml(c.name)}</div>
+              <div style="font-size:11px;color:#94a3b8;font-family:monospace;">ID: ${escapeHtml(c.id)}</div>
+            </td>
+            <td style="padding:14px 16px;">
+              ${isActive 
+                ? '<span class="placard pl-green"><span class="dot"></span>Active</span>' 
+                : '<span class="placard pl-gray"><span class="dot"></span>Deactivated</span>'}
+            </td>
+            <td style="padding:14px 16px;">${ownerHtml}</td>
+            <td style="padding:14px 16px;color:#475569;font-size:12.5px;">
+              ${c.phone ? `<div>📞 ${escapeHtml(c.phone)}</div>` : ''}
+              ${c.email ? `<div>✉️ ${escapeHtml(c.email)}</div>` : ''}
+              ${!c.phone && !c.email ? '<span style="color:#94a3b8;">—</span>' : ''}
+            </td>
+            <td style="padding:14px 16px;text-align:center;font-weight:700;color:#0284c7;">
+              <span style="background:#e0f2fe;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;" title="View drivers" onclick="filterDriversByCompany('${escapeAttr(c.id)}')">
+                ${c.driverCount || 0}
+              </span>
+            </td>
+            <td style="padding:14px 16px;text-align:center;font-weight:700;color:#16a34a;">
+              <span style="background:#dcfce7;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;" title="View loads" onclick="filterLoadsByCompany('${escapeAttr(c.id)}')">
+                ${c.activeLoadsCount || 0}
+              </span>
+            </td>
+            <td style="padding:14px 16px;text-align:right;font-family:monospace;font-weight:700;color:#0f172a;font-size:13.5px;">
+              ${money(c.totalRevenue || 0)}
+            </td>
+            <td style="padding:14px 16px;text-align:right;">
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+                <button class="btn btn-sm btn-ghost" onclick="openCompanyDetailsModal('${escapeAttr(c.id)}')" style="font-size:12px;font-weight:700;color:#0284c7;background:#f0f9ff;border:1px solid #bae6fd;padding:4px 10px;border-radius:8px;">
+                  Overview
+                </button>
+                <button class="btn btn-sm btn-ghost" onclick="toggleCompanyStatusAction('${escapeAttr(c.id)}', '${c.status || 'active'}')" style="font-size:12px;font-weight:700;color:${isActive ? '#e11d48' : '#16a34a'};background:${isActive ? '#fff1f2' : '#f0fdf4'};border:1px solid ${isActive ? '#fecdd3' : '#bbf7d0'};padding:4px 10px;border-radius:8px;">
+                  ${isActive ? 'Deactivate' : 'Activate'}
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openAddCompanyModal() {
+      document.getElementById('fc-name').value = '';
+      document.getElementById('fc-phone').value = '';
+      document.getElementById('fc-email').value = '';
+      document.getElementById('fc-owner-name').value = '';
+      document.getElementById('fc-owner-code').value = '';
+      document.getElementById('fc-owner-pin').value = '';
+      openModal('modal-company');
+    }
+
+    async function submitCompanyForm(e) {
+      e.preventDefault();
+      const name = document.getElementById('fc-name').value.trim();
+      const phone = document.getElementById('fc-phone').value.trim();
+      const email = document.getElementById('fc-email').value.trim();
+      const ownerName = document.getElementById('fc-owner-name').value.trim();
+      const ownerCode = document.getElementById('fc-owner-code').value.trim().toUpperCase();
+      const pin = document.getElementById('fc-owner-pin').value.trim();
+
+      if (!name || !ownerName || !ownerCode || !pin) {
+        return toast('Missing fields', 'Company name, owner name, owner code, and PIN are required.');
+      }
+      if (pin.length < 4 || pin.length > 6) {
+        return toast('Invalid PIN', 'Security PIN must be 4 to 6 digits.');
+      }
+
+      const btn = document.getElementById('fc-save-btn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Creating Fleet...'; }
+
+      try {
+        const res = await fetch('/api/companies', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-pin': '8483',
+            'Authorization': STATE.sessionToken ? `Bearer ${STATE.sessionToken}` : ''
+          },
+          body: JSON.stringify({ name, phone, email, ownerName, ownerCode, pin, contactName: ownerName })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          closeModal('modal-company');
+          toast('Company Created', `Fleet "${name}" and Owner ${ownerCode} successfully provisioned.`, true);
+          await renderCompanies();
+          populateCompanyDropdowns();
+          refreshStateFromServer();
+        } else {
+          toast('Failed to create company', data.error || 'Server rejected creation.');
+        }
+      } catch (err) {
+        toast('Error', 'Network or server error while creating company.');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Create Company & Owner'; }
+      }
+      return false;
+    }
+
+    async function openCompanyDetailsModal(companyId) {
+      const modalBody = document.getElementById('cd-body');
+      if (modalBody) {
+        modalBody.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">Loading fleet overview and performance...</div>';
+      }
+      openModal('modal-company-details');
+
+      try {
+        const res = await fetch(`/api/companies/${encodeURIComponent(companyId)}`, {
+          headers: {
+            'x-admin-pin': '8483',
+            'Authorization': STATE.sessionToken ? `Bearer ${STATE.sessionToken}` : ''
+          }
+        });
+        const data = await res.json();
+        if (!data.ok || !data.company) {
+          if (modalBody) modalBody.innerHTML = `<div style="color:#ef4444;text-align:center;padding:30px;">${escapeHtml(data.error || 'Failed to load details')}</div>`;
+          return;
+        }
+
+        const c = data.company;
+        const stats = data.stats || {};
+        const owner = data.owner;
+        const drivers = data.drivers || [];
+        const loads = data.loads || [];
+
+        document.getElementById('cd-title').textContent = c.name;
+        document.getElementById('cd-subtitle').textContent = `Fleet ID: ${c.id} · Status: ${c.status || 'active'}`;
+
+        modalBody.innerHTML = `
+          <!-- KPI Cards -->
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:20px;">
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Gross Revenue</div>
+              <div style="font-size:20px;font-weight:800;color:#0f172a;margin-top:2px;">${money(stats.grossRevenue || 0)}</div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Driver Pay</div>
+              <div style="font-size:20px;font-weight:800;color:#d97706;margin-top:2px;">${money(stats.totalDriverPay || 0)}</div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Estimated Profit</div>
+              <div style="font-size:20px;font-weight:800;color:#16a34a;margin-top:2px;">${money(stats.estimatedProfit || 0)}</div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Operating Margin</div>
+              <div style="font-size:20px;font-weight:800;color:#0284c7;margin-top:2px;">${stats.marginPct || 0}%</div>
+            </div>
+          </div>
+
+          <!-- Owner Card -->
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:0.04em;">Linked Executive Owner Account</div>
+              <div style="font-size:16px;font-weight:800;color:#0c4a6e;margin-top:2px;">${owner ? escapeHtml(owner.name) : 'No Owner Account Linked'}</div>
+              <div style="font-size:12px;color:#0284c7;margin-top:2px;">${owner ? `Mobile App Login Code: <b>${escapeHtml(owner.ownerCode)}</b> · Phone: ${escapeHtml(owner.phone || '—')}` : 'Admin can provision an owner account'}</div>
+            </div>
+            <button class="btn btn-sm btn-ghost" onclick="closeModal('modal-company-details'); switchView('settings');" style="background:#fff;border:1px solid #0284c7;color:#0284c7;font-weight:700;border-radius:8px;">
+              Admin Settings
+            </button>
+          </div>
+
+          <!-- Assigned Drivers -->
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
+              <span>Assigned Fleet Drivers (${drivers.length})</span>
+              <button class="btn btn-sm btn-ghost" onclick="closeModal('modal-company-details'); filterDriversByCompany('${escapeAttr(c.id)}');" style="color:#0284c7;font-size:12px;font-weight:700;">View in Drivers Tab →</button>
+            </div>
+            ${drivers.length ? `
+              <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:10px;">
+                ${drivers.map(d => `
+                  <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">
+                      ${(d.name || 'D').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style="font-weight:700;font-size:13px;color:#0f172a;">${escapeHtml(d.name)}</div>
+                      <div style="font-size:11px;color:#64748b;">${escapeHtml(d.truck || 'Truck —')} · ${escapeHtml(d.phone || '—')}</div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : '<div style="color:#94a3b8;font-size:13px;padding:12px;background:#f8fafc;border-radius:8px;">No drivers assigned to this company yet.</div>'}
+          </div>
+
+          <!-- Recent Loads -->
+          <div>
+            <div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
+              <span>Company Loads (${loads.length})</span>
+              <button class="btn btn-sm btn-ghost" onclick="closeModal('modal-company-details'); filterLoadsByCompany('${escapeAttr(c.id)}');" style="color:#0284c7;font-size:12px;font-weight:700;">View in Load Board →</button>
+            </div>
+            ${loads.length ? `
+              <div class="table-wrap" style="max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;">
+                <table class="data" style="margin:0;">
+                  <thead>
+                    <tr>
+                      <th style="padding:8px 12px;">Load #</th>
+                      <th style="padding:8px 12px;">Broker</th>
+                      <th style="padding:8px 12px;">Route</th>
+                      <th style="padding:8px 12px;text-align:right;">Rate</th>
+                      <th style="padding:8px 12px;text-align:center;">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${loads.slice(0, 10).map(l => `
+                      <tr>
+                        <td class="cell-strong" style="padding:8px 12px;">${escapeHtml(l.loadNumber)}</td>
+                        <td style="padding:8px 12px;color:#64748b;">${escapeHtml(l.brokerName || '—')}</td>
+                        <td style="padding:8px 12px;color:#475569;font-size:12px;">${escapeHtml(l.pickup || '—')} → ${escapeHtml(l.dropoff || '—')}</td>
+                        <td style="padding:8px 12px;text-align:right;font-family:monospace;font-weight:700;">${money(l.rate || 0)}</td>
+                        <td style="padding:8px 12px;text-align:center;">
+                          <span class="status-pill">${escapeHtml(l.status || 'In Transit')}</span>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : '<div style="color:#94a3b8;font-size:13px;padding:12px;background:#f8fafc;border-radius:8px;">No loads recorded for this company fleet yet.</div>'}
+          </div>
+        `;
+      } catch (err) {
+        if (modalBody) modalBody.innerHTML = '<div style="color:#ef4444;text-align:center;padding:30px;">Error loading company details.</div>';
+      }
+    }
+
+    async function toggleCompanyStatusAction(companyId, currentStatus) {
+      const targetStatus = (currentStatus === 'disabled') ? 'active' : 'disabled';
+      const actionText = (targetStatus === 'disabled') 
+        ? 'Deactivate this company fleet? Linked drivers and owners will be blocked from logging into the mobile app.'
+        : 'Reactivate this company fleet and re-enable login access for linked accounts?';
+
+      if (!confirm(actionText)) return;
+
+      try {
+        const res = await fetch(`/api/companies/${encodeURIComponent(companyId)}/toggle-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-pin': '8483',
+            'Authorization': STATE.sessionToken ? `Bearer ${STATE.sessionToken}` : ''
+          },
+          body: JSON.stringify({ status: targetStatus })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast('Status Updated', `Company status changed to ${targetStatus}.`, true);
+          await renderCompanies();
+          populateCompanyDropdowns();
+          refreshStateFromServer();
+        } else {
+          toast('Update Failed', data.error || 'Could not toggle status.');
+        }
+      } catch (err) {
+        toast('Error', 'Connection error while updating status.');
+      }
+    }
+
+    function filterDriversByCompany(companyId) {
+      switchView('drivers');
+      const sel = document.getElementById('drivers-company-filter');
+      if (sel) {
+        sel.value = companyId;
+        renderDrivers();
+      }
+    }
+
+    function filterLoadsByCompany(companyId) {
+      switchView('loadboard');
+      const sel = document.getElementById('loadboard-company-filter');
+      if (sel) {
+        sel.value = companyId;
+        renderLoadBoard();
+      }
+    }
+
     function saveSettingsField(key, val) { 
       STATE.settings[key] = val; 
       persist(); 
@@ -7413,6 +7857,16 @@
               (STATE.dispatchers || []).map(d => `<option value="${escapeAttr(d.id)}">${escapeHtml(d.name)}</option>`).join('');
           }
         }
+        const compWrap = document.getElementById('dailyreports-company-filter-wrap');
+        if (compWrap) {
+          compWrap.style.display = 'block';
+          const compSel = document.getElementById('dailyreports-company-filter');
+          if (compSel && compSel.options.length <= 1) {
+            const comps = (STATE.companies && STATE.companies.length) ? STATE.companies : [{ id: 'COMP-LEGACY', name: 'HaulBoX Fleet (Default)' }];
+            compSel.innerHTML = '<option value="">All Fleets</option>' +
+              comps.map(c => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+          }
+        }
         await renderAdminDailyReportView(selectedDailyReportDate);
       } else {
         if (kpiRow) kpiRow.style.display = 'none';
@@ -7535,10 +7989,11 @@
       if (subheading) subheading.textContent = `End-of-day driver status reports across all dispatchers (${dateStr === getTodayIsoString() ? 'Today' : dateStr}).`;
 
       const filterDisp = document.getElementById('dailyreports-disp-filter') ? document.getElementById('dailyreports-disp-filter').value : '';
+      const filterComp = document.getElementById('dailyreports-company-filter') ? document.getElementById('dailyreports-company-filter').value : '';
 
       let reportData = null;
       try {
-        const url = `/api/daily-notes/report?date=${encodeURIComponent(dateStr)}${filterDisp ? `&dispatcherId=${encodeURIComponent(filterDisp)}` : ''}`;
+        const url = `/api/daily-notes/report?date=${encodeURIComponent(dateStr)}${filterDisp ? `&dispatcherId=${encodeURIComponent(filterDisp)}` : ''}${filterComp ? `&companyId=${encodeURIComponent(filterComp)}` : ''}`;
         const res = await fetch(url);
         if (res.ok) reportData = await res.json();
       } catch (err) {

@@ -382,6 +382,13 @@
           </svg>
           Dispatchers
         </div>
+        <div class="nav-item" data-view="companies" data-role-view="admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+          </svg>
+          Companies
+        </div>
         <div class="nav-item" data-view="docreview">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -630,8 +637,18 @@
                 </div>
               </div>
 
-              <!-- DRIVER CHOICE / SELECTION DROPDOWN -->
+              <!-- DRIVER CHOICE / SELECTION DROPDOWN & FLEET FILTER -->
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <!-- Optional Fleet Filter for Admin -->
+                <div data-role-view="admin" style="display:flex;align-items:center;gap:6px;">
+                  <label for="tracking-company-select" style="font-size:13px;font-weight:700;color:#334155;white-space:nowrap;">Fleet:</label>
+                  <select id="tracking-company-select" onchange="onTrackingCompanyFilterChanged(this.value)"
+                    style="min-width:140px;background:#f8fafc;border:1.5px solid #cbd5e1;padding:8px 12px;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a;cursor:pointer;outline:none;transition:border-color 0.15s;"
+                    onfocus="this.style.borderColor='#0284c7'" onblur="this.style.borderColor='#cbd5e1'">
+                    <option value="">All Fleets</option>
+                  </select>
+                </div>
+
                 <label for="tracking-driver-select" style="font-size:13px;font-weight:700;color:#334155;white-space:nowrap;">Choose Driver to Track:</label>
                 <select id="tracking-driver-select" onchange="onTrackingDriverChanged(this.value)"
                   style="min-width:220px;background:#f8fafc;border:1.5px solid #cbd5e1;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700;color:#0f172a;cursor:pointer;outline:none;transition:border-color 0.15s;"
@@ -889,6 +906,15 @@
                 </select>
               </div>
 
+              <!-- Filter by Company (Admin only) -->
+              <div data-role-view="admin" style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:12px;font-weight:600;color:#64748b;">Fleet:</label>
+                <select id="loadboard-company-filter" onchange="renderLoadBoard()"
+                  style="padding:6px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;font-size:12.5px;font-weight:600;color:#0f172a;cursor:pointer;">
+                  <option value="">All Fleets</option>
+                </select>
+              </div>
+
               <!-- Filter by Driver -->
               <div style="display:flex;align-items:center;gap:6px;">
                 <label style="font-size:12px;font-weight:600;color:#64748b;">Driver:</label>
@@ -980,8 +1006,17 @@
         <!-- ============ DRIVERS ============ -->
         <section class="view" id="view-drivers">
           <div class="toolbar"
-            style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
-            <div style="font-size:18px;font-weight:700;color:#0f172a;">Fleet Drivers</div>
+            style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <div style="font-size:18px;font-weight:700;color:#0f172a;">Fleet Drivers</div>
+              <div data-role-view="admin" style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:12px;font-weight:600;color:#64748b;">Fleet:</label>
+                <select id="drivers-company-filter" onchange="renderDrivers()"
+                  style="padding:6px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;font-size:12.5px;font-weight:600;color:#0f172a;cursor:pointer;">
+                  <option value="">All Fleets</option>
+                </select>
+              </div>
+            </div>
             <div class="toolbar-right">
               <button class="btn btn-accent" onclick="openDriverModal()" data-role-view="admin"
                 style="background:#2563eb;color:#fff;font-weight:700;">
@@ -1197,6 +1232,71 @@
           </div>
         </section>
 
+        <!-- ============ COMPANIES (Multi-Tenant Fleets & Owners - Admin Only) ============ -->
+        <section class="view" id="view-companies">
+          <div class="toolbar" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div class="search-box" style="width:300px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input id="companies-search" placeholder="Search company name, owner, contact..." oninput="filterCompaniesTable()">
+              </div>
+              <select id="companies-status-filter" onchange="filterCompaniesTable()" style="padding:8px 14px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;background:#fff;font-weight:600;">
+                <option value="all">All Fleets</option>
+                <option value="active">Active Only</option>
+                <option value="disabled">Deactivated Only</option>
+              </select>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn btn-accent" onclick="openAddCompanyModal()" style="display:flex;align-items:center;gap:8px;font-weight:700;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><path d="M12 5v14M5 12h14"/></svg>
+                Add Company Fleet
+              </button>
+            </div>
+          </div>
+
+          <!-- Company Fleet Metrics Overview -->
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:16px;margin-bottom:20px;">
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+              <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Total Fleets</div>
+              <div id="metric-total-companies" style="font-size:26px;font-weight:800;color:#0f172a;margin-top:4px;">0</div>
+            </div>
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+              <div style="font-size:12px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.04em;">Active Fleets</div>
+              <div id="metric-active-companies" style="font-size:26px;font-weight:800;color:#16a34a;margin-top:4px;">0</div>
+            </div>
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+              <div style="font-size:12px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.04em;">Total Fleet Drivers</div>
+              <div id="metric-total-company-drivers" style="font-size:26px;font-weight:800;color:#0284c7;margin-top:4px;">0</div>
+            </div>
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+              <div style="font-size:12px;font-weight:700;color:#8b5cf6;text-transform:uppercase;letter-spacing:0.04em;">Fleet Gross Revenue</div>
+              <div id="metric-total-company-revenue" style="font-size:26px;font-weight:800;color:#8b5cf6;margin-top:4px;">$0.00</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="table-wrap">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th>Company Name</th>
+                    <th>Status</th>
+                    <th>Linked Owner</th>
+                    <th>Contact Info</th>
+                    <th style="text-align:center;">Drivers</th>
+                    <th style="text-align:center;">Active Loads</th>
+                    <th style="text-align:right;">Gross Revenue</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="companies-table-body">
+                  <tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">Loading companies...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <!-- ============ DAILY REPORTS ============ -->
         <section class="view" id="view-dailyreports">
           <div class="panel panel-pad" style="margin-bottom:16px;">
@@ -1214,6 +1314,12 @@
                 <div id="dailyreports-disp-filter-wrap" style="display:none;">
                   <select id="dailyreports-disp-filter" onchange="onDailyReportFilterChange()" style="padding:6px 12px;font-size:12px;font-weight:600;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;">
                     <option value="">All Dispatchers</option>
+                  </select>
+                </div>
+                <!-- Company filter (Admin only) -->
+                <div id="dailyreports-company-filter-wrap" style="display:none;">
+                  <select id="dailyreports-company-filter" onchange="onDailyReportFilterChange()" style="padding:6px 12px;font-size:12px;font-weight:600;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;">
+                    <option value="">All Fleets</option>
                   </select>
                 </div>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="loadDailyReportsView()" style="display:flex;align-items:center;gap:6px;">
@@ -2176,6 +2282,13 @@
                 see this field or the Driver Pay page.</div>
             </div>
             <div class="field span-2" data-role-view="admin">
+              <label>Fleet / Company</label>
+              <select id="d-company">
+                <option value="COMP-LEGACY">HaulBoX Fleet (Default)</option>
+              </select>
+              <div class="hint">The trucking company / fleet this driver belongs to. Financials and loads are scoped to this company.</div>
+            </div>
+            <div class="field span-2" data-role-view="admin">
               <label>Assigned Dispatcher</label>
               <select id="d-dispatcher">
                 <option value="">Unassigned — hidden from every dispatcher</option>
@@ -2728,6 +2841,71 @@
           Minimize / Remind Me Later
         </button>
         <button type="button" class="btn btn-accent" id="btn-save-reminder-notes" onclick="submitAllReminderNotes()" style="background:#0284c7;color:#fff;font-weight:700;">Save All Notes</button>
+      </div>
+    </div>
+  <!-- ============ ADD COMPANY MODAL ============ -->
+  <div class="modal-overlay" id="modal-company">
+    <div class="modal" style="max-width:540px;">
+      <div class="modal-head">
+        <h3 id="company-modal-title">Add Trucking Company Fleet</h3>
+        <div class="modal-close" onclick="closeModal('modal-company')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+      </div>
+      <form onsubmit="return submitCompanyForm(event)">
+        <div class="modal-body" style="padding:22px;">
+          <div class="form-section-title" style="margin-top:0;">Fleet Company Information</div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Company / Fleet Name <span class="req">*</span></label>
+            <input type="text" id="fc-name" placeholder="e.g. Apex Freightways LLC" required style="width:100%;">
+          </div>
+          <div class="form-grid cols-2" style="margin-bottom:12px;">
+            <div class="field">
+              <label>Fleet Phone</label>
+              <input type="tel" id="fc-phone" placeholder="e.g. (312) 555-0199">
+            </div>
+            <div class="field">
+              <label>Fleet Email</label>
+              <input type="email" id="fc-email" placeholder="operations@company.com">
+            </div>
+          </div>
+
+          <div class="form-section-title" style="margin-top:16px;">Linked Owner Account (For Mobile App & Financial Dashboard)</div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Owner Full Name <span class="req">*</span></label>
+            <input type="text" id="fc-owner-name" placeholder="e.g. Marcus Vance" required style="width:100%;">
+          </div>
+          <div class="form-grid cols-2" style="margin-bottom:12px;">
+            <div class="field">
+              <label>Owner Login Code <span class="req">*</span></label>
+              <input type="text" id="fc-owner-code" placeholder="e.g. OWNERAPEX" required style="text-transform:uppercase;">
+              <div class="hint">Alphanumeric code used to log into the mobile app</div>
+            </div>
+            <div class="field">
+              <label>Initial Security PIN <span class="req">*</span></label>
+              <input type="password" id="fc-owner-pin" placeholder="4 to 6 digit PIN" required minlength="4" maxlength="6">
+              <div class="hint">PIN is securely hashed using PBKDF2</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('modal-company')">Cancel</button>
+          <button type="submit" class="btn btn-accent" id="fc-save-btn">Create Company & Owner</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ COMPANY DETAILS MODAL ============ -->
+  <div class="modal-overlay" id="modal-company-details">
+    <div class="modal" style="max-width:750px;">
+      <div class="modal-head">
+        <div>
+          <h3 id="cd-title" style="margin:0;">Company Fleet Details</h3>
+          <div id="cd-subtitle" style="font-size:12px;color:#64748b;margin-top:2px;">Overview, fleet statistics, and assigned drivers</div>
+        </div>
+        <div class="modal-close" onclick="closeModal('modal-company-details')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+      </div>
+      <div class="modal-body" id="cd-body" style="padding:22px;max-height:75vh;overflow-y:auto;">
+        <!-- Dynamically rendered -->
       </div>
     </div>
   </div>
