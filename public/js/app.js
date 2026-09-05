@@ -273,6 +273,7 @@
           STATE.notifications = STATE.notifications || [];
           migrateDrivers();
           migrateLoads();
+          loadCompaniesFromServer().catch(() => {});
           return true; // Successfully loaded
         }
       } catch (e) {
@@ -285,6 +286,32 @@
       return false; // Failed to load
     }
 
+    async function loadCompaniesFromServer() {
+      try {
+        const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
+        const res = await fetch('/api/companies', {
+          headers: {
+            'x-admin-pin': '8483',
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && Array.isArray(data.companies)) {
+            STATE.companies = data.companies;
+            if (typeof populateCompanyDropdowns === 'function') {
+              populateCompanyDropdowns();
+            }
+            return data.companies;
+          }
+        }
+      } catch (err) {
+        console.warn('[Companies] Error fetching companies:', err);
+      }
+      return STATE.companies || [];
+    }
+    window.loadCompaniesFromServer = loadCompaniesFromServer;
+
     async function refreshStateFromServer(silent = true) {
       try {
         const res = await window.storage.get('haulline:state', false);
@@ -296,8 +323,10 @@
             if (Array.isArray(fresh.brokers)) STATE.brokers = fresh.brokers;
             if (Array.isArray(fresh.dispatchers)) STATE.dispatchers = fresh.dispatchers;
             if (fresh.settings) STATE.settings = Object.assign(STATE.settings || {}, fresh.settings);
+            if (Array.isArray(fresh.companies) && fresh.companies.length) STATE.companies = fresh.companies;
             migrateDrivers();
             migrateLoads();
+            loadCompaniesFromServer().catch(() => {});
             if (typeof renderDocReview === 'function') renderDocReview();
             if (typeof renderDocsList === 'function') renderDocsList();
             if (typeof renderLoadBoard === 'function') renderLoadBoard();
@@ -5239,16 +5268,17 @@
     function renderDrivers() {
       const body = document.getElementById('drivers-body');
       if (!body) return;
-      body.innerHTML = visibleDrivers().map(d =>
-        '<tr onclick="openDriverModal(\'' + d.id + '\')" style="cursor:pointer;">' +
+      body.innerHTML = visibleDrivers().map(d => {
+        const compName = d.company || ((STATE.companies || []).find(c => c.id === (d.companyId || d.company_id)) || {}).name || 'HaulBoX Fleet';
+        return '<tr onclick="openDriverModal(\'' + d.id + '\')" style="cursor:pointer;">' +
         '<td class="cell-strong" style="padding:12px 16px;font-weight:700;color:#0f172a;">' + escapeAttr(d.name) + '</td>' +
         '<td style="padding:12px 16px;font-weight:600;color:#334155;">' + escapeAttr(d.truck || '—') + '</td>' +
         '<td style="padding:12px 16px;font-weight:600;color:#334155;">' + escapeAttr(d.phone || '—') + '</td>' +
-        '<td style="padding:12px 16px;color:#64748b;">' + escapeAttr(d.company || '—') + '</td>' +
+        '<td style="padding:12px 16px;color:#0284c7;font-weight:600;">' + escapeAttr(compName) + '</td>' +
         '<td style="padding:12px 16px;">' + (d.active ? '<span class="placard pl-green"><span class="dot"></span>Active</span>' : '<span class="placard pl-gray"><span class="dot"></span>Inactive</span>') + '</td>' +
         '<td style="padding:12px 16px;">' + availabilityBadge(d.id) + '</td>' +
-        '</tr>'
-      ).join('');
+        '</tr>';
+      }).join('');
     }
     // Small popup for a driver row's contact details (Truck #, Phone, Email) —
     // kept out of the row itself; click anywhere on the row (except the action
@@ -5418,17 +5448,17 @@
         ? 'Free-form document slots — label each one as needed (CDL, Truck VIN #, Truck Plate #, Insurance, Medical Card, MVR, etc.) and attach the file.'
         : 'You can view driver details and download documents here, but only Admin can edit driver info or upload/replace documents.';
     }
-    function openDriverModal(id) {
+    window.openDriverModal = async function(id) {
       const isAdmin = STATE.role === 'admin';
       const isEdit = !!id;
       if (!isEdit && !isAdmin) return toast('Admin only', 'Only Admin can add a new driver.');
       document.getElementById('driver-modal-title').textContent = isAdmin ? (isEdit ? 'Edit Driver' : 'Add Driver') : 'Driver Details';
-      const d = isEdit ? STATE.drivers.find(x => x.id === id) : {};
+      const d = isEdit ? (STATE.drivers.find(x => x.id === id) || {}) : {};
       document.getElementById('d-id').value = id || '';
       document.getElementById('d-name').value = d.name || '';
       document.getElementById('d-phone').value = d.phone || '';
       document.getElementById('d-email').value = d.email || '';
-      document.getElementById('d-company').value = d.company || '';
+      if (document.getElementById('d-dba')) document.getElementById('d-dba').value = d.dba || d.carrierDba || '';
       document.getElementById('d-hometown').value = d.hometown || '';
       document.getElementById('d-otr-local').value = d.otrLocal || '';
       document.getElementById('d-team').value = d.team || 'No';
@@ -5462,33 +5492,54 @@
         dispSel.innerHTML = '<option value="">Unassigned — hidden from every dispatcher</option>' + STATE.dispatchers.map(x => '<option value="' + x.id + '">' + x.name + '</option>').join('');
         dispSel.value = d.dispatcherId || '';
       }
+
+      // Ensure companies are fetched and current
+      if (!STATE.companies || !STATE.companies.length) {
+        await loadCompaniesFromServer();
+      }
+      populateCompanyDropdowns();
+
       const compSel = document.getElementById('d-company');
       if (compSel) {
-        const companies = (STATE.companies && STATE.companies.length) ? STATE.companies : [{ id: 'COMP-LEGACY', name: 'HaulBoX Fleet (Default)' }];
+        const companies = (STATE.companies && STATE.companies.length) ? STATE.companies : [{ id: 'COMP-LEGACY', name: 'HaulBoX Fleet (Default)', status: 'active' }];
         compSel.innerHTML = companies.filter(c => c.status !== 'disabled').map(c => '<option value="' + c.id + '">' + escapeAttr(c.name) + '</option>').join('');
-        compSel.value = d.companyId || 'COMP-LEGACY';
+        
+        let targetCompId = d.companyId || d.company_id;
+        if (!targetCompId && d.company) {
+          const found = companies.find(c => (c.name || '').trim().toLowerCase() === String(d.company).trim().toLowerCase());
+          if (found) targetCompId = found.id;
+        }
+        compSel.value = targetCompId || 'COMP-LEGACY';
       }
+
       driverDocsDraft = (isEdit && d.docs && d.docs.length) ? JSON.parse(JSON.stringify(d.docs)) : blankDriverDocSlots(6);
       applyDriverFormMode(isAdmin);
       renderDriverDocSlots();
       openModal('modal-driver');
-    }
-    function saveDriver(e) {
-      e.preventDefault();
+    };
+
+    window.saveDriver = function(e) {
+      if (e && e.preventDefault) e.preventDefault();
       if (STATE.role !== 'admin') { closeModal('modal-driver'); return toast('Admin only', 'Only Admin can add or edit drivers.'); }
       const id = document.getElementById('d-id').value;
       const dispSel = document.getElementById('d-dispatcher');
       const compSel = document.getElementById('d-company');
       const selectedCompanyId = compSel ? (compSel.value || 'COMP-LEGACY') : 'COMP-LEGACY';
       const selectedCompObj = (STATE.companies || []).find(c => c.id === selectedCompanyId);
+      const companyDisplayName = selectedCompObj ? selectedCompObj.name : 'HaulBoX Fleet (Default)';
+      const dbaVal = document.getElementById('d-dba') ? document.getElementById('d-dba').value.trim() : '';
+
       const rec = {
         id: id || uid('drv'),
         name: document.getElementById('d-name').value.trim(),
         truck: document.getElementById('d-truck').value.trim(),
         phone: document.getElementById('d-phone').value.trim(),
         email: document.getElementById('d-email').value.trim(),
-        company: selectedCompObj ? selectedCompObj.name : (document.getElementById('d-company').value.trim() || 'HaulBoX Fleet'),
+        dba: dbaVal,
+        carrierDba: dbaVal,
+        company: companyDisplayName,
         companyId: selectedCompanyId,
+        company_id: selectedCompanyId,
         hometown: document.getElementById('d-hometown').value.trim(),
         otrLocal: document.getElementById('d-otr-local').value,
         team: document.getElementById('d-team').value,
@@ -5521,14 +5572,14 @@
       else { STATE.drivers.push(rec); }
       persist(); closeModal('modal-driver'); renderDrivers(); populateDropdowns(); renderSettings();
       if (STATE.role === 'admin' && document.getElementById('view-driverpay').classList.contains('active')) renderDriverPay();
-      toast('Driver saved', rec.name, true);
+      toast('Driver saved', `${rec.name} allocated to ${companyDisplayName}`, true);
       if (pendingSelectTarget === 'driver') {
         document.getElementById('f-driver').value = rec.id;
         onDriverSelected();
         pendingSelectTarget = null;
       }
       return false;
-    }
+    };
     function toggleDriverActive(id) {
       if (STATE.role !== 'admin') return toast('Admin only', 'Only Admin can activate or deactivate drivers.');
       const d = STATE.drivers.find(x => x.id === id); if (!d) return;
