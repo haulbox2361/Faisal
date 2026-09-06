@@ -7369,7 +7369,8 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
-          refreshStateFromServer();
+          // No refreshStateFromServer() here — the backend emits state_update via broadcastState()
+          // immediately after saving the document change. That event updates STATE and re-renders all views.
         });
 
         appSocket.on('document:pending_review', (data) => {
@@ -7384,7 +7385,7 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
-          refreshStateFromServer();
+          // State sync via state_update socket event — no extra fetch needed.
         });
 
         appSocket.on('document:approved', (data) => {
@@ -7397,7 +7398,7 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
-          refreshStateFromServer();
+          // State sync via state_update socket event — no extra fetch needed.
         });
 
         appSocket.on('document:rejected', (data) => {
@@ -7411,7 +7412,7 @@
             { type: 'doc', targetId: data.loadId }
           );
           renderDashboardNotifications();
-          refreshStateFromServer();
+          // State sync via state_update socket event — no extra fetch needed.
         });
 
         // ── GPS / Live Tracking Map ───────────────────────────────────────────
@@ -7974,17 +7975,10 @@
       if (bar) bar.style.display = 'none';
     }
 
-    // Polling removed: Real-time chat updates are delivered via Socket.IO events ('new_message', 'conversation_updated')
-    let chatPollTimer = null;
-    function startChatPolling() {
-      // No-op: Real-time Socket.IO handles incoming messages instantly
-    }
-    function stopChatPolling() {
-      // No-op
-    }
-    async function pollChatUpdates() {
-      // No-op
-    }
+    // Polling removed: Real-time chat updates are delivered via Socket.IO events
+    // ('new_message', 'conversation_updated'). The setInterval-based polling that
+    // previously hammered Supabase every 5s was eliminated in commit e41893f.
+    // Do NOT re-introduce polling here — it will exhaust the Supabase free-tier egress quota.
 
     /* ================= INIT ================= */
     async function init() {
@@ -9195,7 +9189,7 @@
     let waEmojiOpen = false;
     let waAttachMenuOpen = false;
     let waMsgSearchOpen = false;
-    let waChatPollTimer = null;
+
 
     // Initialise WhatsApp chat pane when chat view is opened
     async function initWaChat() {
