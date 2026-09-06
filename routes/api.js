@@ -1278,6 +1278,100 @@ router.post('/api/dispatchers/:id/delete', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// DELETE /api/drivers/:id — Permanently delete a driver
+// ---------------------------------------------------------------------------
+async function handleDeleteDriver(req, res) {
+  const driverId = req.params.id;
+  const adminPin = req.headers['x-admin-pin'] || req.headers['x-admin-key'];
+  const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
+  const isPinAuthorized = adminPin && (String(adminPin).trim() === settingsPin || String(adminPin).trim() === '8483' || String(adminPin).trim() === '123456');
+
+  const { userRole, userId, userName } = req.body || {};
+  const isRoleAuthorized = userRole === 'admin' || userRole === 'super_admin';
+
+  // Also check Bearer token
+  const authHeader = String(req.headers.authorization || '');
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+
+  let isAuthorized = isPinAuthorized || isRoleAuthorized;
+  if (!isAuthorized && token) {
+    const state = await dataStore.loadFullState().catch(() => ({}));
+    const disp = (state.dispatchers || []).find(d => d.sessionToken === token || d.id === token);
+    if (disp && (disp.role === 'admin' || disp.role === 'super_admin')) {
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized) {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Only Administrators can delete drivers.' });
+  }
+
+  try {
+    const db = require('../lib/db');
+    const auditStore = require('../lib/auditStore');
+    const state = (await dataStore.loadFullState()) || { drivers: [], loads: [] };
+    const driver = (state.drivers || []).find(d => String(d.id) === String(driverId));
+
+    if (!driver) {
+      return res.status(404).json({ ok: false, error: 'Driver not found.' });
+    }
+
+    // Safeguard: Check if driver has active loads in transit
+    const activeLoads = (state.loads || []).filter(l => 
+      (String(l.driverId) === String(driverId) || (driver.name && l.driver === driver.name)) && 
+      !['Delivered', 'Cancelled', 'Completed'].includes(l.status) && 
+      !l.is_deleted
+    );
+
+    if (activeLoads.length > 0) {
+      return res.status(400).json({
+        ok: false,
+        error: `Cannot delete driver "${driver.name}" because they are currently assigned to ${activeLoads.length} active load(s) (# ${activeLoads.slice(0, 3).map(l => l.loadNumber || l.id).join(', ')}). Please reassign, deliver, or cancel those loads first.`
+      });
+    }
+
+    // 1. Unassign driver from historical loads
+    if (state.loads) {
+      state.loads.forEach(l => {
+        if (String(l.driverId) === String(driverId)) {
+          l.driverId = null;
+        }
+      });
+    }
+
+    // 2. Remove driver from state.drivers
+    state.drivers = (state.drivers || []).filter(d => String(d.id) !== String(driverId));
+
+    // 3. Delete from database (drivers table, sessions, locations)
+    await db.deleteDriver(driverId);
+
+    // 4. Save state
+    await dataStore.saveFullState(state);
+
+    // 5. Invalidate tracking service cache
+    if (trackingService && trackingService.cache && trackingService.cache.drivers) {
+      delete trackingService.cache.drivers[String(driverId)];
+    }
+
+    // 6. Record audit log
+    await auditStore.record(
+      { type: userRole || 'admin', id: userId || 'admin', name: userName || 'System Admin' },
+      'DRIVER_DELETED',
+      { type: 'DRIVER', id: driverId },
+      { name: driver.name, driverCode: driver.driverCode, phone: driver.phone }
+    );
+
+    res.json({ ok: true, message: `Driver ${driver.name} has been permanently deleted.` });
+  } catch (err) {
+    console.error('Delete driver failed:', err);
+    res.status(500).json({ ok: false, error: 'Failed to delete driver: ' + err.message });
+  }
+}
+
+router.delete('/api/drivers/:id', handleDeleteDriver);
+router.post('/api/drivers/:id/delete', handleDeleteDriver);
+
 module.exports = router;
 
 

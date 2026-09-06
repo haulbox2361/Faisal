@@ -333,4 +333,85 @@ router.post('/:id/toggle-status', requireAdmin, async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// 6. DELETE /api/companies/:id — Permanently Delete Company Fleet
+// ---------------------------------------------------------------------------
+async function handleDeleteCompany(req, res) {
+  try {
+    const { id } = req.params;
+    if (id === 'COMP-LEGACY') {
+      return res.status(400).json({ ok: false, error: 'The primary default company fleet (HaulBoX Fleet) cannot be deleted.' });
+    }
+
+    const state = await dataStore.loadFullState();
+    state.companies = state.companies || [];
+    const compIdx = state.companies.findIndex(c => c.id === id);
+    if (compIdx < 0) {
+      return res.status(404).json({ ok: false, error: 'Company fleet not found.' });
+    }
+    const compName = state.companies[compIdx].name;
+
+    // Check for active loads in transit
+    const compLoads = (state.loads || []).filter(l => (l.companyId || l.company_id) === id && !l.is_deleted);
+    const activeLoads = compLoads.filter(l => !['Delivered', 'Cancelled', 'Completed'].includes(l.status));
+    if (activeLoads.length > 0) {
+      return res.status(400).json({
+        ok: false,
+        error: `Cannot delete company "${compName}" while it has ${activeLoads.length} active load(s) in transit (# ${activeLoads.slice(0, 3).map(l => l.loadNumber || l.id).join(', ')}). Please reassign, deliver, or cancel these loads before deleting.`
+      });
+    }
+
+    // 1. Reassign historical completed loads to COMP-LEGACY
+    if (state.loads) {
+      state.loads.forEach(l => {
+        if ((l.companyId || l.company_id) === id) {
+          l.companyId = 'COMP-LEGACY';
+          l.company_id = 'COMP-LEGACY';
+        }
+      });
+    }
+
+    // 2. Reassign drivers to COMP-LEGACY
+    if (state.drivers) {
+      state.drivers.forEach(d => {
+        if ((d.companyId || d.company_id) === id) {
+          d.companyId = 'COMP-LEGACY';
+          d.company_id = 'COMP-LEGACY';
+          d.company = 'HaulBoX Fleet (Default)';
+        }
+      });
+    }
+
+    // 3. Remove linked owner(s) from state
+    if (state.owners) {
+      state.owners = state.owners.filter(o => (o.companyId || o.company_id) !== id);
+    }
+
+    // 4. Remove company from state
+    state.companies.splice(compIdx, 1);
+
+    // 5. Delete from database
+    await db.deleteCompany(id);
+
+    // 6. Persist state
+    await dataStore.saveFullState(state);
+
+    // 7. Audit log
+    await audit.record(
+      { type: 'admin', id: req.adminUser.id, name: req.adminUser.name },
+      'company.deleted',
+      { type: 'company', id },
+      { companyName: compName }
+    );
+
+    res.json({ ok: true, message: `Company fleet "${compName}" deleted successfully.` });
+  } catch (err) {
+    console.error('Delete company failed:', err);
+    res.status(500).json({ ok: false, error: 'Failed to delete company: ' + err.message });
+  }
+}
+
+router.delete('/:id', requireAdmin, handleDeleteCompany);
+router.post('/:id/delete', requireAdmin, handleDeleteCompany);
+
 module.exports = router;

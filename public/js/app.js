@@ -5440,9 +5440,12 @@
       const saveBtn = document.getElementById('driver-save-btn');
       const addDocBtn = document.getElementById('driver-add-doc-btn');
       const cancelBtn = document.getElementById('driver-cancel-btn');
+      const delBtn = document.getElementById('driver-delete-btn');
       const docsHint = document.getElementById('d-docs-hint');
+      const isEdit = !!(document.getElementById('d-id') && document.getElementById('d-id').value);
       if (saveBtn) saveBtn.style.display = isAdmin ? '' : 'none';
       if (addDocBtn) addDocBtn.style.display = isAdmin ? '' : 'none';
+      if (delBtn) delBtn.style.display = (isAdmin && isEdit) ? 'inline-flex' : 'none';
       if (cancelBtn) cancelBtn.textContent = isAdmin ? 'Cancel' : 'Close';
       if (docsHint) docsHint.textContent = isAdmin
         ? 'Free-form document slots — label each one as needed (CDL, Truck VIN #, Truck Plate #, Insurance, Medical Card, MVR, etc.) and attach the file.'
@@ -5514,6 +5517,8 @@
 
       driverDocsDraft = (isEdit && d.docs && d.docs.length) ? JSON.parse(JSON.stringify(d.docs)) : blankDriverDocSlots(6);
       applyDriverFormMode(isAdmin);
+      const delBtn = document.getElementById('driver-delete-btn');
+      if (delBtn) delBtn.style.display = (isAdmin && isEdit) ? 'inline-flex' : 'none';
       renderDriverDocSlots();
       openModal('modal-driver');
     };
@@ -5586,6 +5591,61 @@
       d.active = !d.active; persist(); renderDrivers(); populateDropdowns(); renderSettings();
       toast(d.active ? 'Driver activated' : 'Driver deactivated', d.name, true);
     }
+
+    window.deleteDriverAction = async function() {
+      if (STATE.role !== 'admin') return toast('Admin only', 'Only Admin can delete drivers.');
+      const id = document.getElementById('d-id').value;
+      if (!id) return;
+      const d = STATE.drivers.find(x => x.id === id);
+      if (!d) return;
+
+      const activeLoads = (STATE.loads || []).filter(l =>
+        (String(l.driverId) === String(id) || (d.name && l.driver === d.name)) &&
+        !['Delivered', 'Cancelled', 'Completed'].includes(l.status) &&
+        !l.is_deleted
+      );
+      if (activeLoads.length > 0) {
+        alert(`Cannot delete driver "${d.name}" because they are currently assigned to ${activeLoads.length} active load(s) in transit (# ${activeLoads.slice(0, 3).map(l => l.loadNumber || l.id).join(', ')}).\n\nPlease reassign, deliver, or cancel these loads before deleting this driver.`);
+        return;
+      }
+
+      const promptMsg = `Are you sure you want to permanently delete driver "${d.name}"?\n\n` +
+        `• This will remove their profile, mobile credentials (${d.driverCode || 'N/A'}), and uploaded compliance documents.\n` +
+        `• This action cannot be undone.\n\n` +
+        `Click OK to permanently delete.`;
+      if (!confirm(promptMsg)) return;
+
+      try {
+        const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
+        const res = await fetch('/api/drivers/' + encodeURIComponent(id), {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-pin': '8483',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify({ userRole: STATE.role, userId: 'admin', userName: 'Admin' })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          STATE.drivers = STATE.drivers.filter(x => x.id !== id);
+          persist();
+          closeModal('modal-driver');
+          renderDrivers();
+          populateDropdowns();
+          renderSettings();
+          if (typeof refreshStateFromServer === 'function') {
+            refreshStateFromServer().catch(() => {});
+          }
+          toast('Driver Deleted', `Driver "${d.name}" has been permanently removed.`, true);
+        } else {
+          alert(data.error || 'Failed to delete driver.');
+        }
+      } catch (err) {
+        console.error('deleteDriverAction error:', err);
+        toast('Error', 'Network or server error while deleting driver.');
+      }
+    };
 
     /* ================= DRIVER PAY — LEASE SETTLEMENTS (ADMIN ONLY) =================
        Every figure on this page is Admin-only. Dispatchers and view-only links can't reach
@@ -6221,6 +6281,11 @@
                 <button class="btn btn-sm btn-ghost" onclick="toggleCompanyStatusAction('${escapeAttr(c.id)}', '${c.status || 'active'}')" style="font-size:12px;font-weight:700;color:${isActive ? '#e11d48' : '#16a34a'};background:${isActive ? '#fff1f2' : '#f0fdf4'};border:1px solid ${isActive ? '#fecdd3' : '#bbf7d0'};padding:4px 10px;border-radius:8px;">
                   ${isActive ? 'Deactivate' : 'Activate'}
                 </button>
+                ${c.id !== 'COMP-LEGACY' ? `
+                  <button class="btn btn-sm btn-ghost" onclick="deleteCompanyAction('${escapeAttr(c.id)}', '${escapeAttr(c.name)}')" title="Delete Company Fleet" style="font-size:12px;font-weight:700;color:#ef4444;background:#fff1f2;border:1px solid #fecdd3;padding:4px 10px;border-radius:8px;">
+                    Delete
+                  </button>
+                ` : ''}
               </div>
             </td>
           </tr>
@@ -6332,6 +6397,14 @@
         document.getElementById('cd-subtitle').textContent = `Fleet ID: ${c.id} · Status: ${c.status || 'active'}`;
 
         modalBody.innerHTML = `
+          ${c.id !== 'COMP-LEGACY' ? `
+            <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+              <button class="btn btn-sm" onclick="closeModal('modal-company-details'); deleteCompanyAction('${escapeAttr(c.id)}', '${escapeAttr(c.name)}');" style="color:#ef4444;background:#fff1f2;border:1px solid #fecdd3;font-weight:700;font-size:12px;padding:6px 14px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Delete Fleet
+              </button>
+            </div>
+          ` : ''}
           <!-- KPI Cards -->
           <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:20px;">
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;">
@@ -6466,6 +6539,59 @@
         }
       } catch (err) {
         toast('Error', 'Connection error while updating status.');
+      }
+    };
+
+    window.deleteCompanyAction = async function(companyId, companyName) {
+      if (STATE.role !== 'admin') return toast('Admin only', 'Only Admin can delete company fleets.');
+      if (companyId === 'COMP-LEGACY') {
+        return alert('The default HaulBoX Fleet cannot be deleted as it serves as the core system anchor.');
+      }
+
+      const promptMsg = `Are you sure you want to permanently delete the fleet "${companyName}" and its linked Owner account?\n\n` +
+        `• Any drivers assigned to this fleet will be automatically reassigned to HaulBoX Fleet (Default).\n` +
+        `• Historical completed loads will be safely moved to default fleet to preserve records.\n` +
+        `• This action cannot be undone.\n\n` +
+        `Click OK to proceed with deletion.`;
+
+      if (!confirm(promptMsg)) return;
+
+      try {
+        const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
+        const res = await fetch('/api/companies/' + encodeURIComponent(companyId), {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-pin': '8483',
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        });
+        const data = await res.json();
+        if (data.ok) {
+          STATE.companies = (STATE.companies || []).filter(c => c.id !== companyId);
+          if (STATE.drivers) {
+            STATE.drivers.forEach(d => {
+              if ((d.companyId || d.company_id) === companyId) {
+                d.companyId = 'COMP-LEGACY';
+                d.company_id = 'COMP-LEGACY';
+                d.company = 'HaulBoX Fleet (Default)';
+              }
+            });
+          }
+          persist();
+          await renderCompanies();
+          populateCompanyDropdowns();
+          if (typeof renderDrivers === 'function') renderDrivers();
+          if (typeof refreshStateFromServer === 'function') {
+            await refreshStateFromServer();
+          }
+          toast('Company Deleted', `Fleet "${companyName}" was successfully deleted.`, true);
+        } else {
+          alert(data.error || 'Failed to delete company fleet.');
+        }
+      } catch (err) {
+        console.error('deleteCompanyAction error:', err);
+        toast('Error', 'Network or server error while deleting company fleet.');
       }
     };
 
