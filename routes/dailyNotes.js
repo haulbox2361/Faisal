@@ -70,6 +70,11 @@ router.post('/', async (req, res) => {
       status: 'submitted'
     });
 
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.emit('daily_note:saved', saved);
+    }
+
     res.json({ ok: true, note: saved });
   } catch (err) {
     console.error('[DailyNotes] Error saving note:', err);

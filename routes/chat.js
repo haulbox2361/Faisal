@@ -185,10 +185,11 @@ async function postMessageHandler(req, res) {
       createdAt: sent.createdAt || new Date().toISOString(),
     };
 
-    // Real-time broadcast to socket room
+    // Real-time broadcast to socket room and conversation update event
     const io = req.app.get('io');
     if (io) {
       io.to(`conv_${conversationId}`).emit('new_message', msgPayload);
+      io.emit('conversation_updated', { conversationId, lastMessage: msgPayload });
     }
 
     res.json({ ok: true, message: msgPayload });

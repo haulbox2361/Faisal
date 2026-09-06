@@ -7291,10 +7291,54 @@
           const curId = chatThreadId() || (typeof waCurrentConvoId !== 'undefined' ? waCurrentConvoId : null);
           if (curId) joinSocketConversation(curId);
           flushOfflineChatQueue();
+          refreshStateFromServer(true);
+        });
+
+        appSocket.on('state_update', (fresh) => {
+          if (!fresh || typeof fresh !== 'object') return;
+          try {
+            if (Array.isArray(fresh.loads)) STATE.loads = fresh.loads;
+            if (Array.isArray(fresh.drivers)) STATE.drivers = fresh.drivers;
+            if (Array.isArray(fresh.brokers)) STATE.brokers = fresh.brokers;
+            if (Array.isArray(fresh.dispatchers)) STATE.dispatchers = fresh.dispatchers;
+            if (fresh.settings) STATE.settings = Object.assign(STATE.settings || {}, fresh.settings);
+            if (Array.isArray(fresh.companies) && fresh.companies.length) STATE.companies = fresh.companies;
+            if (fresh.chat && typeof fresh.chat === 'object') {
+              STATE.chat = fresh.chat;
+              if (typeof renderChat === 'function') renderChat();
+              if (typeof updateChatBadge === 'function') updateChatBadge();
+            }
+            if (typeof migrateDrivers === 'function') migrateDrivers();
+            if (typeof migrateLoads === 'function') migrateLoads();
+            if (typeof renderDocReview === 'function') renderDocReview();
+            if (typeof renderDocsList === 'function') renderDocsList();
+            if (typeof renderLoadBoard === 'function') renderLoadBoard();
+            if (typeof renderDashboard === 'function') renderDashboard();
+            if (typeof updateDocReviewBadge === 'function') updateDocReviewBadge();
+            if (typeof renderDashboardNotifications === 'function') renderDashboardNotifications();
+          } catch (err) {
+            console.warn('[Socket.IO] Error applying state_update:', err);
+          }
+        });
+
+        appSocket.on('daily_note:saved', () => {
+          if (typeof renderDailyDriverReports === 'function') {
+            renderDailyDriverReports();
+          }
         });
 
         appSocket.on('new_message', (msg) => {
           handleIncomingSocketMessage(msg);
+        });
+
+        appSocket.on('conversation_updated', () => {
+          if (typeof fetchChatConvs === 'function') {
+            fetchChatConvs().then(() => {
+              if (typeof waRenderList === 'function') waRenderList();
+              if (typeof renderMainChatSidebar === 'function') renderMainChatSidebar();
+              if (typeof updateChatBadge === 'function') updateChatBadge();
+            }).catch(() => {});
+          }
         });
 
         appSocket.on('user_typing', (data) => {
@@ -7383,15 +7427,10 @@
         console.error('[Socket.IO] Init failed:', e);
       }
 
-      // Auto-refresh dispatcher state on tab focus and every 12 seconds
+      // Auto-refresh dispatcher state on tab focus (light fallback on tab switch)
       window.addEventListener('focus', () => {
         refreshStateFromServer(true);
       });
-      setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          refreshStateFromServer(true);
-        }
-      }, 12000);
     }
 
     function authenticateAppSocket() {
@@ -7461,6 +7500,15 @@
         const conv = chatConvs.find(c => String(c.id) === msgConvoId);
         if (conv) conv.unreadCount = (conv.unreadCount || 0) + 1;
         updateChatBadge();
+      }
+
+      // Reactively refresh conversations list and badges without polling
+      if (typeof fetchChatConvs === 'function') {
+        fetchChatConvs().then(() => {
+          if (typeof waRenderList === 'function') waRenderList();
+          if (typeof renderMainChatSidebar === 'function') renderMainChatSidebar();
+          if (typeof updateChatBadge === 'function') updateChatBadge();
+        }).catch(() => {});
       }
     }
 
@@ -7926,49 +7974,17 @@
       if (bar) bar.style.display = 'none';
     }
 
-    setInterval(async () => {
-      const panel = document.getElementById('chat-panel');
-      if (STATE.role !== 'viewonly') {
-        await fetchChatConvs();
-        updateChatBadge();
-        if (document.getElementById('view-chat')?.classList.contains('active')) {
-          renderMainChatSidebar();
-          if (currentMainConvoId) loadMainChatMessages();
-        }
-      }
-    }, 5000);
-
-    /* ---- Live chat polling ----------------------------------------------
-       STATE is loaded from the server once at page load, so without this a
-       dispatcher (or admin) only ever sees a new chat message after a manual
-       refresh. This polls the shared state on an interval and merges in just
-       the chat thread(s), so new messages show up on their own. Everything
-       else in STATE (loads, drivers, settings, in-progress edits, etc.) is
-       left untouched. */
+    // Polling removed: Real-time chat updates are delivered via Socket.IO events ('new_message', 'conversation_updated')
     let chatPollTimer = null;
     function startChatPolling() {
-      if (chatPollTimer || STATE.role === 'viewonly') return;
-      chatPollTimer = setInterval(pollChatUpdates, 5000);
+      // No-op: Real-time Socket.IO handles incoming messages instantly
     }
     function stopChatPolling() {
-      clearInterval(chatPollTimer);
-      chatPollTimer = null;
+      // No-op
     }
     async function pollChatUpdates() {
-      if (document.hidden || STATE.role === 'viewonly') return;
-      try {
-        const res = await window.storage.get('haulline:state', false);
-        if (res && res.value) {
-          const remoteChat = (JSON.parse(res.value).chat) || {};
-          if (JSON.stringify(remoteChat) !== JSON.stringify(STATE.chat)) {
-            STATE.chat = remoteChat;
-            renderChat();
-            updateChatBadge();
-          }
-        }
-      } catch (e) { /* transient network/read error — next poll retries */ }
+      // No-op
     }
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) pollChatUpdates(); });
 
     /* ================= INIT ================= */
     async function init() {
@@ -9202,17 +9218,7 @@
       waRenderList();
       updateChatBadge();
 
-      // Start polling
-      if (!waChatPollTimer) {
-        waChatPollTimer = setInterval(async () => {
-          if (document.getElementById('view-chat')?.classList.contains('active')) {
-            await fetchChatConvs();
-            waRenderList();
-            updateChatBadge();
-            if (waCurrentConvoId) waLoadMessages();
-          }
-        }, 4000);
-      }
+      // Polling removed: Updates pushed via Socket.IO
     }
 
     // --- Avatar color helper ---

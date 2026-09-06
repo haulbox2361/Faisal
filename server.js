@@ -256,8 +256,9 @@ io.on('connection', (socket) => {
         tempId: tempId || null,
       };
 
-      // Broadcast to all clients in this conversation room
+      // Broadcast to all clients in this conversation room and conversation update event
       io.to(`conv_${convId}`).emit('new_message', msgPayload);
+      io.emit('conversation_updated', { conversationId: convId, lastMessage: msgPayload });
 
       if (typeof ack === 'function') {
         ack({ ok: true, message: msgPayload });

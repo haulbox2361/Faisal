@@ -76,6 +76,11 @@ router.post('/api/notifications', async (req, res) => {
       }).catch(err => console.error('[FCM] Push send error:', err));
     }
 
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.emit('notification:new', created);
+    }
+
     res.json({ ok: true, id: created.id, createdAt: created.createdAt });
   } catch (e) {
     console.error('notification send failed:', e);
