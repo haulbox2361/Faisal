@@ -8011,7 +8011,8 @@
       updateBranding();
       renderDashboard();
       toast('Welcome back', STATE.currentUser ? STATE.currentUser.name : '', true);
-      startChatPolling();
+      // Chat updates delivered in real-time via Socket.IO ('new_message', 'conversation_updated').
+      // No polling needed — see docs/realtime-architecture.md.
       initDailyNotesReminder();
     }
 
