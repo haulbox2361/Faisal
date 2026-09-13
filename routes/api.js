@@ -52,6 +52,50 @@ function toAttachments(attachments) {
   }));
 }
 
+// Helper: Server-side Admin / Super Admin Authorization Check
+async function checkAdminAuth(req) {
+  // 1. Check Admin PIN header strictly against environment configuration
+  const adminPin = req.headers['x-admin-pin'] || req.headers['x-admin-key'];
+  const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
+  if (adminPin && String(adminPin).trim() === settingsPin) {
+    return { id: 'admin', role: 'admin', name: 'System Admin' };
+  }
+
+  // 2. Check Bearer token from web session
+  const authHeader = String(req.headers.authorization || '');
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  if (token) {
+    // 2a. Check Google OAuth web session
+    try {
+      const authRoutes = require('./auth');
+      if (typeof authRoutes.verifySessionToken === 'function') {
+        const webSess = authRoutes.verifySessionToken(req);
+        if (webSess) {
+          return { id: webSess.accountId || 'admin', role: 'admin', name: 'System Admin' };
+        }
+      }
+    } catch (_) {}
+
+    // 2b. Check registered dispatchers session token
+    const state = await dataStore.loadFullState().catch(() => ({}));
+    const dispatchers = state.dispatchers || [];
+    const disp = dispatchers.find(d => d.sessionToken && d.sessionToken === token);
+    if (disp && (disp.role === 'admin' || disp.role === 'super_admin' || disp.role === 'superadmin')) {
+      return { id: disp.id, role: disp.role, name: disp.name };
+    }
+  }
+
+  // 3. Fallback: check session from cookie if available
+  if (req.session && req.session.user) {
+    const u = req.session.user;
+    if (u.role === 'admin' || u.role === 'super_admin' || u.role === 'superadmin') {
+      return u;
+    }
+  }
+
+  return null;
+}
+
 // Builds a raw RFC 2822 message (base64url, as the Gmail API requires) with
 // optional threading headers for a reply.
 async function buildRawMessage({ to, cc, subject, body, attachments, inReplyTo, references }) {
@@ -76,6 +120,17 @@ async function buildRawMessage({ to, cc, subject, body, attachments, inReplyTo, 
     .replace(/=+$/, '');
 }
 
+// POST /api/verify-settings-pin — Server-side 6-digit Admin PIN verification
+router.post('/api/verify-settings-pin', (req, res) => {
+  const { pin } = req.body || {};
+  const cleanPin = String(pin || '').trim();
+  const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
+  if (cleanPin === settingsPin) {
+    return res.json({ ok: true, message: 'PIN verified' });
+  }
+  return res.status(403).json({ ok: false, error: 'Incorrect 6-digit PIN. Access denied.' });
+});
+
 // GET /api/mc-lookup?mc=123456
 // Looks up a broker/carrier's legal + DBA name from the FMCSA SAFER system by
 // MC number, so the Add Load / Add Broker forms can auto-fill the company
@@ -94,7 +149,7 @@ router.get('/api/mc-lookup', async (req, res) => {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; HaulBoX/1.0)' },
     });
     if (!response.ok) {
-      res.status(502).json({ found: false, error: 'SAFER lookup failed' });
+      res.json({ found: false, error: 'SAFER lookup unavailable' });
       return;
     }
     const html = await response.text();
@@ -117,7 +172,7 @@ router.get('/api/mc-lookup', async (req, res) => {
     }
     res.json({ found: true, mc, legalName, dbaName, name: dbaName || legalName });
   } catch (e) {
-    res.status(502).json({ found: false, error: e.message });
+    res.json({ found: false, error: e.message });
   }
 });
 
@@ -922,13 +977,13 @@ router.post('/api/documents/review', async (req, res) => {
 // Admin / Super Admin ONLY: Soft-deletes a load with required reason and audit log
 // ---------------------------------------------------------------------------
 router.post('/api/loads/:id/delete', async (req, res) => {
-  const { reason, userRole, userId, userName } = req.body || {};
-  const loadId = req.params.id;
-
-  const role = String(userRole || req.query.role || '').toLowerCase();
-  if (role !== 'admin' && role !== 'super_admin' && role !== 'superadmin') {
-    return res.status(403).json({ ok: false, error: 'Forbidden — Only Admin or Super Admin can delete loads.' });
+  const adminAuth = await checkAdminAuth(req);
+  if (!adminAuth) {
+    return res.status(403).json({ ok: false, error: 'Forbidden — Admin authorization required to delete loads.' });
   }
+
+  const { reason } = req.body || {};
+  const loadId = req.params.id;
 
   const cleanReason = String(reason || '').trim();
   if (!cleanReason) {
@@ -947,14 +1002,14 @@ router.post('/api/loads/:id/delete', async (req, res) => {
     const nowIso = new Date().toISOString();
     load.is_deleted = true;
     load.deleted_at = nowIso;
-    load.deleted_by = userName || userId || role;
+    load.deleted_by = adminAuth.name || adminAuth.id || 'Admin';
     load.delete_reason = cleanReason;
 
     await dataStore.saveFullState(state);
 
     // Record immutable audit log
     await auditStore.record(
-      { type: role, id: userId || 'admin', name: userName || 'Admin' },
+      { type: adminAuth.role || 'admin', id: adminAuth.id || 'admin', name: adminAuth.name || 'Admin' },
       'LOAD_SOFT_DELETED',
       { type: 'LOAD', id: load.id },
       {
@@ -1141,11 +1196,12 @@ router.post('/api/drivers/:id/update', async (req, res) => {
 
 // POST /api/payments/update-stage — Audit-logged payment stage changes
 router.post('/api/payments/update-stage', async (req, res) => {
-  const { loadId, paymentStage, userRole, userId, userName } = req.body || {};
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
-    return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can modify payment stages.' });
+  const adminAuth = await checkAdminAuth(req);
+  if (!adminAuth) {
+    return res.status(403).json({ ok: false, error: 'Forbidden: Admin access required.' });
   }
 
+  const { loadId, paymentStage } = req.body || {};
   try {
     const auditStore = require('../lib/auditStore');
     const state = (await dataStore.loadFullState()) || { loads: [] };
@@ -1158,7 +1214,7 @@ router.post('/api/payments/update-stage', async (req, res) => {
     await dataStore.saveFullState(state);
 
     await auditStore.record(
-      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      { type: adminAuth.role || 'admin', id: adminAuth.id || 'admin', name: adminAuth.name || 'Admin' },
       'PAYMENT_STAGE_CHANGED',
       { type: 'LOAD_PAYMENT', id: load.id },
       { loadNumber: load.loadNumber, oldStage, newStage: paymentStage }
@@ -1172,10 +1228,12 @@ router.post('/api/payments/update-stage', async (req, res) => {
 
 // POST /api/dispatchers/create — Audit-logged Dispatcher/Admin account creation
 router.post('/api/dispatchers/create', async (req, res) => {
-  const { name, email, phone, role, userRole, userId, userName } = req.body || {};
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
+  const adminAuth = await checkAdminAuth(req);
+  if (!adminAuth) {
     return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can create dispatch accounts.' });
   }
+
+  const { name, email, phone, role } = req.body || {};
   if (!name || !email) {
     return res.status(400).json({ ok: false, error: 'Name and email are required.' });
   }
@@ -1199,7 +1257,7 @@ router.post('/api/dispatchers/create', async (req, res) => {
     await dataStore.saveFullState(state);
 
     await auditStore.record(
-      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      { type: adminAuth.role || 'admin', id: adminAuth.id || 'admin', name: adminAuth.name || 'Admin' },
       'ACCOUNT_CREATED',
       { type: 'DISPATCHER', id: newId },
       { name, email: newDispatcher.email, role: newDispatcher.role }
@@ -1213,11 +1271,13 @@ router.post('/api/dispatchers/create', async (req, res) => {
 
 // POST /api/dispatchers/:id/role — Audit-logged role promotion / demotion
 router.post('/api/dispatchers/:id/role', async (req, res) => {
-  const dispatcherId = req.params.id;
-  const { newRole, userRole, userId, userName } = req.body || {};
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
+  const adminAuth = await checkAdminAuth(req);
+  if (!adminAuth) {
     return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can modify account roles.' });
   }
+
+  const dispatcherId = req.params.id;
+  const { newRole } = req.body || {};
   if (!['dispatcher', 'admin', 'super_admin'].includes(newRole)) {
     return res.status(400).json({ ok: false, error: 'Invalid role specified.' });
   }
@@ -1234,7 +1294,7 @@ router.post('/api/dispatchers/:id/role', async (req, res) => {
     await dataStore.saveFullState(state);
 
     await auditStore.record(
-      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      { type: adminAuth.role || 'admin', id: adminAuth.id || 'admin', name: adminAuth.name || 'Admin' },
       'USER_ROLE_CHANGED',
       { type: 'DISPATCHER', id: disp.id },
       { name: disp.name, email: disp.email, oldRole, newRole }
@@ -1248,12 +1308,12 @@ router.post('/api/dispatchers/:id/role', async (req, res) => {
 
 // POST /api/dispatchers/:id/delete — Audit-logged account removal / deactivation
 router.post('/api/dispatchers/:id/delete', async (req, res) => {
-  const dispatcherId = req.params.id;
-  const { userRole, userId, userName } = req.body || {};
-  if (userRole !== 'admin' && userRole !== 'super_admin') {
+  const adminAuth = await checkAdminAuth(req);
+  if (!adminAuth) {
     return res.status(403).json({ ok: false, error: 'Forbidden: Only Admins can remove dispatch accounts.' });
   }
 
+  const dispatcherId = req.params.id;
   try {
     const auditStore = require('../lib/auditStore');
     const state = (await dataStore.loadFullState()) || { dispatchers: [] };
@@ -1266,7 +1326,7 @@ router.post('/api/dispatchers/:id/delete', async (req, res) => {
     await dataStore.saveFullState(state);
 
     await auditStore.record(
-      { type: userRole, id: userId || 'admin', name: userName || 'Admin' },
+      { type: adminAuth.role || 'admin', id: adminAuth.id || 'admin', name: adminAuth.name || 'Admin' },
       'ACCOUNT_REMOVED',
       { type: 'DISPATCHER', id: disp.id },
       { name: disp.name, email: disp.email, role: disp.role }
@@ -1283,27 +1343,8 @@ router.post('/api/dispatchers/:id/delete', async (req, res) => {
 // ---------------------------------------------------------------------------
 async function handleDeleteDriver(req, res) {
   const driverId = req.params.id;
-  const adminPin = req.headers['x-admin-pin'] || req.headers['x-admin-key'];
-  const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
-  const isPinAuthorized = adminPin && (String(adminPin).trim() === settingsPin || String(adminPin).trim() === '8483' || String(adminPin).trim() === '123456');
-
-  const { userRole, userId, userName } = req.body || {};
-  const isRoleAuthorized = userRole === 'admin' || userRole === 'super_admin';
-
-  // Also check Bearer token
-  const authHeader = String(req.headers.authorization || '');
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
-
-  let isAuthorized = isPinAuthorized || isRoleAuthorized;
-  if (!isAuthorized && token) {
-    const state = await dataStore.loadFullState().catch(() => ({}));
-    const disp = (state.dispatchers || []).find(d => d.sessionToken === token || d.id === token);
-    if (disp && (disp.role === 'admin' || disp.role === 'super_admin')) {
-      isAuthorized = true;
-    }
-  }
-
-  if (!isAuthorized) {
+  const adminAuth = await checkAdminAuth(req);
+  if (!adminAuth) {
     return res.status(403).json({ ok: false, error: 'Forbidden: Only Administrators can delete drivers.' });
   }
 

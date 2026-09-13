@@ -297,7 +297,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _errorMessage = result['error'] ?? 'Login failed. Please check Driver ID and PIN.';
+        _errorMessage = result['error'] ?? 'Login failed. Please check Driver / Owner Code and Security PIN.';
         _isLoading = false;
         notifyListeners();
         return false;

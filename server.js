@@ -32,9 +32,43 @@ if (SUPER_ADMIN_EMAIL && !ADMIN_EMAILS_RAW.includes(SUPER_ADMIN_EMAIL)) {
 const SETTINGS_ADMIN_PIN = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
 
 const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Enterprise Security Headers
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Strict Auth Rate Limiter (10 attempts per 15 minutes per IP for login and PIN verification)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Too many authentication attempts. Please try again after 15 minutes.' },
+});
+
+app.use('/api/driver/login', authLimiter);
+app.use('/api/verify-settings-pin', authLimiter);
+app.use('/auth/google', authLimiter);
+app.use('/auth/claim', authLimiter);
+app.use('/api/admin/drivers/mass-pin-reset', authLimiter);
+
+// General API Rate Limiter (300 requests per minute per IP for normal endpoints)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+app.use('/api/', apiLimiter);
 
 // High-performance gzip/deflate response compression (reduces payload by ~85%)
 app.use(compression({
@@ -45,7 +79,7 @@ app.use(compression({
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-admin-pin, x-admin-key');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }

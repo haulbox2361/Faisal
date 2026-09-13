@@ -1,11 +1,13 @@
 const express = require('express');
 const kv = require('../lib/kvstore');
+const audit = require('../lib/auditStore');
+const { requireAuth } = require('../lib/security');
 
 const router = express.Router();
 router.use(express.json({ limit: '25mb' })); // the whole app STATE blob round-trips through here
 
-// GET /api/storage?prefix=... — list keys (must come before the /:key route)
-router.get('/api/storage', async (req, res) => {
+// GET /api/storage?prefix=... — list keys (Protected: requires active staff / admin session)
+router.get('/api/storage', requireAuth(['ADMIN']), async (req, res) => {
   try {
     const keys = await kv.list(req.query.prefix ? String(req.query.prefix) : undefined);
     res.json({ keys, prefix: req.query.prefix || undefined, shared: false });
@@ -15,8 +17,8 @@ router.get('/api/storage', async (req, res) => {
   }
 });
 
-// GET /api/storage/:key
-router.get('/api/storage/:key', async (req, res) => {
+// GET /api/storage/:key (Protected: requires active session)
+router.get('/api/storage/:key', requireAuth(['ADMIN']), async (req, res) => {
   try {
     const value = await kv.get(req.params.key);
     if (value === null) return res.status(404).json({ error: 'Key not found: ' + req.params.key });
@@ -27,8 +29,8 @@ router.get('/api/storage/:key', async (req, res) => {
   }
 });
 
-// POST /api/storage  { key, value }
-router.post('/api/storage', async (req, res) => {
+// POST /api/storage  { key, value } (Protected: requires Admin role)
+router.post('/api/storage', requireAuth(['ADMIN']), async (req, res) => {
   const { key, value } = req.body || {};
   if (!key) return res.status(400).json({ error: 'Missing key' });
   try {
@@ -40,6 +42,15 @@ router.post('/api/storage', async (req, res) => {
         dataStore.saveFullState(parsed).catch(err => console.warn('[Storage] dataStore sync warn:', err.message));
       } catch (e) {}
     }
+
+    // Audit Log sensitive storage writes
+    await audit.record(
+      { type: req.user?.type || 'admin', id: req.user?.id || 'admin', name: req.user?.name || req.user?.email || 'Admin' },
+      'STORAGE_WRITE',
+      { type: 'kv_key', id: key },
+      { key, valueLength: typeof value === 'string' ? value.length : JSON.stringify(value || '').length, clientIp: req.ip }
+    );
+
     res.json({ key, value, shared: false });
   } catch (e) {
     console.error('storage set failed:', e);
@@ -47,10 +58,19 @@ router.post('/api/storage', async (req, res) => {
   }
 });
 
-// DELETE /api/storage/:key
-router.delete('/api/storage/:key', async (req, res) => {
+// DELETE /api/storage/:key (Protected: requires Admin role)
+router.delete('/api/storage/:key', requireAuth(['ADMIN']), async (req, res) => {
   try {
     await kv.del(req.params.key);
+
+    // Audit Log storage deletions
+    await audit.record(
+      { type: req.user?.type || 'admin', id: req.user?.id || 'admin', name: req.user?.name || req.user?.email || 'Admin' },
+      'STORAGE_DELETE',
+      { type: 'kv_key', id: req.params.key },
+      { key: req.params.key, clientIp: req.ip }
+    );
+
     res.json({ key: req.params.key, deleted: true, shared: false });
   } catch (e) {
     console.error('storage delete failed:', e);
@@ -59,3 +79,4 @@ router.delete('/api/storage/:key', async (req, res) => {
 });
 
 module.exports = router;
+

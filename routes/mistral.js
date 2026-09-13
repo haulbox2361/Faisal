@@ -10,11 +10,12 @@
 
 const express = require('express');
 const router = express.Router();
+const { requireAuth } = require('../lib/security');
 
 // Enable JSON body parsing for document payloads up to 25MB
 router.use(express.json({ limit: '25mb' }));
 
-router.post('/api/ai/mistral-extract', async (req, res) => {
+router.post('/api/ai/mistral-extract', requireAuth(), async (req, res) => {
   const { apiKey: reqKey, model, prompt, base64, mediaType, isPdf } = req.body || {};
 
   const apiKey = (reqKey && String(reqKey).trim()) || (process.env.MISTRAL_API_KEY || '').trim();

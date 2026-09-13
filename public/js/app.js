@@ -9876,9 +9876,14 @@
       if (btn) btn.disabled = true;
 
       try {
+        const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
         const res = await fetch(`/api/loads/${encodeURIComponent(loadId)}/delete`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-pin': '8483',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
           body: JSON.stringify({ reason })
         });
         const data = await res.json();

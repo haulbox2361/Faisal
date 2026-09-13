@@ -11,12 +11,22 @@ const fcm = require('../lib/fcmService');
 const router = express.Router();
 router.use(express.json({ limit: '1mb' }));
 
-function requireParty(req, res) {
-  const { accountId, role } = req.body || req.query || {};
-  const type = role === 'dispatcher' ? 'dispatcher' : 'admin';
+async function requireParty(req, res) {
+  try {
+    const security = require('../lib/security');
+    const user = await security.authenticateRequest(req);
+    if (user) {
+      return { type: user.type || (user.role ? user.role.toLowerCase() : 'admin'), id: String(user.id) };
+    }
+  } catch (_) {}
+
+  const role = (req.body && req.body.role) || (req.query && req.query.role);
+  const accountId = (req.body && req.body.accountId) || (req.query && req.query.accountId);
+  const type = role === 'dispatcher' ? 'dispatcher' : (role === 'driver' ? 'driver' : 'admin');
   const id = String(accountId || (type === 'admin' ? 'admin' : '')).trim();
+
   if (!id) {
-    res.status(400).json({ error: 'Missing accountId' });
+    res.status(401).json({ error: 'Unauthorized: Valid session authentication required.' });
     return null;
   }
   return { type, id };
@@ -24,7 +34,7 @@ function requireParty(req, res) {
 
 // GET /api/notifications?accountId=...&role=...&unread=1
 router.get('/api/notifications', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   try {
     const list = await notifications.listFor(me.type, me.id, { unreadOnly: req.query.unread === '1' });
@@ -37,7 +47,7 @@ router.get('/api/notifications', async (req, res) => {
 
 // POST /api/notifications/:id/read  { accountId, role }
 router.post('/api/notifications/:id/read', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   try {
     const ok = await notifications.markRead(me.type, me.id, Number(req.params.id));
@@ -53,7 +63,7 @@ router.post('/api/notifications/:id/read', async (req, res) => {
 // admin. Used for things like "Admin announcement" or a dispatcher's ETA
 // update reaching the assigned driver.
 router.post('/api/notifications', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const { toType, toId, type, title, body, data } = req.body || {};
   if (!toType || !toId) return res.status(400).json({ error: 'Missing toType/toId' });
@@ -89,3 +99,4 @@ router.post('/api/notifications', async (req, res) => {
 });
 
 module.exports = router;
+

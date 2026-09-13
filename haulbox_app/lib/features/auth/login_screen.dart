@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (driverId.isEmpty || pin.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter your Driver ID and Security PIN'),
+          content: Text('Please enter your Driver / Owner Code and Security PIN'),
           backgroundColor: AppColors.statusDanger,
         ),
       );
@@ -166,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Text(
-                          'Driver Sign In',
+                          'Portal Sign In',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
@@ -175,17 +175,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'Enter your Driver Code and PIN to access your runs',
+                          'Enter your Driver Code (e.g. D101) or Owner Code (e.g. OWN-01)',
                           style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
                         ),
                         const SizedBox(height: 20),
 
-                        // Driver ID Field
+                        // Driver / Owner Code Field
                         TextField(
                           controller: _driverIdController,
                           decoration: const InputDecoration(
-                            labelText: 'Driver ID or Code',
-                            hintText: 'e.g. D101',
+                            labelText: 'Driver or Owner Code',
+                            hintText: 'e.g. D101 or OWN-01',
                             prefixIcon: Icon(Icons.badge_outlined, color: AppColors.textMuted, size: 20),
                           ),
                         ),

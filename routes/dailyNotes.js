@@ -1,12 +1,8 @@
-/**
- * routes/dailyNotes.js
- * Endpoints for Daily Driver Notes and 4:00 PM – 5:00 PM Submission Tracking.
- */
-
 const express = require('express');
 const router = express.Router();
 const db = require('../lib/db');
 const dataStore = require('../lib/dataStore');
+const { requireAuth } = require('../lib/security');
 
 function getTodayIsoString() {
   const d = new Date();
@@ -24,7 +20,7 @@ function getTodayIsoString() {
  * - Same-day editing allowed only; past dates are locked.
  * - Admin can submit on behalf of any dispatcher.
  */
-router.post('/', async (req, res) => {
+router.post('/', requireAuth(), async (req, res) => {
   try {
     const { driverId, note, date, dispatcherId: reqDispId } = req.body || {};
     const today = getTodayIsoString();
@@ -79,6 +75,21 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('[DailyNotes] Error saving note:', err);
     res.status(500).json({ error: 'Failed to save daily driver note: ' + err.message });
+  }
+});
+
+/**
+ * GET /api/daily-notes
+ * Returns daily driver notes list with optional filters (date, dispatcherId, startDate).
+ */
+router.get('/', requireAuth(), async (req, res) => {
+  try {
+    const { date, dispatcherId, startDate } = req.query || {};
+    const notes = await db.getDailyDriverNotes({ date, dispatcherId, startDate });
+    res.json({ ok: true, notes });
+  } catch (err) {
+    console.error('[DailyNotes] Error fetching notes:', err);
+    res.status(500).json({ error: 'Failed to fetch daily notes: ' + err.message });
   }
 });
 

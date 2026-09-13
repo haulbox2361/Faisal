@@ -105,6 +105,22 @@ function loadMatchesPeriod(load, range) {
 // ---------------------------------------------------------------------------
 async function requireOwner(req, res, next) {
   try {
+    // 1. Allow fallback for Admin / Super Admin web sessions or clients with admin PIN
+    const adminPin = req.headers['x-admin-pin'] || req.headers['x-admin-key'];
+    const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
+    if (adminPin && String(adminPin).trim() === settingsPin) {
+      let state = await dataStore.loadFullState().catch(() => null);
+      if (!state) state = { drivers: [], loads: [], dispatchers: [], brokers: [], owners: [], settings: {} };
+      req.owner = {
+        id: 'admin',
+        name: 'System Admin',
+        role: 'OWNER',
+        companyId: req.query.companyId || null
+      };
+      req.state = state;
+      return next();
+    }
+
     const authHeader = String(req.headers.authorization || '');
     const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
 
@@ -112,7 +128,7 @@ async function requireOwner(req, res, next) {
       return res.status(401).json({ error: 'Unauthorized: Authentication token required.' });
     }
 
-    // 1. Verify against driver_sessions
+    // 2. Verify against driver_sessions
     const session = await sessions.verifySession(bearer);
     let isOwner = false;
     let ownerObj = null;
@@ -136,14 +152,26 @@ async function requireOwner(req, res, next) {
       }
     }
 
-    // 2. Allow fallback for Admin / Super Admin web sessions if accessing owner endpoints
-    if (!isOwner) {
-      // Check admin security pin header or web token
-      const adminPin = req.headers['x-admin-pin'];
-      const settingsPin = process.env.SETTINGS_ADMIN_PIN || '8483';
-      if (adminPin && String(adminPin).trim() === String(settingsPin).trim()) {
-        isOwner = true;
-        ownerObj = { id: 'admin', name: 'System Admin', role: 'OWNER' };
+    // 3. Fallback: check bearer token for staff admin session (Google OAuth or sessionToken)
+    if (!isOwner && bearer) {
+      try {
+        const authRoutes = require('./auth');
+        if (typeof authRoutes.verifySessionToken === 'function') {
+          const webSess = authRoutes.verifySessionToken(req);
+          if (webSess) {
+            isOwner = true;
+            ownerObj = { id: webSess.accountId || 'admin', name: 'System Admin', role: 'OWNER' };
+          }
+        }
+      } catch (_) {}
+
+      if (!isOwner) {
+        const state = await dataStore.loadFullState().catch(() => ({}));
+        const disp = (state.dispatchers || []).find(d => d.sessionToken && d.sessionToken === bearer);
+        if (disp && (disp.role === 'admin' || disp.role === 'super_admin')) {
+          isOwner = true;
+          ownerObj = { id: disp.id, name: disp.name, role: 'OWNER' };
+        }
       }
     }
 
@@ -772,13 +800,26 @@ router.get('/analytics', requireOwner, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Admin Endpoints: Create & Manage Owner Accounts
+// 7. GET /api/owner/audit-logs — Traceable History for Payments, Actions & PINs
+// ---------------------------------------------------------------------------
+router.get('/audit-logs', requireOwner, async (req, res) => {
+  const { loadId, action, limit } = req.query || {};
+  try {
+    const logs = await audit.list({ loadId, action, limit });
+    res.json({ ok: true, logs });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve audit logs: ' + err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 8. Admin Endpoints: Create & Manage Owner Accounts
 // ---------------------------------------------------------------------------
 router.get('/accounts', async (req, res) => {
-  // Restricted to Admin / Super Admin
+  // Restricted strictly to Admin / Super Admin
   const adminPin = req.headers['x-admin-pin'];
-  const settingsPin = process.env.SETTINGS_ADMIN_PIN || '8483';
-  if (!adminPin || String(adminPin).trim() !== String(settingsPin).trim()) {
+  const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
+  if (!adminPin || String(adminPin).trim() !== settingsPin) {
     return res.status(403).json({ error: 'Admin access required to view owner accounts.' });
   }
 
@@ -793,7 +834,7 @@ router.get('/accounts', async (req, res) => {
 router.post('/accounts', async (req, res) => {
   const adminPin = String(req.headers['x-admin-pin'] || '').trim();
   const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
-  if (!adminPin || (adminPin !== settingsPin && adminPin !== '8483' && adminPin !== '123456')) {
+  if (!adminPin || adminPin !== settingsPin) {
     return res.status(403).json({ error: 'Admin access required to create owner accounts.' });
   }
 
@@ -833,6 +874,13 @@ router.post('/accounts', async (req, res) => {
     if (existingIdx >= 0) state.owners[existingIdx] = ownerRec;
     else state.owners.push(ownerRec);
     await dataStore.saveFullState(state);
+
+    await audit.record(
+      { type: 'admin', id: 'admin', name: 'System Admin' },
+      'ADMIN_CREATE_OWNER',
+      { type: 'owner', id: owner.id },
+      { ownerCode: owner.owner_code, name: owner.name, companyId: assignedCompanyId }
+    );
 
     res.json({ ok: true, message: 'Owner account created successfully', owner: { id: owner.id, ownerCode: owner.owner_code, name: owner.name } });
   } catch (err) {

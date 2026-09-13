@@ -37,3 +37,12 @@ haulbox_app/.pub-cache/
 # Nested standalone repos
 vetta-website/
 
+# Android build artifacts & Gradle
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/.cxx/
+*.apk
+*.aab

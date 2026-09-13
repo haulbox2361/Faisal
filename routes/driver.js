@@ -69,8 +69,8 @@ router.get('/api/ocr-ping', async (req, res) => {
 // Admin-scoped endpoint to dynamically toggle the system data layer (IMP-204)
 router.post('/api/admin/system/data-layer', async (req, res) => {
   const { layer, reason } = req.body || {};
-  const authHeader = req.headers.authorization || '';
-  const isAdmin = req.session?.role === 'admin' || req.query.role === 'admin' || authHeader.includes('admin');
+  const user = await security.authenticateRequest(req);
+  const isAdmin = user && (user.role === 'admin' || user.type === 'admin');
 
   if (!isAdmin) {
     return res.status(403).json({ ok: false, error: 'Forbidden: Admin access required.' });
@@ -112,8 +112,8 @@ const MASS_RESET_COOLDOWN_MS = 24 * 60 * 60 * 1000; // Max 1 execution per 24 ho
 
 router.post('/api/admin/drivers/mass-pin-reset', async (req, res) => {
   const { confirmationToken, reason, driverIds } = req.body || {};
-  const authHeader = req.headers.authorization || '';
-  const isAdmin = req.session?.role === 'admin' || req.query.role === 'admin' || authHeader.includes('admin');
+  const user = await security.authenticateRequest(req);
+  const isAdmin = user && (user.role === 'admin' || user.type === 'admin');
 
   if (!isAdmin) {
     return res.status(403).json({ ok: false, error: 'Forbidden: Admin access required.' });
@@ -251,7 +251,7 @@ function findDriverByCredentials(state, driverId, pin) {
 
       // PIN check (Supports both raw PIN and PBKDF2 hashed PIN via dataStore)
       const storedPin = d.pinHash || d.pin;
-      if (!storedPin) return true; // If no PIN configured on driver, allow login
+      if (!storedPin) return false; // Require a valid configured PIN
       return dataStore.verifyPin(p, storedPin);
     }) || null
   );
@@ -290,11 +290,7 @@ async function requireDriver(req, res) {
 
   let driver = null;
   if (bearer) {
-    let driverId = await sessions.verify(bearer).catch(() => null);
-    if (!driverId && bearer.startsWith('token_')) {
-      const parts = bearer.split('_');
-      if (parts.length >= 2) driverId = parts[1];
-    }
+    const driverId = await sessions.verify(bearer).catch(() => null);
     if (driverId) driver = findDriverById(state, driverId);
   } else {
     const { driverId, pin } = req.body || {};
@@ -378,8 +374,9 @@ function shapeLoadForDriver(l, driverId) {
     Extra: arrMeta(docs.Extra),
   };
 
-  // Show driver the full Rate Con (RC) price clearly (e.g. $1,500 if RC is $1,500)
-  const fullRcRate = Number(l.brokerRate || l.rate || l.grossAmount || l.driverPay || 0);
+  // Show driver the full Rate Con (RC) price clearly and their agreed driver pay
+  const grossAmount = Number(l.brokerRate || l.rate || l.grossAmount || 0);
+  const driverPay = Number(l.driverPay != null && !isNaN(Number(l.driverPay)) ? l.driverPay : (l.rate || l.brokerRate || grossAmount));
 
   // Derive explicit BOL & POD statuses
   const bolStatusRaw = String((docs.BOL && docs.BOL.status) || l.bolStatus || '').toUpperCase();
@@ -477,11 +474,11 @@ function shapeLoadForDriver(l, driverId) {
     brokerName: l.brokerName,
     brokerPhone: l.brokerPhone || null,
     brokerEmail: l.brokerEmail || null,
-    grossAmount: fullRcRate,
-    driverPay: fullRcRate,
-    rate: fullRcRate,
-    brokerRate: fullRcRate,
-    rcRate: fullRcRate,
+    grossAmount: grossAmount,
+    driverPay: driverPay,
+    rate: grossAmount,
+    brokerRate: grossAmount,
+    rcRate: grossAmount,
     status: l.status,
     driverProgress: l.driverProgress || l.driverCheckpoint || 'ASSIGNED',
     driverCheckpoint: l.driverProgress || l.driverCheckpoint || null,
@@ -896,7 +893,9 @@ router.post('/api/driver/location', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
   if (!requireModuleEnabled(req, res, ctx.state, 'driver_tracking_enabled', 'Driver GPS Tracking')) return;
-  const { latitude, longitude, speed, heading, loadId, sharingMode } = req.body || {};
+  const { speed, heading, loadId, sharingMode } = req.body || {};
+  const latitude = req.body && (req.body.latitude != null ? req.body.latitude : req.body.lat);
+  const longitude = req.body && (req.body.longitude != null ? req.body.longitude : req.body.lng);
   if (latitude == null || longitude == null) {
     return res.status(400).json({ error: 'Missing latitude or longitude' });
   }

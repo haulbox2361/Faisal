@@ -11,12 +11,22 @@ const chat = require('../lib/chatStore');
 const router = express.Router();
 router.use(express.json({ limit: '2mb' }));
 
-function requireParty(req, res) {
-  const { accountId, role } = req.body || req.query || {};
-  const type = role === 'dispatcher' ? 'dispatcher' : 'admin';
+async function requireParty(req, res) {
+  try {
+    const security = require('../lib/security');
+    const user = await security.authenticateRequest(req);
+    if (user) {
+      return { type: user.type || (user.role ? user.role.toLowerCase() : 'admin'), id: String(user.id) };
+    }
+  } catch (_) {}
+
+  const role = (req.body && req.body.role) || (req.query && req.query.role);
+  const accountId = (req.body && req.body.accountId) || (req.query && req.query.accountId);
+  const type = role === 'dispatcher' ? 'dispatcher' : (role === 'driver' ? 'driver' : 'admin');
   const id = String(accountId || (type === 'admin' ? 'admin' : '')).trim();
+
   if (!id) {
-    res.status(400).json({ error: 'Missing accountId' });
+    res.status(401).json({ error: 'Unauthorized: Valid session authentication required.' });
     return null;
   }
   return { type, id };
@@ -27,7 +37,7 @@ const dataStore = require('../lib/dataStore');
 
 // GET /api/chat/conversations?accountId=...&role=admin|dispatcher
 router.get('/api/chat/conversations', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   try {
     const convos = await chat.listConversationsFor(me);
@@ -40,7 +50,7 @@ router.get('/api/chat/conversations', async (req, res) => {
 
 // GET /api/chat/contacts?accountId=...&role=admin|dispatcher
 router.get('/api/chat/contacts', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   try {
     const state = (await dataStore.loadFullState()) || {};
@@ -80,7 +90,7 @@ router.get('/api/chat/contacts', async (req, res) => {
 
 // POST /api/chat/start  { accountId, role, withType, withId }
 router.post('/api/chat/start', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const { withType, withId } = req.body || {};
   if (!withType || !withId) return res.status(400).json({ error: 'Missing withType/withId' });
@@ -118,7 +128,7 @@ router.post('/api/chat/start', async (req, res) => {
 // Creates a group chat (e.g. Driver + Dispatcher + Admin/Owner). Creator is
 // added automatically if not already included in `members`.
 router.post('/api/chat/group', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const { name, members } = req.body || {};
   const list = Array.isArray(members) ? members.slice() : [];
@@ -135,7 +145,7 @@ router.post('/api/chat/group', async (req, res) => {
 
 // GET /api/chat/conversations/:id/messages?accountId=...&role=...
 async function getMessagesHandler(req, res) {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const conversationId = Number(req.params.id);
   try {
@@ -155,7 +165,7 @@ router.get('/api/chat/messages/:id', getMessagesHandler);
 
 // POST /api/chat/conversations/:id/messages  { accountId, role, name, body, loadId, loadNumber, attachment }
 async function postMessageHandler(req, res) {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const { name, body, loadId, loadNumber, attachment } = req.body || {};
   const text = String(body || '').trim();
@@ -203,7 +213,7 @@ router.post('/api/chat/messages/:id', postMessageHandler);
 
 // POST /api/chat/read/:id
 router.post('/api/chat/read/:id', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const conversationId = Number(req.params.id);
   try {
@@ -226,7 +236,7 @@ router.post('/api/chat/read/:id', async (req, res) => {
 
 // GET /api/chat/search?q=...&conversationId=...
 router.get('/api/chat/search', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const { q, conversationId } = req.query || {};
   try {
@@ -240,7 +250,7 @@ router.get('/api/chat/search', async (req, res) => {
 
 // POST /api/chat/typing { accountId, role, conversationId, isTyping }
 router.post('/api/chat/typing', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const { conversationId, isTyping } = req.body || {};
   if (!conversationId) return res.status(400).json({ error: 'Missing conversationId' });
@@ -262,7 +272,7 @@ router.post('/api/chat/typing', async (req, res) => {
 
 // GET /api/chat/typing/:id?accountId=...&role=...
 router.get('/api/chat/typing/:id', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const conversationId = Number(req.params.id);
   try {
@@ -275,7 +285,7 @@ router.get('/api/chat/typing/:id', async (req, res) => {
 
 // POST /api/chat/presence { accountId, role, isOnline }
 router.post('/api/chat/presence', async (req, res) => {
-  const me = requireParty(req, res);
+  const me = await requireParty(req, res);
   if (!me) return;
   const { isOnline } = req.body || {};
   chat.setUserPresence(me, isOnline !== false);

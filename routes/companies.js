@@ -16,10 +16,10 @@ const audit = require('../lib/auditStore');
  */
 async function requireAdmin(req, res, next) {
   try {
-    // 1. Check Admin PIN header (used by Admin settings & API clients)
+    // 1. Check Admin PIN header strictly against environment configuration
     const adminPin = req.headers['x-admin-pin'] || req.headers['x-admin-key'];
     const settingsPin = String(process.env.SETTINGS_ADMIN_PIN || '123456').trim();
-    if (adminPin && (String(adminPin).trim() === settingsPin || String(adminPin).trim() === '8483' || String(adminPin).trim() === '123456')) {
+    if (adminPin && String(adminPin).trim() === settingsPin) {
       req.adminUser = { id: 'admin', role: 'admin', name: 'System Admin' };
       return next();
     }
@@ -28,9 +28,21 @@ async function requireAdmin(req, res, next) {
     const authHeader = String(req.headers.authorization || '');
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
     if (token) {
+      // 2a. Check Google OAuth web session
+      try {
+        const authRoutes = require('./auth');
+        if (typeof authRoutes.verifySessionToken === 'function') {
+          const webSess = authRoutes.verifySessionToken(req);
+          if (webSess) {
+            req.adminUser = { id: webSess.accountId || 'admin', role: 'admin', name: 'System Admin' };
+            return next();
+          }
+        }
+      } catch (_) {}
+
       const state = await dataStore.loadFullState().catch(() => ({}));
       const dispatchers = state.dispatchers || [];
-      const disp = dispatchers.find(d => d.sessionToken === token || d.id === token);
+      const disp = dispatchers.find(d => d.sessionToken && d.sessionToken === token);
       if (disp && (disp.role === 'admin' || disp.role === 'super_admin' || disp.role === 'superadmin')) {
         req.adminUser = { id: disp.id, role: disp.role, name: disp.name };
         return next();
