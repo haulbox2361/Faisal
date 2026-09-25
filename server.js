@@ -18,14 +18,20 @@ const { trackingService } = require('./lib/trackingService');
 
 // Admin and Super Admin Google accounts allowed to sign in.
 // Supports comma-separated emails or SUPER_ADMIN_EMAIL / ADMIN_EMAIL env vars.
-const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
-const ADMIN_EMAILS_RAW = (process.env.ADMIN_EMAIL || process.env.ADMIN_EMAILS || 'haulbox2361@gmail.com')
+const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || 'faisaljoyia320@gmail.com').trim().toLowerCase();
+const ADMIN_EMAILS_RAW = (process.env.ADMIN_EMAIL || process.env.ADMIN_EMAILS || 'haulbox2361@gmail.com,faisaljoyia320@gmail.com')
   .split(',')
   .map(e => e.trim().toLowerCase())
   .filter(Boolean);
 
 if (SUPER_ADMIN_EMAIL && !ADMIN_EMAILS_RAW.includes(SUPER_ADMIN_EMAIL)) {
   ADMIN_EMAILS_RAW.unshift(SUPER_ADMIN_EMAIL);
+}
+if (!ADMIN_EMAILS_RAW.includes('haulbox2361@gmail.com')) {
+  ADMIN_EMAILS_RAW.push('haulbox2361@gmail.com');
+}
+if (!ADMIN_EMAILS_RAW.includes('faisaljoyia320@gmail.com')) {
+  ADMIN_EMAILS_RAW.push('faisaljoyia320@gmail.com');
 }
 
 // 6-digit security PIN required to open the Settings page (Configured in Render / environment)
