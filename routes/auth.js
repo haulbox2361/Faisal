@@ -12,20 +12,25 @@ const router = express.Router();
 const pendingStates = new Map();
 
 function popupResponseHtml(payload) {
-  // Posts the result back to the window that opened the popup, then closes
-  // itself. `*` targetOrigin is fine here — the payload contains nothing
-  // secret (an email address + accountId), and the opener only trusts
-  // messages of type google-auth-success/google-auth-error anyway.
   return `<!DOCTYPE html><html><body>
 <script>
+  const msg = ${JSON.stringify(payload)};
   try {
     if (window.opener) {
-      window.opener.postMessage(${JSON.stringify(payload)}, '*');
+      window.opener.postMessage(msg, '*');
     }
+  } catch (e) {}
+  try {
+    const bc = new BroadcastChannel('haulbox_oauth_channel');
+    bc.postMessage(msg);
+    bc.close();
+  } catch (e) {}
+  try {
+    localStorage.setItem('haulbox_oauth_msg', JSON.stringify({ payload: msg, at: Date.now() }));
   } catch (e) {}
   window.close();
 </script>
-<p>You can close this window.</p>
+<p>Sign-in complete. You can close this window.</p>
 </body></html>`;
 }
 

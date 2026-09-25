@@ -48,6 +48,7 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
 }));
 
 // Strict Auth Rate Limiter (10 attempts per 15 minutes per IP for login and PIN verification)

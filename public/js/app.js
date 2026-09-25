@@ -5243,25 +5243,88 @@
     // (or rejects on error / on the user just closing the popup).
     function openGoogleOAuthPopup(accountId) {
       return new Promise((resolve, reject) => {
+        try { localStorage.removeItem('haulbox_oauth_msg'); } catch (_) {}
         const popup = window.open('/auth/google?accountId=' + encodeURIComponent(accountId), 'haulline-google-oauth', 'width=520,height=650');
         if (!popup) { reject(new Error('POPUP_BLOCKED')); return; }
         let settled = false;
+
+        function finish(data) {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          if (data && data.type === 'google-auth-success') {
+            resolve(data);
+          } else {
+            reject(new Error((data && data.error) || 'Google sign-in failed.'));
+          }
+        }
+
         function onMsg(ev) {
           if (!ev.data || (ev.data.type !== 'google-auth-success' && ev.data.type !== 'google-auth-error')) return;
-          settled = true;
-          window.removeEventListener('message', onMsg);
-          clearInterval(poll);
-          if (ev.data.type === 'google-auth-success') resolve(ev.data);
-          else reject(new Error(ev.data.error || 'Google sign-in failed.'));
+          finish(ev.data);
         }
-        window.addEventListener('message', onMsg);
-        const poll = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(poll);
-            window.removeEventListener('message', onMsg);
-            if (!settled) reject(new Error('CLOSED'));
+
+        let bc = null;
+        try {
+          bc = new BroadcastChannel('haulbox_oauth_channel');
+          bc.onmessage = (ev) => {
+            if (ev.data && (ev.data.type === 'google-auth-success' || ev.data.type === 'google-auth-error')) {
+              finish(ev.data);
+            }
+          };
+        } catch (_) {}
+
+        function onStorage(ev) {
+          if (ev.key === 'haulbox_oauth_msg' && ev.newValue) {
+            try {
+              const parsed = JSON.parse(ev.newValue);
+              if (parsed && parsed.payload) finish(parsed.payload);
+            } catch (_) {}
           }
-        }, 500);
+        }
+
+        window.addEventListener('message', onMsg);
+        window.addEventListener('storage', onStorage);
+
+        function cleanup() {
+          window.removeEventListener('message', onMsg);
+          window.removeEventListener('storage', onStorage);
+          if (bc) { try { bc.close(); } catch (_) {} }
+          clearInterval(poll);
+          try { localStorage.removeItem('haulbox_oauth_msg'); } catch (_) {}
+        }
+
+        const poll = setInterval(() => {
+          try {
+            const raw = localStorage.getItem('haulbox_oauth_msg');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && parsed.payload) {
+                finish(parsed.payload);
+                return;
+              }
+            }
+          } catch (_) {}
+
+          if (popup.closed) {
+            setTimeout(() => {
+              if (!settled) {
+                try {
+                  const raw = localStorage.getItem('haulbox_oauth_msg');
+                  if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && parsed.payload) {
+                      finish(parsed.payload);
+                      return;
+                    }
+                  }
+                } catch (_) {}
+                cleanup();
+                reject(new Error('CLOSED'));
+              }
+            }, 300);
+          }
+        }, 400);
       });
     }
 
