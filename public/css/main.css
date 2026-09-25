@@ -5043,10 +5043,10 @@
     }
 
     .nav-item.active {
-      background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
+      background: linear-gradient(135deg, #1E40AF 0%, #0F2D5C 100%) !important;
       color: #FFFFFF !important;
       font-weight: 700 !important;
-      box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+      box-shadow: 0 4px 14px rgba(30,64,175,0.4) !important;
     }
 
     .nav-item.active svg {
@@ -5220,16 +5220,16 @@
     }
 
     .btn-accent {
-      background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
+      background: linear-gradient(135deg, #1E40AF 0%, #0F2D5C 100%) !important;
       border-color: transparent !important;
       color: #FFFFFF !important;
       font-weight: 700 !important;
-      box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+      box-shadow: 0 4px 14px rgba(30,64,175,0.35) !important;
     }
 
     .btn-accent:hover {
-      background: linear-gradient(135deg, #0284C7 0%, #1D4ED8 100%) !important;
-      box-shadow: 0 6px 20px rgba(14,165,233,0.45) !important;
+      background: linear-gradient(135deg, #1D4ED8 0%, #0C2049 100%) !important;
+      box-shadow: 0 6px 20px rgba(30,64,175,0.45) !important;
     }
 
     .btn-sm {
@@ -5332,8 +5332,8 @@
     select option { background: #FFFFFF !important; color: #0F172A !important; }
 
     input:focus, select:focus, textarea:focus {
-      border-color: #0EA5E9 !important;
-      box-shadow: 0 0 0 3px rgba(14,165,233,0.18) !important;
+      border-color: #1E40AF !important;
+      box-shadow: 0 0 0 3px rgba(30,64,175,0.18) !important;
       outline: none !important;
     }
 
@@ -5363,10 +5363,10 @@
     }
 
     .tab-btn.active, .lb-filter-tab.active {
-      background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
+      background: linear-gradient(135deg, #1E40AF 0%, #0F2D5C 100%) !important;
       border-color: transparent !important;
       color: #FFFFFF !important;
-      box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+      box-shadow: 0 4px 14px rgba(30,64,175,0.35) !important;
     }
 
     .lb-filter-tab-badge {

@@ -2623,9 +2623,26 @@
 
       const elRevenue = document.getElementById('kpi-revenue-num');
       if (elRevenue) {
-        const rev = weekGross || 42650;
+        const rev = weekGross || 0;
         elRevenue.setAttribute('data-countup', Math.round(rev));
         elRevenue.textContent = '$' + Math.round(rev).toLocaleString();
+      }
+      const weekLoadsCount = allLoads.filter(l => {
+        if (!l.systemDate) return false;
+        const d = new Date(l.systemDate + 'T00:00:00');
+        return d >= weekStart;
+      }).length;
+      const elRevDelta = document.getElementById('kpi-revenue-delta');
+      if (elRevDelta) {
+        if (weekLoadsCount > 0) {
+          elRevDelta.textContent = `${weekLoadsCount} load${weekLoadsCount !== 1 ? 's' : ''} in last 7 days`;
+          elRevDelta.style.color = '#059669';
+          elRevDelta.style.fontWeight = '700';
+        } else {
+          elRevDelta.textContent = 'No loads in last 7 days';
+          elRevDelta.style.color = '#64748b';
+          elRevDelta.style.fontWeight = '600';
+        }
       }
 
       triggerCountUpAnimations();
