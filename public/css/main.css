@@ -4978,17 +4978,138 @@
     }
 
     /* =========================================================================
-       HAULBOX LIGHT THEME & HIGH-VISIBILITY CONTRAST MASTER OVERRIDES
-       Matches website aesthetic: light backgrounds, crisp dark text, clear fonts
+       HAULBOX PROFESSIONAL THEME — IMPRESSIVE, CLEAN & MODERN
+       Navy sidebar · Rich accent blues · Subtle depth · Dark-on-light contrast
        ========================================================================= */
+
+    /* ── Base ── */
     :root, html, body {
-      background-color: #F8FAFC !important;
+      background-color: #EEF2F7 !important;
       color: #0F172A !important;
       font-size: 16px !important;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
 
-    /* All panels, cards, containers have clean white background with crisp border */
+    /* ── Sidebar — deep navy, premium feel ── */
+    #sidebar {
+      background: #0F172A !important;
+      border-right: none !important;
+      width: 245px !important;
+      min-width: 245px !important;
+      box-shadow: 4px 0 24px rgba(15,23,42,0.15) !important;
+    }
+
+    .brand {
+      border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    }
+
+    .brand-name {
+      color: #FFFFFF !important;
+    }
+
+    .brand-sub {
+      color: rgba(255,255,255,0.45) !important;
+    }
+
+    .nav-section-label {
+      color: rgba(255,255,255,0.35) !important;
+      font-weight: 800 !important;
+      font-size: 11.5px !important;
+      letter-spacing: 0.12em !important;
+    }
+
+    .nav-item {
+      color: rgba(255,255,255,0.72) !important;
+      font-size: 15px !important;
+      font-weight: 600 !important;
+      padding: 11px 14px !important;
+      gap: 12px !important;
+      border-radius: 10px !important;
+    }
+
+    .nav-item svg {
+      width: 19px !important;
+      height: 19px !important;
+      color: rgba(255,255,255,0.5) !important;
+    }
+
+    .nav-item:hover {
+      background: rgba(255,255,255,0.09) !important;
+      color: #FFFFFF !important;
+    }
+
+    .nav-item:hover svg {
+      color: #FFFFFF !important;
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
+      color: #FFFFFF !important;
+      font-weight: 700 !important;
+      box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
+    }
+
+    .nav-item.active svg {
+      color: #FFFFFF !important;
+    }
+
+    .nav-item.active::before {
+      display: none !important;
+    }
+
+    .sidebar-foot {
+      border-top: 1px solid rgba(255,255,255,0.08) !important;
+    }
+
+    .role-chip {
+      background: rgba(255,255,255,0.1) !important;
+      color: rgba(255,255,255,0.85) !important;
+      border-color: rgba(255,255,255,0.15) !important;
+      font-size: 12.5px !important;
+      font-weight: 700 !important;
+    }
+
+    .role-dot {
+      background: #10B981 !important;
+    }
+
+    /* ── Topbar ── */
+    #topbar {
+      background: #FFFFFF !important;
+      border-bottom: 1px solid #E2E8F0 !important;
+      height: 68px !important;
+      box-shadow: 0 1px 12px rgba(15,23,42,0.06) !important;
+    }
+
+    #pagetitle {
+      font-size: 22px !important;
+      font-weight: 800 !important;
+      letter-spacing: -0.025em !important;
+      color: #0F172A !important;
+    }
+
+    .user-pill {
+      background: #F8FAFC !important;
+      border: 1.5px solid #E2E8F0 !important;
+    }
+
+    .user-pill-name {
+      font-size: 14.5px !important;
+      font-weight: 700 !important;
+      color: #0F172A !important;
+    }
+
+    .user-pill-role {
+      font-size: 12.5px !important;
+      color: #64748B !important;
+    }
+
+    /* ── Viewport / page background ── */
+    #viewport {
+      background: #EEF2F7 !important;
+    }
+
+    /* ── Panels, cards, containers ── */
     .panel,
     .stat-card,
     .chart-card,
@@ -4996,15 +5117,64 @@
     .login-card,
     .about-modal-card {
       background: #FFFFFF !important;
-      border-color: #E2E8F0 !important;
+      border: 1px solid #E2E8F0 !important;
+      border-radius: 14px !important;
       color: #0F172A !important;
+      box-shadow: 0 1px 6px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.04) !important;
     }
 
-    /* All headings */
+    /* ── Stat cards — colorful left accent bars ── */
+    .stat-card {
+      padding: 20px 22px !important;
+      position: relative !important;
+      overflow: hidden !important;
+    }
+
+    .stat-card::after {
+      width: 4px !important;
+      border-radius: 0 2px 2px 0 !important;
+    }
+
+    /* Top-right accent glow per card color */
+    .stat-card::before {
+      content: '' !important;
+      position: absolute !important;
+      top: -30px !important;
+      right: -30px !important;
+      width: 100px !important;
+      height: 100px !important;
+      border-radius: 50% !important;
+      background: var(--stat-color, #0EA5E9) !important;
+      opacity: 0.06 !important;
+      pointer-events: none !important;
+    }
+
+    .stat-label {
+      color: #475569 !important;
+      font-weight: 700 !important;
+      font-size: 13px !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.08em !important;
+    }
+
+    .stat-value {
+      color: #0F172A !important;
+      font-weight: 800 !important;
+      font-size: 34px !important;
+    }
+
+    .stat-delta {
+      font-weight: 600 !important;
+      font-size: 13px !important;
+    }
+
+    .stat-delta.up { color: #059669 !important; }
+    .stat-delta.down { color: #DC2626 !important; }
+
+    /* ── Section headings ── */
     h1, h2, h3, h4, h5, h6,
     .font-display,
     .brand-name,
-    #pagetitle,
     .modal-head h3,
     .section-head h2,
     .chart-card h3 {
@@ -5014,149 +5184,52 @@
       letter-spacing: -0.015em !important;
     }
 
-    #pagetitle, h1 {
-      font-size: 26px !important;
-      font-weight: 800 !important;
-      letter-spacing: -0.02em !important;
-    }
+    h1 { font-size: 26px !important; font-weight: 800 !important; }
+    h2, .section-head h2 { font-size: 18px !important; font-weight: 700 !important; }
+    h3, .modal-head h3, .chart-card h3 { font-size: 17px !important; font-weight: 700 !important; }
 
-    h2, .section-head h2 {
-      font-size: 19px !important;
-      font-weight: 700 !important;
-    }
-
-    h3, .modal-head h3, .chart-card h3 {
-      font-size: 18px !important;
-      font-weight: 700 !important;
-    }
-
-    /* Form fields, inputs, selects, textareas */
-    .field label,
-    form label,
-    label {
-      color: #1E293B !important;
-      font-weight: 700 !important;
-      font-size: 14px !important;
-      letter-spacing: 0.02em !important;
-      margin-bottom: 3px !important;
-    }
-
-    input, select, textarea,
-    .field input, .field select, .field textarea,
-    .search-box input {
-      background: #FFFFFF !important;
-      color: #0F172A !important;
-      border: 1.5px solid #CBD5E1 !important;
-      font-size: 15.5px !important;
-      font-weight: 500 !important;
-      padding: 12px 14px !important;
-      border-radius: 9px !important;
-    }
-
-    input::placeholder,
-    textarea::placeholder {
-      color: #64748B !important;
-      font-size: 14.5px !important;
-      font-weight: 400 !important;
-    }
-
-    select option {
-      background: #FFFFFF !important;
-      color: #0F172A !important;
-      font-size: 15px !important;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: #0284C7 !important;
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
-      outline: none !important;
-    }
-
-    .field .hint {
-      font-size: 13.5px !important;
-      color: #475569 !important;
-      font-weight: 500 !important;
-    }
-
-    /* High contrast table styling */
-    table.data {
-      background: #FFFFFF !important;
-      border-collapse: separate !important;
-      border-spacing: 0 !important;
-      border: 1px solid #E2E8F0 !important;
-      border-radius: 12px !important;
-      overflow: hidden !important;
-      font-size: 15px !important;
-    }
-
-    table.data thead th {
-      background: #F8FAFC !important;
-      color: #1E293B !important;
-      font-size: 13px !important;
-      font-weight: 800 !important;
-      letter-spacing: 0.04em !important;
+    .section-head h2 {
       text-transform: uppercase !important;
-      padding: 14px 16px !important;
-      border-bottom: 2px solid #CBD5E1 !important;
-    }
-
-    table.data tbody td {
-      color: #0F172A !important;
-      font-size: 15px !important;
-      font-weight: 500 !important;
-      padding: 14px 16px !important;
-      border-bottom: 1px solid #F1F5F9 !important;
-    }
-
-    table.data tbody tr:hover td {
-      background: #F8FAFC !important;
-    }
-
-    .cell-dim {
+      letter-spacing: 0.07em !important;
       color: #334155 !important;
-      font-size: 14.5px !important;
-      font-weight: 500 !important;
     }
 
-    .cell-strong {
-      color: #0F172A !important;
-      font-size: 15px !important;
-      font-weight: 700 !important;
+    .chart-card h3 {
+      text-transform: uppercase !important;
+      letter-spacing: 0.08em !important;
+      color: #475569 !important;
     }
 
-    .cell-mono {
-      font-size: 14.5px !important;
-      font-weight: 700 !important;
-    }
-
-    /* Buttons */
+    /* ── Buttons ── */
     .btn {
-      font-size: 14.5px !important;
+      font-size: 14px !important;
       font-weight: 700 !important;
-      border-radius: 8px !important;
-      border: 1.5px solid #CBD5E1 !important;
+      border-radius: 9px !important;
+      border: 1.5px solid #D1D5DB !important;
       background: #FFFFFF !important;
-      color: #0F172A !important;
+      color: #1E293B !important;
       padding: 10px 18px !important;
+      transition: all 0.18s ease !important;
     }
 
     .btn:hover {
-      background: #F1F5F9 !important;
+      background: #F8FAFC !important;
       border-color: #94A3B8 !important;
       color: #0F172A !important;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.08) !important;
     }
 
     .btn-accent {
-      background: #0284C7 !important;
-      border-color: #0284C7 !important;
+      background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
+      border-color: transparent !important;
       color: #FFFFFF !important;
       font-weight: 700 !important;
+      box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
     }
 
     .btn-accent:hover {
-      background: #0369A1 !important;
-      border-color: #0369A1 !important;
-      color: #FFFFFF !important;
+      background: linear-gradient(135deg, #0284C7 0%, #1D4ED8 100%) !important;
+      box-shadow: 0 6px 20px rgba(14,165,233,0.45) !important;
     }
 
     .btn-sm {
@@ -5168,66 +5241,132 @@
     .btn-ghost {
       background: transparent !important;
       border-color: transparent !important;
-      color: #334155 !important;
+      color: #475569 !important;
       font-weight: 600 !important;
     }
 
     .btn-ghost:hover {
       background: #F1F5F9 !important;
       color: #0F172A !important;
+      border-color: transparent !important;
     }
 
-    /* Muted text upgraded for readability */
-    .stat-label {
+    .btn-danger {
+      background: rgba(220,38,38,0.08) !important;
+      border-color: rgba(220,38,38,0.25) !important;
+      color: #DC2626 !important;
+    }
+
+    .btn-danger:hover {
+      background: rgba(220,38,38,0.14) !important;
+    }
+
+    /* ── Tables ── */
+    table.data {
+      background: #FFFFFF !important;
+      border-collapse: separate !important;
+      border-spacing: 0 !important;
+      border: 1px solid #E2E8F0 !important;
+      border-radius: 12px !important;
+      overflow: hidden !important;
+      font-size: 15px !important;
+    }
+
+    table.data thead th {
+      background: #F1F5F9 !important;
       color: #334155 !important;
+      font-size: 12.5px !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.06em !important;
+      text-transform: uppercase !important;
+      padding: 14px 16px !important;
+      border-bottom: 2px solid #CBD5E1 !important;
+    }
+
+    table.data tbody td {
+      color: #0F172A !important;
+      font-size: 15px !important;
+      font-weight: 500 !important;
+      padding: 13px 16px !important;
+      border-bottom: 1px solid #F1F5F9 !important;
+    }
+
+    table.data tbody tr:nth-child(even) td {
+      background: #F8FAFC !important;
+    }
+
+    table.data tbody tr:hover td {
+      background: #EFF6FF !important;
+    }
+
+    .cell-dim { color: #475569 !important; font-size: 14.5px !important; font-weight: 500 !important; }
+    .cell-strong { color: #0F172A !important; font-size: 15px !important; font-weight: 700 !important; }
+    .cell-mono { font-size: 14.5px !important; font-weight: 700 !important; }
+
+    /* ── Form inputs ── */
+    .field label, form label, label {
+      color: #1E293B !important;
       font-weight: 700 !important;
       font-size: 14px !important;
+      letter-spacing: 0.02em !important;
     }
 
-    .stat-value {
+    input, select, textarea,
+    .field input, .field select, .field textarea,
+    .search-box input {
+      background: #FFFFFF !important;
       color: #0F172A !important;
-      font-weight: 800 !important;
-      font-size: 34px !important;
-    }
-
-    .stat-delta {
-      color: #334155 !important;
-      font-weight: 600 !important;
-      font-size: 13.5px !important;
-    }
-
-    .activity-text {
-      color: #0F172A !important;
-      font-size: 14.5px !important;
-    }
-
-    .activity-time {
-      color: #475569 !important;
+      border: 1.5px solid #CBD5E1 !important;
+      font-size: 15.5px !important;
       font-weight: 500 !important;
-      font-size: 13px !important;
+      padding: 11px 14px !important;
+      border-radius: 9px !important;
     }
 
-    /* Tab filters */
+    input::placeholder, textarea::placeholder {
+      color: #94A3B8 !important;
+      font-size: 14.5px !important;
+      font-weight: 400 !important;
+    }
+
+    select option { background: #FFFFFF !important; color: #0F172A !important; }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: #0EA5E9 !important;
+      box-shadow: 0 0 0 3px rgba(14,165,233,0.18) !important;
+      outline: none !important;
+    }
+
+    .field .hint {
+      font-size: 13.5px !important;
+      color: #64748B !important;
+      font-weight: 500 !important;
+    }
+
+    /* ── Tab filters / filter tabs ── */
     .tab-btn, .lb-filter-tab {
       background: #FFFFFF !important;
-      border: 1.5px solid #CBD5E1 !important;
-      color: #334155 !important;
+      border: 1.5px solid #D1D5DB !important;
+      color: #475569 !important;
       font-size: 14px !important;
       font-weight: 700 !important;
       border-radius: 9px !important;
       padding: 9px 18px !important;
+      transition: all 0.18s ease !important;
     }
 
     .tab-btn:hover, .lb-filter-tab:hover {
       background: #F8FAFC !important;
       color: #0F172A !important;
       border-color: #94A3B8 !important;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.07) !important;
     }
 
     .tab-btn.active, .lb-filter-tab.active {
-      background: #0284C7 !important;
-      border-color: #0284C7 !important;
+      background: linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%) !important;
+      border-color: transparent !important;
       color: #FFFFFF !important;
+      box-shadow: 0 4px 14px rgba(14,165,233,0.35) !important;
     }
 
     .lb-filter-tab-badge {
@@ -5235,80 +5374,77 @@
       font-weight: 800 !important;
     }
 
-    /* Sidebar and navigation */
-    #sidebar {
-      background: #FFFFFF !important;
-      border-right: 1.5px solid #E2E8F0 !important;
-      width: 245px !important;
-      min-width: 245px !important;
-    }
-
-    .nav-item {
-      color: #334155 !important;
-      font-size: 15px !important;
-      font-weight: 600 !important;
-      padding: 12px 14px !important;
-      gap: 12px !important;
-    }
-
-    .nav-item svg {
-      width: 19px !important;
-      height: 19px !important;
-      color: #475569 !important;
-    }
-
-    .nav-item:hover {
-      background: #F1F5F9 !important;
+    /* ── Activity feed ── */
+    .activity-text {
       color: #0F172A !important;
-    }
-
-    .nav-item:hover svg {
-      color: #0F172A !important;
-    }
-
-    .nav-item.active {
-      background: rgba(2, 132, 199, 0.12) !important;
-      color: #0284C7 !important;
-      font-weight: 700 !important;
-    }
-
-    .nav-item.active svg {
-      color: #0284C7 !important;
-    }
-
-    .nav-section-label {
-      color: #475569 !important;
-      font-weight: 800 !important;
-      font-size: 12px !important;
-      letter-spacing: 0.1em !important;
-    }
-
-    /* Topbar */
-    #topbar {
-      background: #FFFFFF !important;
-      border-bottom: 1.5px solid #E2E8F0 !important;
-      height: 72px !important;
-    }
-
-    .user-pill-name {
       font-size: 14.5px !important;
-      font-weight: 700 !important;
-      color: #0F172A !important;
     }
 
-    .user-pill-role {
-      font-size: 12.5px !important;
-      color: #475569 !important;
+    .activity-time {
+      color: #64748B !important;
+      font-weight: 500 !important;
+      font-size: 13px !important;
     }
 
-    .role-chip {
-      font-size: 12.5px !important;
-      font-weight: 700 !important;
-    }
-
-    /* Status placards / pills */
+    /* ── Status placards / pills ── */
     .placard {
       font-weight: 700 !important;
       font-size: 13px !important;
-      padding: 6px 12px !important;
+      padding: 5px 12px !important;
     }
+
+    /* ── Search box in topbar ── */
+    .search-box {
+      background: #F8FAFC !important;
+      border: 1.5px solid #E2E8F0 !important;
+      border-radius: 9px !important;
+    }
+
+    .search-box input {
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+    }
+
+    /* ── Icon buttons ── */
+    .icon-btn {
+      background: #F8FAFC !important;
+      border: 1.5px solid #E2E8F0 !important;
+      border-radius: 9px !important;
+    }
+
+    .icon-btn:hover {
+      background: #EEF2F7 !important;
+      border-color: #CBD5E1 !important;
+    }
+
+    /* ── Toolbar separators and wrappers ── */
+    .toolbar { gap: 10px !important; }
+
+    /* ── Modal overlay ── */
+    .modal-overlay { background: rgba(15,23,42,0.55) !important; backdrop-filter: blur(4px) !important; }
+
+    .modal { border-radius: 16px !important; }
+
+    .modal-head {
+      border-bottom: 1px solid #E2E8F0 !important;
+      padding: 22px 28px 18px !important;
+    }
+
+    .modal-head h3 {
+      font-size: 19px !important;
+      font-weight: 800 !important;
+    }
+
+    .modal-foot {
+      border-top: 1px solid #E2E8F0 !important;
+      padding: 18px 28px !important;
+      background: #F8FAFC !important;
+      border-radius: 0 0 16px 16px !important;
+    }
+
+    /* ── Scrollbar improvements ── */
+    ::-webkit-scrollbar { width: 7px !important; height: 7px !important; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1 !important; border-radius: 8px !important; }
+    ::-webkit-scrollbar-track { background: transparent !important; }
