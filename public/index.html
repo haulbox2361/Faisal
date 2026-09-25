@@ -439,23 +439,23 @@
 
     <!-- ============ MAIN ============ -->
     <div id="main">
-      <div id="topbar" style="background:#ffffff;border-bottom:1px solid #e2e8f0;height:68px;padding:0 28px;">
+      <div id="topbar" style="background:#ffffff;border-bottom:1.5px solid #e2e8f0;height:72px;padding:0 28px;">
         <div class="topbar-left">
           <div>
-            <h1 id="pagetitle" style="font-size:20px;font-weight:700;margin:0;color:#0f172a;">Dispatcher Dashboard</h1>
-            <div style="font-size:12px;color:#64748b;margin-top:2px;">Overview & Operations</div>
+            <h1 id="pagetitle" style="font-size:26px;font-weight:800;margin:0;color:#0f172a;letter-spacing:-0.02em;">Dispatcher Dashboard</h1>
+            <div style="font-size:13.5px;color:#475569;margin-top:3px;font-weight:600;">Overview & Operations</div>
           </div>
         </div>
         <div class="topbar-right" style="gap:16px;">
           <div class="search-box"
-            style="width:340px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;">
+            style="width:360px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:10px;padding:10px 16px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              style="width:16px;height:16px;color:#94a3b8;">
+              style="width:18px;height:18px;color:#475569;">
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4.3-4.3" />
             </svg>
             <input id="globalsearch" placeholder="Search loads, drivers, documents..."
-              oninput="globalSearch(this.value)" style="font-size:13px;color:#0f172a;">
+              oninput="globalSearch(this.value)" style="font-size:15px;color:#0f172a;font-weight:500;">
           </div>
           <div style="position:relative;">
             <button class="icon-btn" id="notif-bell-btn" title="Notifications" onclick="toggleNotifications()"
@@ -526,10 +526,10 @@
                 </svg>
               </div>
               <div>
-                <div style="font-size:13px;font-weight:700;color:#334155;">Available Drivers</div>
+                <div style="font-size:14.5px;font-weight:700;color:#334155;">Available Drivers</div>
                 <div class="kpi-num" id="kpi-available-drivers-num" data-countup="4" data-suffix=" / 7"
-                  style="font-size:28px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">4 / 7</div>
-                <div id="kpi-available-drivers-sub" style="font-size:12px;color:#475569;font-weight:600;">4 available • 3 on road</div>
+                  style="font-size:34px;font-weight:800;color:#0f172a;margin:3px 0 5px;line-height:1.1;">4 / 7</div>
+                <div id="kpi-available-drivers-sub" style="font-size:13px;color:#475569;font-weight:600;">4 available • 3 on road</div>
               </div>
             </div>
 
@@ -548,10 +548,10 @@
                 </svg>
               </div>
               <div>
-                <div style="font-size:13px;font-weight:700;color:#334155;">Active Loads Today</div>
+                <div style="font-size:14.5px;font-weight:700;color:#334155;">Active Loads Today</div>
                 <div class="kpi-num" id="kpi-active-loads-num" data-countup="18"
-                  style="font-size:28px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">18</div>
-                <div id="kpi-active-loads-sub" style="font-size:12px;color:#15803d;font-weight:700;">Active in transit</div>
+                  style="font-size:34px;font-weight:800;color:#0f172a;margin:3px 0 5px;line-height:1.1;">18</div>
+                <div id="kpi-active-loads-sub" style="font-size:13px;color:#15803d;font-weight:700;">Active in transit</div>
               </div>
             </div>
 
@@ -569,10 +569,10 @@
                 </svg>
               </div>
               <div>
-                <div style="font-size:13px;font-weight:700;color:#334155;">Today's Pickups</div>
+                <div style="font-size:14.5px;font-weight:700;color:#334155;">Today's Pickups</div>
                 <div class="kpi-num" id="kpi-pickups-num" data-countup="7"
-                  style="font-size:28px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">7</div>
-                <div id="kpi-pickups-sub" style="font-size:12px;color:#15803d;font-weight:700;">Scheduled for today</div>
+                  style="font-size:34px;font-weight:800;color:#0f172a;margin:3px 0 5px;line-height:1.1;">7</div>
+                <div id="kpi-pickups-sub" style="font-size:13px;color:#15803d;font-weight:700;">Scheduled for today</div>
               </div>
             </div>
 
@@ -591,10 +591,10 @@
                 </svg>
               </div>
               <div>
-                <div style="font-size:13px;font-weight:700;color:#334155;">Today's Deliveries</div>
+                <div style="font-size:14.5px;font-weight:700;color:#334155;">Today's Deliveries</div>
                 <div class="kpi-num" id="kpi-deliveries-num" data-countup="5"
-                  style="font-size:28px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">5</div>
-                <div id="kpi-deliveries-sub" style="font-size:12px;color:#15803d;font-weight:700;">Arriving today</div>
+                  style="font-size:34px;font-weight:800;color:#0f172a;margin:3px 0 5px;line-height:1.1;">5</div>
+                <div id="kpi-deliveries-sub" style="font-size:13px;color:#15803d;font-weight:700;">Arriving today</div>
               </div>
             </div>
 
@@ -613,10 +613,10 @@
                 </svg>
               </div>
               <div>
-                <div style="font-size:13px;font-weight:700;color:#334155;">Weekly Gross</div>
+                <div style="font-size:14.5px;font-weight:700;color:#334155;">Weekly Gross</div>
                 <div class="kpi-num" id="kpi-revenue-num" data-countup="42650" data-prefix="$"
-                  style="font-size:28px;font-weight:800;color:#0f172a;margin:2px 0 4px;line-height:1.1;">$42,650</div>
-                <div style="font-size:12px;color:#15803d;font-weight:700;">↗ 12.5% from last week</div>
+                  style="font-size:34px;font-weight:800;color:#0f172a;margin:3px 0 5px;line-height:1.1;">$42,650</div>
+                <div style="font-size:13px;color:#15803d;font-weight:700;">↗ 12.5% from last week</div>
               </div>
             </div>
           </div>

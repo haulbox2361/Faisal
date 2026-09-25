@@ -4984,6 +4984,7 @@
     :root, html, body {
       background-color: #F8FAFC !important;
       color: #0F172A !important;
+      font-size: 16px !important;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
 
@@ -5013,9 +5014,20 @@
       letter-spacing: -0.015em !important;
     }
 
-    #pagetitle {
-      font-size: 22px !important;
+    #pagetitle, h1 {
+      font-size: 26px !important;
       font-weight: 800 !important;
+      letter-spacing: -0.02em !important;
+    }
+
+    h2, .section-head h2 {
+      font-size: 19px !important;
+      font-weight: 700 !important;
+    }
+
+    h3, .modal-head h3, .chart-card h3 {
+      font-size: 18px !important;
+      font-weight: 700 !important;
     }
 
     /* Form fields, inputs, selects, textareas */
@@ -5024,8 +5036,9 @@
     label {
       color: #1E293B !important;
       font-weight: 700 !important;
-      font-size: 12.5px !important;
+      font-size: 14px !important;
       letter-spacing: 0.02em !important;
+      margin-bottom: 3px !important;
     }
 
     input, select, textarea,
@@ -5034,20 +5047,23 @@
       background: #FFFFFF !important;
       color: #0F172A !important;
       border: 1.5px solid #CBD5E1 !important;
-      font-size: 14px !important;
+      font-size: 15.5px !important;
       font-weight: 500 !important;
-      border-radius: 8px !important;
+      padding: 12px 14px !important;
+      border-radius: 9px !important;
     }
 
     input::placeholder,
     textarea::placeholder {
       color: #64748B !important;
+      font-size: 14.5px !important;
       font-weight: 400 !important;
     }
 
     select option {
       background: #FFFFFF !important;
       color: #0F172A !important;
+      font-size: 15px !important;
     }
 
     input:focus, select:focus, textarea:focus {
@@ -5056,32 +5072,39 @@
       outline: none !important;
     }
 
+    .field .hint {
+      font-size: 13.5px !important;
+      color: #475569 !important;
+      font-weight: 500 !important;
+    }
+
     /* High contrast table styling */
     table.data {
       background: #FFFFFF !important;
       border-collapse: separate !important;
       border-spacing: 0 !important;
       border: 1px solid #E2E8F0 !important;
-      border-radius: 10px !important;
+      border-radius: 12px !important;
       overflow: hidden !important;
+      font-size: 15px !important;
     }
 
     table.data thead th {
       background: #F8FAFC !important;
       color: #1E293B !important;
-      font-size: 12px !important;
-      font-weight: 700 !important;
+      font-size: 13px !important;
+      font-weight: 800 !important;
       letter-spacing: 0.04em !important;
       text-transform: uppercase !important;
-      padding: 12px 14px !important;
+      padding: 14px 16px !important;
       border-bottom: 2px solid #CBD5E1 !important;
     }
 
     table.data tbody td {
       color: #0F172A !important;
-      font-size: 13.5px !important;
+      font-size: 15px !important;
       font-weight: 500 !important;
-      padding: 13px 14px !important;
+      padding: 14px 16px !important;
       border-bottom: 1px solid #F1F5F9 !important;
     }
 
@@ -5091,22 +5114,30 @@
 
     .cell-dim {
       color: #334155 !important;
+      font-size: 14.5px !important;
       font-weight: 500 !important;
     }
 
     .cell-strong {
       color: #0F172A !important;
+      font-size: 15px !important;
+      font-weight: 700 !important;
+    }
+
+    .cell-mono {
+      font-size: 14.5px !important;
       font-weight: 700 !important;
     }
 
     /* Buttons */
     .btn {
-      font-size: 13px !important;
-      font-weight: 600 !important;
+      font-size: 14.5px !important;
+      font-weight: 700 !important;
       border-radius: 8px !important;
       border: 1.5px solid #CBD5E1 !important;
       background: #FFFFFF !important;
       color: #0F172A !important;
+      padding: 10px 18px !important;
     }
 
     .btn:hover {
@@ -5128,6 +5159,12 @@
       color: #FFFFFF !important;
     }
 
+    .btn-sm {
+      font-size: 13px !important;
+      font-weight: 700 !important;
+      padding: 7px 13px !important;
+    }
+
     .btn-ghost {
       background: transparent !important;
       border-color: transparent !important;
@@ -5144,66 +5181,79 @@
     .stat-label {
       color: #334155 !important;
       font-weight: 700 !important;
-      font-size: 12px !important;
+      font-size: 14px !important;
     }
 
     .stat-value {
       color: #0F172A !important;
       font-weight: 800 !important;
+      font-size: 34px !important;
     }
 
     .stat-delta {
       color: #334155 !important;
       font-weight: 600 !important;
-      font-size: 12.5px !important;
+      font-size: 13.5px !important;
     }
 
     .activity-text {
       color: #0F172A !important;
-      font-size: 13.5px !important;
+      font-size: 14.5px !important;
     }
 
     .activity-time {
       color: #475569 !important;
       font-weight: 500 !important;
-      font-size: 12px !important;
+      font-size: 13px !important;
     }
 
     /* Tab filters */
-    .tab-btn {
+    .tab-btn, .lb-filter-tab {
       background: #FFFFFF !important;
       border: 1.5px solid #CBD5E1 !important;
       color: #334155 !important;
-      font-size: 12.5px !important;
-      font-weight: 600 !important;
-      border-radius: 8px !important;
+      font-size: 14px !important;
+      font-weight: 700 !important;
+      border-radius: 9px !important;
+      padding: 9px 18px !important;
     }
 
-    .tab-btn:hover {
+    .tab-btn:hover, .lb-filter-tab:hover {
       background: #F8FAFC !important;
       color: #0F172A !important;
       border-color: #94A3B8 !important;
     }
 
-    .tab-btn.active {
+    .tab-btn.active, .lb-filter-tab.active {
       background: #0284C7 !important;
       border-color: #0284C7 !important;
       color: #FFFFFF !important;
+    }
+
+    .lb-filter-tab-badge {
+      font-size: 12px !important;
+      font-weight: 800 !important;
     }
 
     /* Sidebar and navigation */
     #sidebar {
       background: #FFFFFF !important;
       border-right: 1.5px solid #E2E8F0 !important;
+      width: 245px !important;
+      min-width: 245px !important;
     }
 
     .nav-item {
       color: #334155 !important;
-      font-size: 14px !important;
+      font-size: 15px !important;
       font-weight: 600 !important;
+      padding: 12px 14px !important;
+      gap: 12px !important;
     }
 
     .nav-item svg {
+      width: 19px !important;
+      height: 19px !important;
       color: #475569 !important;
     }
 
@@ -5229,17 +5279,36 @@
     .nav-section-label {
       color: #475569 !important;
       font-weight: 800 !important;
-      font-size: 11.5px !important;
+      font-size: 12px !important;
+      letter-spacing: 0.1em !important;
     }
 
     /* Topbar */
     #topbar {
       background: #FFFFFF !important;
       border-bottom: 1.5px solid #E2E8F0 !important;
+      height: 72px !important;
+    }
+
+    .user-pill-name {
+      font-size: 14.5px !important;
+      font-weight: 700 !important;
+      color: #0F172A !important;
+    }
+
+    .user-pill-role {
+      font-size: 12.5px !important;
+      color: #475569 !important;
+    }
+
+    .role-chip {
+      font-size: 12.5px !important;
+      font-weight: 700 !important;
     }
 
     /* Status placards / pills */
     .placard {
       font-weight: 700 !important;
-      font-size: 12px !important;
+      font-size: 13px !important;
+      padding: 6px 12px !important;
     }
