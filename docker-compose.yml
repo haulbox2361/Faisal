@@ -1,0 +1,60 @@
+services:
+  haulbox-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: haulbox_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/haulbox}
+      - SESSION_SECRET=${SESSION_SECRET:-change_me_super_secret_32_characters_random}
+      - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-haulbox2361@gmail.com}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-haulbox2361@gmail.com}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-haulbox2361@gmail.com}
+      - SETTINGS_ADMIN_PIN=${SETTINGS_ADMIN_PIN:-123456}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3000/auth/google/callback}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+    depends_on:
+      - postgres
+
+  vetta-website:
+    build:
+      context: ./vetta-website
+      dockerfile: Dockerfile
+    container_name: vetta_website
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3001}
+      - NEXT_PUBLIC_SITE_NAME=${NEXT_PUBLIC_SITE_NAME:-VETTA}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:-}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS:-hello@vetta.com}
+      - EMAIL_TO_ADDRESS=${EMAIL_TO_ADDRESS:-inquiries@vetta.com}
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: haulbox_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=haulbox
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

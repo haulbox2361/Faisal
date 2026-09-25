@@ -1954,6 +1954,68 @@ router.post('/api/driver/notifications/:id/read', async (req, res) => {
   }
 });
 
+// POST /api/driver/notifications/read-all
+router.post('/api/driver/notifications/read-all', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  try {
+    const count = await notifications.markAllRead('driver', ctx.driver.id);
+    res.json({ ok: true, count });
+  } catch (e) {
+    console.error('driver notifications mark-all-read failed:', e);
+    res.status(500).json({ error: 'Failed to mark all notifications as read' });
+  }
+});
+
+// DELETE /api/driver/notifications/clear-all
+router.delete('/api/driver/notifications/clear-all', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  try {
+    const count = await notifications.clearAll('driver', ctx.driver.id);
+    res.json({ ok: true, count });
+  } catch (e) {
+    console.error('driver notifications clear-all failed:', e);
+    res.status(500).json({ error: 'Failed to clear notifications' });
+  }
+});
+
+// POST /api/driver/push-token (Registers native mobile FCM device token)
+async function handleRegisterPushToken(req, res) {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { token, platform } = req.body || {};
+  if (!token) {
+    return res.status(400).json({ error: 'Missing device push token' });
+  }
+  try {
+    const registered = await fcm.registerDeviceToken(ctx.driver.id, String(token).trim(), platform || 'android');
+    res.json({ ok: registered, message: registered ? 'Push token registered successfully' : 'Failed to register token' });
+  } catch (e) {
+    console.error('driver push token registration failed:', e);
+    res.status(500).json({ error: 'Failed to register push token' });
+  }
+}
+router.post('/api/driver/push-token', handleRegisterPushToken);
+router.post('/api/driver/device-token', handleRegisterPushToken);
+
+// DELETE /api/driver/push-token (Unregisters device push token on logout)
+async function handleRemovePushToken(req, res) {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const { token } = req.body || {};
+  try {
+    const removed = await fcm.removeDeviceToken(ctx.driver.id, token ? String(token).trim() : null);
+    res.json({ ok: removed, message: 'Push token deregistered' });
+  } catch (e) {
+    console.error('driver push token removal failed:', e);
+    res.status(500).json({ error: 'Failed to deregister push token' });
+  }
+}
+router.delete('/api/driver/push-token', handleRemovePushToken);
+router.delete('/api/driver/device-token', handleRemovePushToken);
+
+
 // ---------------------------------------------------------------------------
 // Chat — a driver may only message contacts Admin has explicitly allowed
 // (driver.allowedContacts, an array of {type,id} — defaults to Admin only).
@@ -2440,6 +2502,28 @@ async function handleReviewAction(req, res) {
             }
 
             await saveFullState(state);
+
+            // Dispatch Push & Real-Time Notification to Assigned Driver
+            if (load.driverId) {
+              const dType = (docType || 'BOL').toUpperCase();
+              if (action === 'APPROVE') {
+                notificationService.dispatchNotification({
+                  recipientType: 'driver',
+                  recipientId: String(load.driverId),
+                  type: `${dType}_APPROVED`,
+                  title: `✅ ${dType} Approved: #${load.loadNumber || load.id}`,
+                  body: `Your ${dType} has been verified and approved by Dispatch.`,
+                  data: { loadId: String(load.id || loadId), docType: dType, screen: 'current_load' },
+                }).catch(e => console.error('[ReviewAction] Driver push notification error:', e));
+              } else {
+                notificationService.notifyDriverDocCorrectionRequired(
+                  String(load.driverId),
+                  load,
+                  dType,
+                  reason || `Your ${dType} was rejected by Dispatch. Please retake photo.`
+                ).catch(e => console.error('[ReviewAction] Driver push notification error:', e));
+              }
+            }
           }
         }
       } catch (syncErr) {

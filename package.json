@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node tests/full_system_verification.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -21,6 +22,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^8.7.0",
     "express-session": "^1.18.0",
+    "firebase-admin": "^12.0.0",
     "google-auth-library": "^9.11.0",
     "googleapis": "^140.0.1",
     "helmet": "^8.3.0",

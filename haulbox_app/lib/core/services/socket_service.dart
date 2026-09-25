@@ -21,6 +21,7 @@ class SocketService {
   final _docApprovedController = StreamController<Map<String, dynamic>>.broadcast();
   final _docRejectedController = StreamController<Map<String, dynamic>>.broadcast();
   final _loadUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _notificationController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
   Stream<Map<String, dynamic>> get typingStream => _typingController.stream;
@@ -29,6 +30,7 @@ class SocketService {
   Stream<Map<String, dynamic>> get docApprovedStream => _docApprovedController.stream;
   Stream<Map<String, dynamic>> get docRejectedStream => _docRejectedController.stream;
   Stream<Map<String, dynamic>> get loadUpdatedStream => _loadUpdatedController.stream;
+  Stream<Map<String, dynamic>> get notificationStream => _notificationController.stream;
 
   bool get isConnected => _isConnected;
 
@@ -116,6 +118,21 @@ class SocketService {
         debugPrint('[SocketService] Real-time load:updated received: $data');
         if (data != null && data is Map) {
           _loadUpdatedController.add(Map<String, dynamic>.from(data));
+        }
+      });
+
+      // 5. Listen for push / new notification events
+      _socket!.on('notification:new', (data) {
+        debugPrint('[SocketService] Real-time notification:new received: $data');
+        if (data != null && data is Map) {
+          _notificationController.add(Map<String, dynamic>.from(data));
+        }
+      });
+
+      _socket!.on('driver:notification', (data) {
+        debugPrint('[SocketService] Real-time driver:notification received: $data');
+        if (data != null && data is Map) {
+          _notificationController.add(Map<String, dynamic>.from(data));
         }
       });
 

@@ -5,7 +5,10 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -14,7 +17,15 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: SUPER_ADMIN_EMAIL
+        value: haulbox2361@gmail.com
       - key: ADMIN_EMAIL
         value: haulbox2361@gmail.com
+      - key: ADMIN_EMAILS
+        value: haulbox2361@gmail.com
+      - key: SETTINGS_ADMIN_PIN
+        sync: false
       - key: DATABASE_URL
+        sync: false
+      - key: MISTRAL_API_KEY
         sync: false

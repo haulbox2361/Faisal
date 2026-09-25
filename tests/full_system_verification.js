@@ -229,6 +229,7 @@ async function run() {
 
   } finally {
     server.close();
+    process.exit(0);
   }
 }
 

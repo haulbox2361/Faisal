@@ -11,6 +11,8 @@ import '../../core/services/location_service.dart';
 import '../../shared/models/load_model.dart';
 import '../../shared/models/load_state.dart';
 import '../auth/auth_provider.dart';
+import '../notifications/notifications_provider.dart';
+import '../notifications/notifications_screen.dart';
 import '../photo_upload/document_camera_screen.dart';
 import 'widgets/active_trip_hero_card.dart';
 import 'widgets/load_specs_card.dart';
@@ -715,6 +717,54 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
           style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.4),
         ),
         actions: [
+          Consumer<NotificationsProvider>(
+            builder: (context, notifs, _) {
+              final unread = notifs.unreadCount;
+              return IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen()),
+                  );
+                },
+                icon: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(Icons.notifications_none_rounded,
+                        color: Colors.white, size: 22),
+                    if (unread > 0)
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: AppColors.emeraldPrimary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: const Color(0xFF0F172A), width: 1.5),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 14,
+                            minHeight: 14,
+                          ),
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
           Container(
             margin: const EdgeInsets.only(right: 14),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

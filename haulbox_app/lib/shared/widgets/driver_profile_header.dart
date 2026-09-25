@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../features/notifications/notifications_provider.dart';
+import '../../features/notifications/notifications_screen.dart';
 import '../models/driver_model.dart';
 
 class DriverProfileHeader extends StatelessWidget {
@@ -138,36 +141,63 @@ class DriverProfileHeader extends StatelessWidget {
           ),
 
           // Notification Icon
-          InkWell(
-            onTap: onNotificationTap,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 20),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: AppColors.emeraldPrimary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.surfaceDark, width: 1.5),
-                      ),
-                    ),
+          Consumer<NotificationsProvider>(
+            builder: (context, notifs, _) {
+              final unread = notifs.unreadCount;
+              return InkWell(
+                onTap: onNotificationTap ??
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const NotificationsScreen()),
+                      );
+                    },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
                   ),
-                ],
-              ),
-            ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(Icons.notifications_none_rounded,
+                          color: Colors.white, size: 20),
+                      if (unread > 0)
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: AppColors.emeraldPrimary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.surfaceDark, width: 1.5),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 14,
+                              minHeight: 14,
+                            ),
+                            child: Text(
+                              unread > 9 ? '9+' : '$unread',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

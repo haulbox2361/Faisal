@@ -294,6 +294,30 @@ io.on('connection', (socket) => {
       io.to(`conv_${convId}`).emit('new_message', msgPayload);
       io.emit('conversation_updated', { conversationId: convId, lastMessage: msgPayload });
 
+      // Dispatch push notification to other participants in conversation
+      chatStore.getConversationParticipants(convId).then(participants => {
+        for (const p of participants) {
+          if (p.type === user.type && String(p.id) === String(user.id)) continue;
+          
+          io.to(`user_${p.type}_${p.id}`).emit('notification:new', {
+            type: 'chat_message',
+            title: `💬 ${user.name || 'New Message'}`,
+            body: text || (attachment ? `[Attachment: ${attachment.name || 'File'}]` : ''),
+            data: { conversationId: convId, senderId: user.id, senderType: user.type, screen: 'chat' },
+            createdAt: msgPayload.createdAt,
+          });
+
+          if (p.type === 'driver') {
+            const notificationService = require('./lib/notificationService');
+            notificationService.notifyDriverDispatcherMessage(
+              String(p.id),
+              user.name || 'Dispatcher',
+              text || (attachment ? `[Attachment: ${attachment.name || 'File'}]` : '')
+            ).catch(() => {});
+          }
+        }
+      }).catch(err => console.warn('[Socket.IO Chat] Participant notify error:', err.message));
+
       if (typeof ack === 'function') {
         ack({ ok: true, message: msgPayload });
       }

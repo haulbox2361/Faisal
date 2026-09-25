@@ -6,8 +6,8 @@ import '../../shared/models/load_model.dart';
 import '../../shared/models/payment_model.dart';
 
 class ApiClient {
-  static const String prodUrl = 'https://haulbox-x5jz.onrender.com';
-  static String baseUrl = kIsWeb ? 'http://localhost:3000' : (kDebugMode ? 'http://10.0.2.2:3000' : prodUrl);
+  static const String prodUrl = String.fromEnvironment('API_URL', defaultValue: 'https://haulbox-x5jz.onrender.com');
+  static String baseUrl = kIsWeb ? 'http://localhost:3000' : (kDebugMode ? (prodUrl.isNotEmpty ? prodUrl : 'http://10.0.2.2:3000') : prodUrl);
 
   static void setBaseUrl(String url) {
     if (url.endsWith('/')) {
@@ -580,4 +580,112 @@ class ApiClient {
     }
     return null;
   }
+
+  // 22. Fetch Driver Notifications
+  static Future<List<Map<String, dynamic>>> fetchNotifications(String token, {bool unreadOnly = false}) async {
+    final uri = Uri.parse('$baseUrl/api/driver/notifications').replace(
+      queryParameters: unreadOnly ? {'unread': '1'} : null,
+    );
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['notifications'] is List) {
+          return List<Map<String, dynamic>>.from(
+            (data['notifications'] as List).map((x) => Map<String, dynamic>.from(x)),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] fetchNotifications error: $e');
+    }
+    return [];
+  }
+
+  // 23. Mark Single Notification as Read
+  static Future<bool> markNotificationRead(String token, dynamic notificationId) async {
+    final uri = Uri.parse('$baseUrl/api/driver/notifications/$notificationId/read');
+    try {
+      final response = await http.post(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] markNotificationRead error: $e');
+    }
+    return false;
+  }
+
+  // 24. Mark All Notifications as Read
+  static Future<bool> markAllNotificationsRead(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/notifications/read-all');
+    try {
+      final response = await http.post(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] markAllNotificationsRead error: $e');
+    }
+    return false;
+  }
+
+  // 25. Clear All Notifications
+  static Future<bool> clearAllNotifications(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/notifications/clear-all');
+    try {
+      final response = await http.delete(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] clearAllNotifications error: $e');
+    }
+    return false;
+  }
+
+  // 26. Register Device Push Token
+  static Future<bool> registerPushToken(String token, String pushToken, {String platform = 'android'}) async {
+    final uri = Uri.parse('$baseUrl/api/driver/push-token');
+    try {
+      final response = await http.post(
+        uri,
+        headers: authHeaders(token),
+        body: jsonEncode({
+          'token': pushToken,
+          'platform': platform,
+        }),
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] registerPushToken error: $e');
+    }
+    return false;
+  }
+
+  // 27. Remove Device Push Token on Logout
+  static Future<bool> removePushToken(String token, {String? pushToken}) async {
+    final uri = Uri.parse('$baseUrl/api/driver/push-token');
+    try {
+      final response = await http.delete(
+        uri,
+        headers: authHeaders(token),
+        body: pushToken != null ? jsonEncode({'token': pushToken}) : null,
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] removePushToken error: $e');
+    }
+    return false;
+  }
 }
+

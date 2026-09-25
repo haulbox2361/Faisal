@@ -1,4 +1,6 @@
-# HaulBoX Backend
+# HaulBoX Logistics Platform
+
+> 🚀 **Ready to deploy everything?** Check out the step-by-step [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for deploying the HaulBoX Dispatch Web Platform, VETTA Website, and Driver Mobile App.
 
 Node/Express backend for the HaulBoX Dispatch Command frontend. It handles:
 

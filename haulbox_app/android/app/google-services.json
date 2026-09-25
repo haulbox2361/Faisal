@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1077115621884",
+    "project_id": "haulbox-2361",
+    "storage_bucket": "haulbox-2361.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1077115621884:android:2d2cf552025df81278a279",
+        "android_client_info": {
+          "package_name": "com.example.haulbox_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaEEeasrHM1MgfgN2Fxzm2Fl5BeHtEe7Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

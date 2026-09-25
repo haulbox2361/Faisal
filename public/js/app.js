@@ -1040,6 +1040,30 @@
       }
     }
 
+    function requestBrowserNotificationPermission() {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+
+    function notifyDriverLoadAssigned(load) {
+      if (!load || !load.driverId) return;
+      fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: currentAccountId(),
+          role: STATE.role || 'dispatcher',
+          toType: 'driver',
+          toId: String(load.driverId),
+          type: 'load_assigned',
+          title: '📦 New Load Assigned: #' + (load.loadNumber || load.id),
+          body: (load.pickup || 'Origin') + ' ➔ ' + (load.dropoff || 'Destination') + ' • Pay: $' + (load.driverPay || load.brokerRate || '0') + '. Tap to review & accept.',
+          data: { loadId: String(load.id), screen: 'load_detail' },
+        })
+      }).catch(err => console.warn('[Notification] Failed to notify driver:', err));
+    }
+
     function pushNotification(title, sub, meta = {}) {
       STATE.notifications = STATE.notifications || [];
       STATE.notifications.unshift({
@@ -1054,6 +1078,16 @@
       persist();
       renderNotifications();
       renderDashboardNotifications();
+
+      // Trigger Browser Push Notification if permission granted
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(title || 'HaulBoX Alert', {
+            body: sub || '',
+            icon: '/favicon.png',
+          });
+        } catch (_) {}
+      }
     }
 
     function onNotificationClicked(notifId) {
@@ -3769,6 +3803,9 @@
       load.status = computeStatus(load);
       STATE.loads.unshift(load);
       pushNotification('New load booked — ' + load.loadNumber, (broker ? broker.name + ' · ' : '') + (load.pickup || '') + ' → ' + (load.dropoff || ''), { type: 'load', targetId: load.id });
+      if (load.driverId) {
+        notifyDriverLoadAssigned(load);
+      }
       syncLoadToSheet(load);
       persist();
       // Auto-upload RC to Google Drive on load creation
@@ -7991,6 +8028,7 @@
           return;
         }
       }
+      setTimeout(() => requestBrowserNotificationPermission(), 2000);
       const params = new URLSearchParams(window.location.search);
       const shareToken = params.get('share');
       const validShare = shareToken ? (STATE.settings.shares || []).find(x => x.token === shareToken && x.active) : null;

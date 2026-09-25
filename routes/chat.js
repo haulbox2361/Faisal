@@ -202,6 +202,32 @@ async function postMessageHandler(req, res) {
       io.emit('conversation_updated', { conversationId, lastMessage: msgPayload });
     }
 
+    // Push notification to other participants in conversation
+    chat.getConversationParticipants(conversationId).then(participants => {
+      for (const p of participants) {
+        if (p.type === me.type && String(p.id) === String(me.id)) continue;
+        
+        if (io) {
+          io.to(`user_${p.type}_${p.id}`).emit('notification:new', {
+            type: 'chat_message',
+            title: `💬 ${name || me.name || 'New Message'}`,
+            body: text || (attachment ? `[Attachment: ${attachment.name || 'File'}]` : ''),
+            data: { conversationId, senderId: me.id, senderType: me.type, screen: 'chat' },
+            createdAt: msgPayload.createdAt,
+          });
+        }
+
+        if (p.type === 'driver') {
+          const notificationService = require('../lib/notificationService');
+          notificationService.notifyDriverDispatcherMessage(
+            String(p.id),
+            name || me.name || 'Dispatcher',
+            text || (attachment ? `[Attachment: ${attachment.name || 'File'}]` : '')
+          ).catch(() => {});
+        }
+      }
+    }).catch(err => console.warn('[Chat] Participant push notify error:', err.message));
+
     res.json({ ok: true, message: msgPayload });
   } catch (e) {
     console.error('chat send failed:', e);

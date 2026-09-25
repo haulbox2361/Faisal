@@ -458,6 +458,11 @@ class AuthProvider extends ChangeNotifier {
   // 11. Logout (Only on explicit driver action)
   Future<void> logout() async {
     _autoSyncTimer?.cancel();
+    final oldToken = _token;
+    if (oldToken != null) {
+      ApiClient.removePushToken(oldToken).catchError((_) => false);
+    }
+    SocketService().disconnect();
     _token = null;
     _role = 'DRIVER';
     _driver = null;
