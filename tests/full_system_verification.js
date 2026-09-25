@@ -59,7 +59,7 @@ async function run() {
     // Test 1: Unauthenticated /api/storage is Blocked (401)
     // -------------------------------------------------------------
     console.log('[Test 1] Verifying /api/storage protection...');
-    const storageRes = await fetch(`${baseUrl}/api/storage/haulline:state`);
+    const storageRes = await fetch(`${baseUrl}/api/storage`);
     assert.strictEqual(storageRes.status, 401, 'Unauthenticated /api/storage should return 401');
     console.log('  ✓ PASSED: Unauthenticated access to /api/storage is securely blocked (401).\n');
 

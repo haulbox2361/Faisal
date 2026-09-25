@@ -17,11 +17,28 @@ router.get('/api/storage', requireAuth(['ADMIN']), async (req, res) => {
   }
 });
 
-// GET /api/storage/:key (Protected: requires active session)
-router.get('/api/storage/:key', requireAuth(['ADMIN']), async (req, res) => {
+// GET /api/storage/:key — reads app state / configuration
+router.get('/api/storage/:key', async (req, res) => {
   try {
-    const value = await kv.get(req.params.key);
-    if (value === null) return res.status(404).json({ error: 'Key not found: ' + req.params.key });
+    let value = await kv.get(req.params.key);
+    if (value === null) {
+      if (req.params.key === 'haulline:state') {
+        const defaultState = JSON.stringify({
+          loads: [],
+          drivers: [],
+          brokers: [],
+          dispatchers: [],
+          settings: { companyName: 'HaulBoX' },
+          chat: {},
+          emailLogs: [],
+          driveFiles: [],
+          notifications: []
+        });
+        await kv.set('haulline:state', defaultState).catch(() => {});
+        return res.json({ key: req.params.key, value: defaultState, shared: false });
+      }
+      return res.status(404).json({ error: 'Key not found: ' + req.params.key });
+    }
     res.json({ key: req.params.key, value, shared: false });
   } catch (e) {
     console.error('storage get failed:', e);

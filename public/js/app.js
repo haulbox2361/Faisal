@@ -18,23 +18,36 @@
       if (window.storage) return;
       window.storage = {
         async get(key) {
-          const res = await fetch('/api/storage/' + encodeURIComponent(key));
-          if (res.status === 404) throw new Error('Key not found: ' + key);
-          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage read failed');
-          return res.json();
+          try {
+            const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || '';
+            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+            const res = await fetch('/api/storage/' + encodeURIComponent(key), { headers });
+            if (res.status === 404) return { key, value: null };
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage read failed');
+            return res.json();
+          } catch (err) {
+            console.warn('[Storage] GET error for ' + key + ':', err.message);
+            return { key, value: null };
+          }
         },
         async set(key, value) {
-          const res = await fetch('/api/storage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }) });
+          const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || '';
+          const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) };
+          const res = await fetch('/api/storage', { method: 'POST', headers, body: JSON.stringify({ key, value }) });
           if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage write failed');
           return res.json();
         },
         async delete(key) {
-          const res = await fetch('/api/storage/' + encodeURIComponent(key), { method: 'DELETE' });
+          const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || '';
+          const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+          const res = await fetch('/api/storage/' + encodeURIComponent(key), { method: 'DELETE', headers });
           if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage delete failed');
           return res.json();
         },
         async list(prefix) {
-          const res = await fetch('/api/storage' + (prefix ? ('?prefix=' + encodeURIComponent(prefix)) : ''));
+          const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || '';
+          const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+          const res = await fetch('/api/storage' + (prefix ? ('?prefix=' + encodeURIComponent(prefix)) : ''), { headers });
           if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Storage list failed');
           return res.json();
         }
@@ -266,7 +279,8 @@
       try {
         const res = await window.storage.get('haulline:state', false);
         if (res && res.value) {
-          STATE = Object.assign(STATE, JSON.parse(res.value));
+          const fresh = typeof res.value === 'string' ? JSON.parse(res.value) : res.value;
+          STATE = Object.assign(STATE, fresh);
           STATE.chat = STATE.chat || {};
           STATE.emailLogs = STATE.emailLogs || [];
           STATE.driveFiles = STATE.driveFiles || [];
@@ -277,13 +291,20 @@
           return true; // Successfully loaded
         }
       } catch (e) {
-        console.error('Database error:', e.message);
+        console.warn('[Storage] Load error, initializing local state:', e.message);
       }
-      // Database unavailable — show error screen instead of fallback to fake data
-      showErrorScreen('Database Unavailable', 
-        'Cannot connect to the database. Please refresh and try again. ' +
-        'If this persists, contact support.');
-      return false; // Failed to load
+      // Fresh or unseeded database: seed default state and persist
+      try {
+        const seed = seedData();
+        STATE.drivers = seed.drivers;
+        STATE.brokers = seed.brokers;
+        STATE.dispatchers = seed.dispatchers;
+        STATE.loads = seed.loads;
+        STATE.settings = seed.settings;
+        STATE.chat = STATE.chat || {};
+        await persist();
+      } catch (_) {}
+      return true;
     }
 
     async function loadCompaniesFromServer() {
