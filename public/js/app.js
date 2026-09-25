@@ -547,6 +547,7 @@
           return false;
         }
 
+        STATE.sessionToken = sessionToken;
         const verifiedEmail = data.email.toLowerCase().trim();
         const adminEmails = await loadAdminEmailConfig();
         const matchedDispatcher = (STATE.dispatchers || []).find(d => (d.email || '').trim().toLowerCase() === verifiedEmail);
@@ -3557,7 +3558,8 @@
 
       try {
         if (provider === 'mistral') {
-          const key = (STATE.settings.aiMistralKey || '').trim();
+          const mistralInput = document.getElementById('s-ai-mistralkey');
+          const key = (mistralInput && mistralInput.value ? mistralInput.value : (STATE.settings && STATE.settings.aiMistralKey) || '').trim();
           if (!key) throw new Error('Please enter a Mistral API key above before testing.');
           await callMistralForDoc(sampleBase64, 'image/png', false, 'Return {"status":"ok"}');
         } else if (provider === 'gemini') {
@@ -3648,16 +3650,23 @@
       return safeParseJsonFromAi(text);
     }
     async function callMistralForDoc(base64, mediaType, isPdf, prompt) {
-      const key = (STATE.settings.aiMistralKey || '').trim();
+      const mistralInput = document.getElementById('s-ai-mistralkey');
+      const key = (mistralInput && mistralInput.value ? mistralInput.value : (STATE.settings && STATE.settings.aiMistralKey) || '').trim();
       if (!key) throw new Error('No Mistral AI API key set — add one in Settings → AI RC Extraction.');
-      let model = (STATE.settings.aiMistralModel || '').trim();
+      let model = (STATE.settings && STATE.settings.aiMistralModel || '').trim();
       if (!model || model === 'mistral-small-latest' || model === 'mistral-tiny' || model === 'mistral-medium') {
         model = 'pixtral-12b-2409';
       }
       console.log('[MISTRAL-CLIENT] 🚀 Dispatching extraction request to /api/ai/mistral-extract', { model, isPdf, mediaType, promptLength: prompt.length });
+      const token = (typeof localStorage !== 'undefined' && localStorage.getItem('haulbox_web_session_token')) || STATE.sessionToken || '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
+        headers['x-session-token'] = token;
+      }
       const resp = await fetch('/api/ai/mistral-extract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ apiKey: key, model, prompt, base64, mediaType, isPdf })
       });
       let data = {};

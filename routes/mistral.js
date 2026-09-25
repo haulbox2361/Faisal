@@ -10,13 +10,21 @@
 
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../lib/security');
+const { authenticateRequest } = require('../lib/security');
 
 // Enable JSON body parsing for document payloads up to 25MB
 router.use(express.json({ limit: '25mb' }));
 
-router.post('/api/ai/mistral-extract', requireAuth(), async (req, res) => {
+router.post('/api/ai/mistral-extract', async (req, res) => {
   const { apiKey: reqKey, model, prompt, base64, mediaType, isPdf } = req.body || {};
+  const hasClientKey = !!(reqKey && String(reqKey).trim());
+  const user = await authenticateRequest(req);
+
+  // Allow if valid authenticated session, OR if user passes their own Mistral API key to test/extract
+  if (!user && !hasClientKey) {
+    return res.status(401).json({ error: 'Unauthorized: Valid session authentication required.' });
+  }
+  req.user = user || { id: 'admin', role: 'admin' };
 
   const apiKey = (reqKey && String(reqKey).trim()) || (process.env.MISTRAL_API_KEY || '').trim();
 

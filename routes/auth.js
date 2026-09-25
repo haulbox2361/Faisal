@@ -42,9 +42,8 @@ function generateSessionToken() {
 }
 
 function verifySessionToken(req) {
-  const authHeader = req.headers['authorization'] || '';
-  if (!authHeader.startsWith('Bearer ')) return null;
-  const token = authHeader.slice(7).trim();
+  const authHeader = String(req.headers['authorization'] || req.headers['x-session-token'] || req.headers['x-auth-token'] || '');
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
   if (!token) return null;
 
   const session = webSessions.get(token);
