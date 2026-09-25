@@ -9380,14 +9380,20 @@
 
     // Theme init before login (so login screen matches preference)
     (function () {
-      let pref = 'dark';
-      try { pref = localStorage.getItem('haulline-theme-pref') || 'dark'; } catch (e) { }
-      document.documentElement.setAttribute('data-theme', pref);
+      let pref = 'light';
+      try {
+        pref = localStorage.getItem('haulline-theme-pref') || 'light';
+        if (pref !== 'light') {
+          pref = 'light';
+          localStorage.setItem('haulline-theme-pref', 'light');
+        }
+      } catch (e) { pref = 'light'; }
+      document.documentElement.setAttribute('data-theme', 'light');
       document.addEventListener('DOMContentLoaded', () => {
         const darkBtn = document.getElementById('theme-dark-btn');
-        if (darkBtn) darkBtn.classList.toggle('active', pref === 'dark');
+        if (darkBtn) darkBtn.classList.toggle('active', false);
         const lightBtn = document.getElementById('theme-light-btn');
-        if (lightBtn) lightBtn.classList.toggle('active', pref === 'light');
+        if (lightBtn) lightBtn.classList.toggle('active', true);
         if (isDriverModeRequested()) {
           initDriverMode();
           return;
