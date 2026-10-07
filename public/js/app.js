@@ -925,12 +925,26 @@
       if (savedView === 'settings' && !IS_SETTINGS_PIN_UNLOCKED) {
         savedView = 'dashboard';
       }
+
+      // Safe global UI helpers initialization
+      try { if (typeof updateBranding === 'function') updateBranding(); } catch (e) { }
+      try { if (typeof populateDropdowns === 'function') populateDropdowns(); } catch (e) { }
+      try { if (typeof populateStatFilters === 'function') populateStatFilters(); } catch (e) { }
+      try { if (typeof updateChatBadge === 'function') updateChatBadge(); } catch (e) { }
+      try { if (typeof initDailyNotesReminder === 'function') initDailyNotesReminder(); } catch (e) { }
+
+      const feeEl = document.getElementById('f-feepct');
+      if (feeEl) feeEl.value = (STATE.settings && STATE.settings.defaultFeePct) || 10;
+      const dpDefEl = document.getElementById('f-driverpaypct');
+      if (dpDefEl && typeof defaultDriverPayPct === 'function') dpDefEl.value = defaultDriverPayPct();
+
       try {
         switchView(savedView);
       } catch (err) {
         console.error('switchView error in init:', err);
         const targetViewEl = document.getElementById('view-dashboard');
         if (targetViewEl) targetViewEl.classList.add('active');
+        try { renderDashboard(); } catch (e) { }
       }
 
       // Restore active modal state if refreshing while viewing a load
@@ -2487,14 +2501,15 @@
 
     async function renderLiveDashboardMap() {
       initDashboardMap();
-      if (!dashboardMap) return;
+      if (!dashboardMap && typeof L === 'undefined') {
+        setTimeout(renderLiveDashboardMap, 300);
+      }
 
       let drivers = visibleDrivers();
       const compSelect = document.getElementById('tracking-company-select');
       if (compSelect && compSelect.value) {
         drivers = drivers.filter(d => (d.companyId || d.company_id || 'COMP-LEGACY') === compSelect.value);
       }
-      await fetchTrackingCache();
 
       // Populate Driver Choice dropdown in tracking header
       const select = document.getElementById('tracking-driver-select');
@@ -2503,6 +2518,12 @@
         const optionsHtml = '<option value="">-- Choose Driver to Track --</option>' +
           drivers.map(d => `<option value="${escapeAttr(d.id)}" ${d.id === currentVal ? 'selected' : ''}>${escapeHtml(d.name)} (${escapeHtml(d.truck || 'Truck #' + (d.code || '101'))})</option>`).join('');
         select.innerHTML = optionsHtml;
+      }
+
+      await fetchTrackingCache();
+
+      if (dashboardMap) {
+        setTimeout(() => { if (dashboardMap) dashboardMap.invalidateSize(); }, 150);
       }
 
       const curSelected = select && select.value ? select.value : (drivers[0] ? drivers[0].id : '');
@@ -8325,42 +8346,8 @@
     // previously hammered Supabase every 5s was eliminated in commit e41893f.
     // Do NOT re-introduce polling here — it will exhaust the Supabase free-tier egress quota.
 
-    /* ================= INIT ================= */
-    async function init() {
-      if (!STATE._loaded) {
-        const loaded = await loadState();
-        STATE._loaded = true;
-        if (!loaded) {
-          // Error screen already shown by loadState(); app initialization stopped
-          console.error('Failed to load application state');
-          return;
-        }
-      }
-      setTimeout(() => requestBrowserNotificationPermission(), 2000);
-      const params = new URLSearchParams(window.location.search);
-      const shareToken = params.get('share');
-      const validShare = shareToken ? (STATE.settings.shares || []).find(x => x.token === shareToken && x.active) : null;
-      if (params.get('view') === 'readonly' || validShare) {
-        STATE.role = 'viewonly';
-        STATE.currentDispatcherId = null;
-        STATE.viewAs = (validShare && validShare.viewMode === 'dispatcher') ? validShare.dispatcherId : null;
-      }
-      applyRoleUI();
-      populateViewAsField();
-      populateDropdowns();
-      populateStatFilters();
-      renderChat();
-      updateChatBadge();
-      document.getElementById('f-feepct').value = STATE.settings.defaultFeePct || 10;
-      const dpDefEl = document.getElementById('f-driverpaypct'); if (dpDefEl) dpDefEl.value = defaultDriverPayPct();
-      document.getElementById('s-current-profile') && (document.getElementById('s-current-profile').textContent = (STATE.currentUser ? STATE.currentUser.name : '') + (STATE.role === 'admin' ? ' (Admin)' : ' (Dispatcher)'));
-      updateBranding();
-      renderDashboard();
-      toast('Welcome back', STATE.currentUser ? STATE.currentUser.name : '', true);
-      // Chat updates delivered in real-time via Socket.IO ('new_message', 'conversation_updated').
-      // No polling needed — see docs/realtime-architecture.md.
-      initDailyNotesReminder();
-    }
+    // Note: Initialization is handled by the primary init() function (at line 921)
+    // which handles view restoring, UI state, branding, and dashboard rendering.
 
     /* ================= DAILY DRIVER REPORTS & 4:00 PM – 5:00 PM REMINDER ================= */
     let selectedDailyReportDate = getTodayIsoString();
