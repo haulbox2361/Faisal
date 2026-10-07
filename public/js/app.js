@@ -661,7 +661,77 @@
     }
     window.directAdminLogin = directAdminLogin;
 
-    // Runs OAuth popup, matches returned email against Admin/dispatchers.
+    // Launches the app in demo mode — no credentials required.
+    // Issues a server-side demo session (2-hour TTL), sets STATE.isDemo = true,
+    // and injects a prominent demo banner so visitors know they're in preview mode.
+    async function demoLogin() {
+      const btn = document.getElementById('demo-login-btn');
+      const signinBtn = document.getElementById('google-signin-btn');
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+      if (signinBtn) { signinBtn.disabled = true; }
+      showLoginStatus('Loading demo…');
+      try {
+        if (!STATE._loaded) { await loadState(); STATE._loaded = true; }
+
+        // Request a short-lived demo session token from the backend
+        let sessionToken = '';
+        try {
+          const res = await fetch('/auth/demo-session', { method: 'POST' });
+          if (res.ok) {
+            const data = await res.json();
+            sessionToken = data.sessionToken || '';
+            if (sessionToken) {
+              try { localStorage.setItem('haulbox_web_session_token', sessionToken); } catch (e) {}
+            }
+          }
+        } catch (e) { /* proceed without token — demo still works client-side */ }
+
+        STATE.role = 'admin';
+        STATE.isSuperAdmin = false;
+        STATE.isDemo = true;
+        STATE.currentDispatcherId = null;
+        STATE.viewAs = null;
+        STATE.currentUser = {
+          name: 'Demo User',
+          email: 'demo@haulbox.app',
+          initials: 'DM'
+        };
+        showLoginStatus('Welcome to the demo!');
+
+        // Show demo banner inside the app
+        function injectDemoBanner() {
+          if (document.getElementById('demo-mode-banner')) return;
+          const banner = document.createElement('div');
+          banner.id = 'demo-mode-banner';
+          banner.innerHTML =
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>' +
+            '<span>🎯 You\'re in Demo Mode — explore freely. Data is read-only and changes won\'t be saved.</span>' +
+            '<button class="demo-exit-btn" onclick="exitDemoMode()">Exit Demo</button>';
+          document.body.insertBefore(banner, document.body.firstChild);
+          document.body.classList.add('demo-active');
+        }
+
+        enterApp();
+        setTimeout(injectDemoBanner, 300);
+      } catch (err) {
+        console.error('demoLogin failed:', err);
+        showLoginStatus('Demo failed to load. Please try again.', true);
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        if (signinBtn) { signinBtn.disabled = false; }
+      }
+    }
+    window.demoLogin = demoLogin;
+
+    // Exits demo mode and returns to login
+    function exitDemoMode() {
+      try { localStorage.removeItem('haulbox_web_session_token'); } catch (e) {}
+      try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+      if (typeof SessionManager !== 'undefined') SessionManager.clearSession();
+      window.location.reload();
+    }
+    window.exitDemoMode = exitDemoMode;
+
+
     // If OAuth is unavailable or blocked, falls back seamlessly to direct Admin login.
     async function googleSignIn() {
       const btn = document.getElementById('google-signin-btn');
@@ -7334,7 +7404,11 @@
 
       const chip = document.getElementById('role-chip');
       if (chip) {
-        if (STATE.isSuperAdmin) {
+        if (STATE.isDemo) {
+          chip.innerHTML = '<span class="role-dot" style="background:#0ea5e9;"></span> 🎯 Demo Mode';
+          chip.style.borderColor = '#0ea5e9';
+          chip.style.color = '#0ea5e9';
+        } else if (STATE.isSuperAdmin) {
           chip.innerHTML = '<span class="role-dot" style="background:#38bdf8;"></span> Role: Super Admin ⭐';
           chip.style.borderColor = '#38bdf8';
           chip.style.color = '#38bdf8';

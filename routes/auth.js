@@ -292,6 +292,22 @@ router.post('/auth/dev-session', express.json(), (req, res) => {
   res.json({ ok: true, sessionToken, email: adminEmail, accountId: 'admin' });
 });
 
+// POST /auth/demo-session — Issues a short-lived read-only demo session for public preview
+router.post('/auth/demo-session', express.json(), (req, res) => {
+  const sessionToken = generateSessionToken();
+  const demoEmail = 'demo@haulbox.app';
+  const demoAccountId = 'demo_' + crypto.randomBytes(6).toString('hex');
+  webSessions.set(sessionToken, {
+    email: demoEmail,
+    accountId: demoAccountId,
+    isDemo: true,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 2 * 60 * 60 * 1000, // 2-hour demo session
+  });
+  store.set(demoAccountId, { email: demoEmail, tokens: {}, isDemo: true });
+  res.json({ ok: true, sessionToken, email: demoEmail, accountId: demoAccountId, isDemo: true });
+});
+
 router.verifySessionToken = verifySessionToken;
 router._webSessions = webSessions;
 module.exports = router;
