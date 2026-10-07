@@ -9,6 +9,7 @@ import '../../shared/widgets/range_selector.dart';
 import '../../shared/widgets/status_badge.dart';
 import '../auth/auth_provider.dart';
 import '../documents/document_detail_screen.dart';
+import '../earnings/earnings_screen.dart';
 import 'payment_detail_screen.dart';
 
 class PaymentsScreen extends StatefulWidget {
@@ -107,6 +108,18 @@ class _PaymentsScreenState extends State<PaymentsScreen> with SingleTickerProvid
           'Payments & Settlements',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.4),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart_rounded, color: Colors.white),
+            tooltip: 'Earnings & Analytics',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EarningsScreen()),
+              );
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: Container(

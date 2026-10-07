@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../core/network/api_client.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radius.dart';
 import '../../core/theme/theme_provider.dart';
@@ -26,117 +27,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isTruckGalleryExpanded = false;
   bool _isUploadingPhoto = false;
 
+  // Real backend document state
+  List<DriverDocument> _driverDocs = [];
+  List<TruckDocument> _truckDocs = [];
+  List<TruckGalleryPhoto> _galleryPhotos = [];
+  bool _isLoadingDocs = false;
+  String? _docsError;
+
   final ImagePicker _picker = ImagePicker();
 
-  // 1. Driver Documents List
-  final List<DriverDocument> _driverDocs = [
-    DriverDocument(
-      id: 'dd-1',
-      type: 'DRIVER_LICENSE',
-      title: 'Driver License',
-      documentNumber: 'TX-48921098',
-      issueDate: 'Aug 20, 2021',
-      expirationDate: 'Dec 15, 2027',
-      status: 'VALID',
-    ),
-    DriverDocument(
-      id: 'dd-2',
-      type: 'CDL',
-      title: 'Commercial Driver License (CDL)',
-      documentNumber: 'CDL12345678',
-      issueDate: 'Dec 15, 2022',
-      expirationDate: 'Dec 15, 2026',
-      status: 'VALID',
-    ),
-    DriverDocument(
-      id: 'dd-3',
-      type: 'MEDICAL_CARD',
-      title: 'DOT Medical Examiner Card',
-      documentNumber: 'MED-774921',
-      issueDate: 'Aug 10, 2023',
-      expirationDate: 'Aug 10, 2025',
-      status: 'VALID',
-    ),
-    DriverDocument(
-      id: 'dd-4',
-      type: 'W9',
-      title: 'Form W-9 (Taxpayer ID)',
-      documentNumber: 'W9-VERIFIED',
-      issueDate: 'Jan 05, 2024',
-      expirationDate: 'Dec 31, 2025',
-      status: 'VALID',
-    ),
-    DriverDocument(
-      id: 'dd-5',
-      type: 'MVR',
-      title: 'Motor Vehicle Record (MVR)',
-      documentNumber: 'MVR-CLEAN',
-      issueDate: 'Feb 20, 2024',
-      expirationDate: 'Feb 20, 2025',
-      status: 'EXPIRING',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.token != null) {
+        _loadDocuments(auth.token!);
+      }
+    });
+  }
 
-  // 2. Truck Documents List
-  final List<TruckDocument> _truckDocs = [
-    TruckDocument(
-      id: 'td-1',
-      type: 'REGISTRATION',
-      title: 'Truck Cab Card Registration',
-      documentNumber: 'CAB-98421-TX',
-      issueDate: 'Mar 15, 2023',
-      expirationDate: 'Mar 15, 2027',
-      status: 'VALID',
-    ),
-    TruckDocument(
-      id: 'td-2',
-      type: 'INSURANCE',
-      title: 'Commercial Truck Insurance',
-      documentNumber: 'POL-884210-COI',
-      issueDate: 'Dec 10, 2023',
-      expirationDate: 'Dec 10, 2026',
-      status: 'VALID',
-    ),
-    TruckDocument(
-      id: 'td-3',
-      type: 'INSPECTION',
-      title: 'Annual DOT Safety Inspection',
-      documentNumber: 'INSP-2023-99',
-      issueDate: 'Nov 01, 2023',
-      expirationDate: 'Nov 01, 2026',
-      status: 'VALID',
-    ),
-    TruckDocument(
-      id: 'td-4',
-      type: 'IFTA',
-      title: 'IFTA License & Decals',
-      documentNumber: 'IFTA-TX-2024',
-      issueDate: 'Jan 01, 2024',
-      expirationDate: 'Dec 31, 2026',
-      status: 'VALID',
-    ),
-    TruckDocument(
-      id: 'td-5',
-      type: 'PERMIT',
-      title: 'State Highway & Oversize Permits',
-      documentNumber: 'PERM-7721',
-      issueDate: 'Sep 30, 2023',
-      expirationDate: 'Sep 30, 2025',
-      status: 'VALID',
-    ),
-  ];
+  Future<void> _loadDocuments(String token) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingDocs = true;
+      _docsError = null;
+    });
+    try {
+      final results = await Future.wait([
+        ApiClient.fetchDriverDocsList(token),
+        ApiClient.fetchTruckDocsList(token),
+        ApiClient.fetchTruckGallery(token),
+      ]);
 
-  // 3. Truck Gallery 8 Photo Slots
-  final List<TruckGalleryPhoto> _galleryPhotos = [
-    TruckGalleryPhoto(id: 'g-1', slotKey: 'truck_front', label: 'Truck Front', isUploaded: true),
-    TruckGalleryPhoto(id: 'g-2', slotKey: 'truck_driver_side', label: 'Truck Driver Side', isUploaded: true),
-    TruckGalleryPhoto(id: 'g-3', slotKey: 'truck_passenger_side', label: 'Truck Passenger Side', isUploaded: false),
-    TruckGalleryPhoto(id: 'g-4', slotKey: 'truck_rear', label: 'Truck Rear', isUploaded: false),
-    TruckGalleryPhoto(id: 'g-5', slotKey: 'trailer_front', label: 'Trailer Front', isUploaded: false),
-    TruckGalleryPhoto(id: 'g-6', slotKey: 'trailer_side', label: 'Trailer Side', isUploaded: true),
-    TruckGalleryPhoto(id: 'g-7', slotKey: 'trailer_rear', label: 'Trailer Rear', isUploaded: false),
-    TruckGalleryPhoto(id: 'g-8', slotKey: 'equipment_additional', label: 'Additional Photo', isUploaded: false),
-  ];
+      final driverData = results[0];
+      final truckData = results[1];
+      final galleryData = results[2];
+
+      if (mounted) {
+        setState(() {
+          if (driverData != null) {
+            _driverDocs = driverData.map((e) => DriverDocument.fromJson(Map<String, dynamic>.from(e))).toList();
+          }
+          if (truckData != null) {
+            _truckDocs = truckData.map((e) => TruckDocument.fromJson(Map<String, dynamic>.from(e))).toList();
+          }
+          if (galleryData != null) {
+            _galleryPhotos = galleryData.map((e) => TruckGalleryPhoto.fromJson(Map<String, dynamic>.from(e))).toList();
+          }
+          _isLoadingDocs = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _docsError = 'Failed to load documents';
+          _isLoadingDocs = false;
+        });
+      }
+    }
+  }
 
   // Pick and Upload Profile Photo (Camera or Gallery)
   Future<void> _pickProfilePhoto(AuthProvider auth, ImageSource source) async {
@@ -360,116 +310,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Equipment photo action sheet with Camera & Gallery
-  void _openPhotoActionSheet(TruckGalleryPhoto photo) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.borderLight, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 16),
-              Text('Add ${photo.label} Photo', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.emeraldSoft, borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.camera_alt_outlined, color: AppColors.emeraldPrimary)),
-                title: const Text('TAKE PHOTO WITH CAMERA', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 85);
-                  if (file != null) {
-                    setState(() => photo.isUploaded = true);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${photo.label} photo captured!'), backgroundColor: AppColors.emeraldPrimary),
-                    );
-                  }
-                },
-              ),
-              const Divider(color: AppColors.borderLight, height: 1),
-              ListTile(
-                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFE0F2FE), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.photo_library_outlined, color: Color(0xFF0284C7))),
-                title: const Text('CHOOSE FROM PHONE GALLERY', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-                  if (file != null) {
-                    setState(() => photo.isUploaded = true);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${photo.label} photo selected from gallery!'), backgroundColor: AppColors.emeraldPrimary),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  void _openPhotoPreviewModal(TruckGalleryPhoto photo) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.xlBorder),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(photo.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textDark)),
-            const StatusBadge(status: 'VALID', isSmall: true),
-          ],
-        ),
-        content: Container(
-          height: 180,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.bgSecondary,
-            borderRadius: AppRadius.lgBorder,
-            border: Border.all(color: AppColors.borderLight),
-          ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.local_shipping_rounded, size: 54, color: AppColors.emeraldDark.withValues(alpha: 0.8)),
-                const SizedBox(height: 8),
-                Text('${photo.label} Inspection Record', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textDark, fontSize: 13)),
-                const SizedBox(height: 2),
-                const Text('Verified in Fleet Cloud', style: TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.statusDanger, size: 18),
-            label: const Text('DELETE', style: TextStyle(color: AppColors.statusDanger, fontWeight: FontWeight.w700)),
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() => photo.isUploaded = false);
-            },
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.emeraldPrimary),
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-            label: const Text('REPLACE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openPhotoActionSheet(photo);
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -504,7 +345,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: Stack(
         children: [
           RefreshIndicator(
-            onRefresh: () => authProvider.syncAllData(),
+            onRefresh: () async {
+              await authProvider.syncAllData();
+              if (authProvider.token != null) {
+                await _loadDocuments(authProvider.token!);
+              }
+            },
             color: AppColors.emeraldPrimary,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -525,9 +371,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   count: _driverDocs.length,
                   isExpanded: _isDriverDocsExpanded,
                   onToggle: () => setState(() => _isDriverDocsExpanded = !_isDriverDocsExpanded),
-                  child: Column(
-                    children: _driverDocs.map((doc) => _buildDriverDocTile(doc)).toList(),
-                  ),
+                  child: _isLoadingDocs
+                      ? const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.emeraldPrimary)),
+                        )
+                      : (_docsError != null
+                          ? _buildDocsError(authProvider.token)
+                          : (_driverDocs.isEmpty
+                              ? _buildDocsEmpty('No driver documents on file.')
+                              : Column(
+                                  children: _driverDocs.map((doc) => _buildDriverDocTile(doc)).toList(),
+                                ))),
                 ),
                 const SizedBox(height: 14),
 
@@ -538,9 +393,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   count: _truckDocs.length,
                   isExpanded: _isTruckDocsExpanded,
                   onToggle: () => setState(() => _isTruckDocsExpanded = !_isTruckDocsExpanded),
-                  child: Column(
-                    children: _truckDocs.map((doc) => _buildTruckDocTile(doc)).toList(),
-                  ),
+                  child: _isLoadingDocs
+                      ? const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.emeraldPrimary)),
+                        )
+                      : (_docsError != null
+                          ? _buildDocsError(authProvider.token)
+                          : (_truckDocs.isEmpty
+                              ? _buildDocsEmpty('No truck documents on file.')
+                              : Column(
+                                  children: _truckDocs.map((doc) => _buildTruckDocTile(doc)).toList(),
+                                ))),
                 ),
                 const SizedBox(height: 14),
 
@@ -552,7 +416,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   totalCount: _galleryPhotos.length,
                   isExpanded: _isTruckGalleryExpanded,
                   onToggle: () => setState(() => _isTruckGalleryExpanded = !_isTruckGalleryExpanded),
-                  child: _buildTruckGalleryGrid(),
+                  child: _isLoadingDocs
+                      ? const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.emeraldPrimary)),
+                        )
+                      : _buildTruckGalleryGrid(authProvider.token ?? ''),
                 ),
               ],
             ),
@@ -1067,7 +936,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildTruckGalleryGrid() {
+  Widget _buildDocsError(String? token) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppColors.statusDanger, size: 28),
+          const SizedBox(height: 8),
+          const Text('Failed to load documents', style: TextStyle(color: AppColors.textDark, fontSize: 13, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          if (token != null)
+            TextButton.icon(
+              onPressed: () => _loadDocuments(token),
+              icon: const Icon(Icons.refresh_rounded, size: 16, color: AppColors.emeraldPrimary),
+              label: const Text('Retry', style: TextStyle(color: AppColors.emeraldPrimary, fontWeight: FontWeight.w700)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocsEmpty(String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        children: [
+          const Icon(Icons.folder_open_rounded, color: AppColors.textSubtle, size: 28),
+          const SizedBox(height: 8),
+          Text(message, style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTruckGalleryGrid(String token) {
+    final photos = _galleryPhotos.isNotEmpty
+        ? _galleryPhotos
+        : [
+            TruckGalleryPhoto(id: 'g-1', slotKey: 'truck_front', label: 'Truck Front', isUploaded: false, index: 0),
+            TruckGalleryPhoto(id: 'g-2', slotKey: 'truck_driver_side', label: 'Truck Driver Side', isUploaded: false, index: 1),
+            TruckGalleryPhoto(id: 'g-3', slotKey: 'truck_passenger_side', label: 'Truck Passenger Side', isUploaded: false, index: 2),
+            TruckGalleryPhoto(id: 'g-4', slotKey: 'truck_rear', label: 'Truck Rear', isUploaded: false, index: 3),
+            TruckGalleryPhoto(id: 'g-5', slotKey: 'trailer_front', label: 'Trailer Front', isUploaded: false, index: 4),
+            TruckGalleryPhoto(id: 'g-6', slotKey: 'trailer_side', label: 'Trailer Side', isUploaded: false, index: 5),
+            TruckGalleryPhoto(id: 'g-7', slotKey: 'trailer_rear', label: 'Trailer Rear', isUploaded: false, index: 6),
+            TruckGalleryPhoto(id: 'g-8', slotKey: 'equipment_additional', label: 'Additional Photo', isUploaded: false, index: 7),
+          ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1088,17 +1003,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisSpacing: 10,
             childAspectRatio: 0.95,
           ),
-          itemCount: _galleryPhotos.length,
+          itemCount: photos.length,
           itemBuilder: (context, idx) {
-            final photo = _galleryPhotos[idx];
+            final photo = photos[idx];
             final isUploaded = photo.isUploaded;
 
             return GestureDetector(
               onTap: () {
                 if (isUploaded) {
-                  _openPhotoPreviewModal(photo);
+                  _openPhotoPreviewModal(photo, token);
                 } else {
-                  _openPhotoActionSheet(photo);
+                  _openPhotoActionSheet(photo, token);
                 }
               },
               child: Container(
@@ -1154,6 +1069,204 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Future<void> _pickAndUploadGalleryPhoto(TruckGalleryPhoto photo, ImageSource source, String token) async {
+    try {
+      final xFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1200,
+      );
+      if (xFile == null) return;
+
+      setState(() => _isUploadingPhoto = true);
+      final bytes = await xFile.readAsBytes();
+      final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+      final ok = await ApiClient.uploadTruckGalleryPhoto(
+        token,
+        '${photo.slotKey}.jpg',
+        base64String,
+        index: photo.index,
+      );
+
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+        if (ok) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✓ ${photo.label} uploaded successfully!'),
+              backgroundColor: AppColors.emeraldPrimary,
+            ),
+          );
+          _loadDocuments(token);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to upload ${photo.label}. Please try again.'),
+              backgroundColor: AppColors.statusDanger,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload error: $e'),
+            backgroundColor: AppColors.statusDanger,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openPhotoActionSheet(TruckGalleryPhoto photo, String token) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Upload ${photo.label}',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textDark),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Attach an equipment photo for fleet verification.',
+                style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.emeraldSoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.emeraldPrimary),
+                ),
+                title: const Text('TAKE PHOTO WITH CAMERA', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark, fontSize: 13.5)),
+                subtitle: const Text('Capture photo using device camera', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadGalleryPhoto(photo, ImageSource.camera, token);
+                },
+              ),
+              const Divider(color: AppColors.borderLight, height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2FE),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF0284C7)),
+                ),
+                title: const Text('CHOOSE FROM DEVICE GALLERY', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark, fontSize: 13.5)),
+                subtitle: const Text('Select existing photo from library', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadGalleryPhoto(photo, ImageSource.gallery, token);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openPhotoPreviewModal(TruckGalleryPhoto photo, String token) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: AppColors.emeraldSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_circle_rounded, color: AppColors.emeraldPrimary, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          photo.label,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                        ),
+                        Text(
+                          photo.uploadedDate != null ? 'Uploaded: ${photo.uploadedDate}' : 'Status: Uploaded & Verified',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgSecondary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.refresh_rounded, color: AppColors.emeraldPrimary),
+                ),
+                title: const Text('REPLACE THIS PHOTO', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textDark, fontSize: 13.5)),
+                subtitle: const Text('Upload a new photo for this slot', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openPhotoActionSheet(photo, token);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

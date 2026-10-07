@@ -105,6 +105,7 @@ class TruckGalleryPhoto {
   String? fileUrl;
   bool isUploaded;
   String? uploadedDate;
+  int? index;
 
   TruckGalleryPhoto({
     required this.id,
@@ -113,6 +114,7 @@ class TruckGalleryPhoto {
     this.fileUrl,
     this.isUploaded = false,
     this.uploadedDate,
+    this.index,
   });
 
   factory TruckGalleryPhoto.fromJson(Map<String, dynamic> json) {
@@ -123,6 +125,7 @@ class TruckGalleryPhoto {
       fileUrl: json['fileUrl']?.toString(),
       isUploaded: json['isUploaded'] == true,
       uploadedDate: json['uploadedDate']?.toString(),
+      index: json['index'] is int ? json['index'] as int : int.tryParse(json['index']?.toString() ?? ''),
     );
   }
 
@@ -133,5 +136,6 @@ class TruckGalleryPhoto {
     'fileUrl': fileUrl,
     'isUploaded': isUploaded,
     'uploadedDate': uploadedDate,
+    'index': index,
   };
 }

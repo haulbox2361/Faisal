@@ -21,7 +21,7 @@ class _LoadsScreenState extends State<LoadsScreen> with SingleTickerProviderStat
   late TabController _tabController;
   DateRangeFilterType _selectedDateRange = DateRangeFilterType.thisWeek;
   DateTimeRange? _customDateRange;
-  String _selectedFilter = 'ALL';
+  final String _selectedFilter = 'ALL';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
   final TextEditingController _searchController = TextEditingController();

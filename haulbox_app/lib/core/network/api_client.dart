@@ -6,8 +6,8 @@ import '../../shared/models/load_model.dart';
 import '../../shared/models/payment_model.dart';
 
 class ApiClient {
-  static const String prodUrl = String.fromEnvironment('API_URL', defaultValue: 'https://haulbox-x5jz.onrender.com');
-  static String baseUrl = kIsWeb ? 'http://localhost:3000' : (kDebugMode ? (prodUrl.isNotEmpty ? prodUrl : 'http://10.0.2.2:3000') : prodUrl);
+  static const String prodUrl = 'https://haulbox-x5jz.onrender.com';
+  static String baseUrl = prodUrl;
 
   static void setBaseUrl(String url) {
     if (url.endsWith('/')) {
@@ -686,6 +686,114 @@ class ApiClient {
       debugPrint('[ApiClient] removePushToken error: $e');
     }
     return false;
+  }
+
+  // 28. Fetch Driver Profile Documents (CDL, license, medical, truck docs, gallery)
+  // Uses the existing GET /api/driver/documents endpoint.
+  static Future<Map<String, dynamic>?> fetchDriverDocuments(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/documents');
+    try {
+      final response = await http.get(uri, headers: authHeaders(token))
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] fetchDriverDocuments error: $e');
+    }
+    return null;
+  }
+
+  // 29. Fetch Truck Info (number, make, model, year, VIN)
+  // Uses the existing GET /api/driver/truck endpoint.
+  static Future<Map<String, dynamic>?> fetchTruckInfo(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/truck');
+    try {
+      final response = await http.get(uri, headers: authHeaders(token))
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] fetchTruckInfo error: $e');
+    }
+    return null;
+  }
+
+  // 30. Upload a Truck Gallery Photo (slot index in the truckPhotos array)
+  // Uses the existing POST /api/driver/documents endpoint with key=truckPhotos.
+  static Future<bool> uploadTruckGalleryPhoto(
+    String token,
+    String fileName,
+    String base64Data, {
+    int? index,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/driver/documents');
+    try {
+      final body = <String, dynamic>{
+        'key': 'truckPhotos',
+        'fileName': fileName,
+        'data': base64Data,
+        if (index != null) 'index': index,
+      };
+      final response = await http.post(
+        uri,
+        headers: authHeaders(token),
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 25));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['ok'] == true;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] uploadTruckGalleryPhoto error: $e');
+    }
+    return false;
+  }
+
+  // 31. Fetch Dedicated Driver Docs List
+  static Future<List<dynamic>?> fetchDriverDocsList(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/driver-docs');
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['documents'] as List<dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] fetchDriverDocsList error: $e');
+    }
+    return null;
+  }
+
+  // 32. Fetch Dedicated Truck Docs List
+  static Future<List<dynamic>?> fetchTruckDocsList(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/truck-docs');
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['documents'] as List<dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] fetchTruckDocsList error: $e');
+    }
+    return null;
+  }
+
+  // 33. Fetch Dedicated Truck Gallery Photos
+  static Future<List<dynamic>?> fetchTruckGallery(String token) async {
+    final uri = Uri.parse('$baseUrl/api/driver/truck-gallery');
+    try {
+      final response = await http.get(uri, headers: authHeaders(token)).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['photos'] as List<dynamic>?;
+      }
+    } catch (e) {
+      debugPrint('[ApiClient] fetchTruckGallery error: $e');
+    }
+    return null;
   }
 }
 

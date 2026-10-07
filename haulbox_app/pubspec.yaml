@@ -1,5 +1,5 @@
 name: haulbox_app
-description: "A new Flutter project."
+description: "HaulBoX Driver & Owner dispatch portal — GPS tracking, loads, documents, payments & chat."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -34,29 +34,29 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  http: any
-  google_fonts: any
-  provider: any
-  intl: any
-  shared_preferences: any
-  geolocator: any
-  permission_handler: any
-  battery_plus: any
-  connectivity_plus: any
-  socket_io_client: any
-  image_picker: any
-  camera: any
-  camera_android: any
-  speech_to_text: any
-  url_launcher: any
-  firebase_core: any
-  firebase_messaging: any
+  http: ^1.6.0
+  google_fonts: ^6.3.2
+  provider: ^6.1.5
+  intl: ^0.20.2
+  shared_preferences: ^2.5.3
+  geolocator: ^13.0.4
+  permission_handler: ^11.4.0
+  battery_plus: ^6.2.3
+  connectivity_plus: ^6.1.5
+  socket_io_client: ^3.1.6
+  image_picker: ^1.2.1
+  camera: ^0.11.2
+  camera_android: ^0.10.10
+  speech_to_text: ^7.4.0
+  url_launcher: ^6.3.2
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: any
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

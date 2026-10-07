@@ -1,0 +1,14 @@
+# Example Android Release Keystore Configuration for HaulBoX
+# Copy this file to key.properties (which is ignored by Git) and fill in your real keystore details:
+#
+# storePassword=YourKeystorePassword
+# keyPassword=YourKeyPassword
+# keyAlias=upload
+# storeFile=upload-keystore.jks
+#
+# Generate a release keystore using keytool:
+# keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+storePassword=
+keyPassword=
+keyAlias=
+storeFile=

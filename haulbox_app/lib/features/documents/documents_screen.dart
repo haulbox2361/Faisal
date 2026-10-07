@@ -274,7 +274,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             MaterialPageRoute(
               builder: (_) => DocumentDetailScreen(
                 title: title,
-                documentNumber: '${type}-${load.loadNumber}',
+                documentNumber: '$type-${load.loadNumber}',
                 issueDate: load.pickupDate,
                 expirationDate: load.deliveryDate,
                 status: statusLabel,
@@ -299,7 +299,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     MaterialPageRoute(
                       builder: (_) => DocumentDetailScreen(
                         title: title,
-                        documentNumber: '${type}-${load.loadNumber}',
+                        documentNumber: '$type-${load.loadNumber}',
                         issueDate: load.pickupDate,
                         expirationDate: load.deliveryDate,
                         status: statusLabel,

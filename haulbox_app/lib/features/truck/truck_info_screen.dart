@@ -47,12 +47,12 @@ class TruckInfoScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  '${truck.year} ${truck.make} ${truck.model}',
+                  '${truck.year} ${truck.make} ${truck.model}'.trim(),
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.3),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Unit: ${truck.truckNumber} • License Plate: ${truck.licensePlate} (${truck.state})',
+                  'Unit: ${truck.truckNumber}${truck.licensePlate != null && truck.licensePlate!.isNotEmpty ? ' • License Plate: ${truck.licensePlate}${truck.state != null ? ' (${truck.state})' : ''}' : ''}',
                   style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
               ],
@@ -71,10 +71,10 @@ class TruckInfoScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 _buildSpecRow('Vehicle Identification (VIN)', truck.vin),
-                _buildSpecRow('Current Odometer Mileage', truck.mileage),
-                _buildSpecRow('Fuel Type', 'Ultra-Low Sulfur Diesel (DEF)'),
-                _buildSpecRow('ELD Hardware ID', 'HBX-ELD-4091'),
-                _buildSpecRow('Transponder (PrePass)', 'PASS-77281'),
+                _buildSpecRow('Current Odometer Mileage', truck.mileage ?? 'Not Reported'),
+                _buildSpecRow('Fuel Type', truck.fuelType ?? 'Diesel'),
+                _buildSpecRow('ELD Hardware ID', truck.eldHardwareId ?? 'Not Configured'),
+                _buildSpecRow('Transponder (PrePass)', truck.transponderId ?? 'Not Assigned'),
               ],
             ),
           ),
@@ -90,10 +90,10 @@ class TruckInfoScreen extends StatelessWidget {
                   icon: Icons.verified_outlined,
                 ),
                 const SizedBox(height: 6),
-                _buildComplianceTile('Vehicle Cab Card Registration', truck.registrationExpiry, true),
-                _buildComplianceTile('Annual DOT Safety Inspection', truck.annualInspectionExpiry, true),
-                _buildComplianceTile('IFTA Decals & License', truck.iftaExpiry, true),
-                _buildComplianceTile('Commercial Truck Insurance', truck.insuranceExpiry, true),
+                _buildComplianceTile('Vehicle Cab Card Registration', truck.registrationExpiry),
+                _buildComplianceTile('Annual DOT Safety Inspection', truck.annualInspectionExpiry),
+                _buildComplianceTile('IFTA Decals & License', truck.iftaExpiry),
+                _buildComplianceTile('Commercial Truck Insurance', truck.insuranceExpiry),
               ],
             ),
           ),
@@ -102,7 +102,8 @@ class TruckInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildComplianceTile(String title, String expiry, bool isValid) {
+  Widget _buildComplianceTile(String title, String? expiry) {
+    final hasExpiry = expiry != null && expiry.isNotEmpty && expiry != '—';
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -114,9 +115,9 @@ class TruckInfoScreen extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            isValid ? Icons.check_circle_rounded : Icons.warning_rounded,
+            hasExpiry ? Icons.check_circle_rounded : Icons.info_outline_rounded,
             size: 18,
-            color: isValid ? AppColors.emeraldPrimary : AppColors.statusWarning,
+            color: hasExpiry ? AppColors.emeraldPrimary : AppColors.textSubtle,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -124,11 +125,11 @@ class TruckInfoScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white)),
-                Text('Valid Thru: $expiry', style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                Text(hasExpiry ? 'Valid Thru: $expiry' : 'No expiry date recorded', style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
               ],
             ),
           ),
-          const StatusBadge(status: 'VALID', isSmall: true),
+          StatusBadge(status: hasExpiry ? 'VALID' : 'UNVERIFIED', isSmall: true),
         ],
       ),
     );
