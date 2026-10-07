@@ -547,6 +547,35 @@
           return false;
         }
 
+        // ── Demo session restore ──────────────────────────────────────────────
+        // If the backend flagged this token as a demo session, re-enter demo
+        // mode without touching the login screen. The banner is re-injected
+        // so the user never notices the refresh.
+        if (data.isDemo) {
+          STATE.sessionToken = sessionToken;
+          STATE.role = 'admin';
+          STATE.isSuperAdmin = false;
+          STATE.isDemo = true;
+          STATE.currentDispatcherId = null;
+          STATE.viewAs = null;
+          STATE.currentUser = { name: 'Demo User', email: 'demo@haulbox.app', initials: 'DM' };
+          enterApp();
+          setTimeout(() => {
+            if (!document.getElementById('demo-mode-banner')) {
+              const banner = document.createElement('div');
+              banner.id = 'demo-mode-banner';
+              banner.innerHTML =
+                '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>' +
+                '<span>🎯 You\'re in Demo Mode — explore freely. Data is read-only and changes won\'t be saved.</span>' +
+                '<button class="demo-exit-btn" onclick="exitDemoMode()">Exit Demo</button>';
+              document.body.insertBefore(banner, document.body.firstChild);
+              document.body.classList.add('demo-active');
+            }
+          }, 300);
+          return true;
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         STATE.sessionToken = sessionToken;
         const verifiedEmail = data.email.toLowerCase().trim();
         const adminEmails = await loadAdminEmailConfig();
@@ -584,6 +613,7 @@
       if (typeof SessionManager !== 'undefined') SessionManager.clearSession();
       return false;
     }
+
 
     async function mockGoogleLogin() {
       if (!STATE._loaded) { await loadState(); STATE._loaded = true; }

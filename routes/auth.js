@@ -144,12 +144,13 @@ router.get('/auth/google/callback', async (req, res) => {
 });
 
 // GET /auth/verify-session — Validates server-issued session token
+// Returns isDemo:true for demo sessions so the client can restore the demo banner on refresh.
 router.get('/auth/verify-session', (req, res) => {
   const session = verifySessionToken(req);
   if (!session) {
     return res.status(401).json({ ok: false, error: 'Invalid or expired session token' });
   }
-  res.json({ ok: true, email: session.email, accountId: session.accountId });
+  res.json({ ok: true, email: session.email, accountId: session.accountId, isDemo: !!session.isDemo });
 });
 
 // POST /auth/claim { fromAccountId, toAccountId }
@@ -292,7 +293,8 @@ router.post('/auth/dev-session', express.json(), (req, res) => {
   res.json({ ok: true, sessionToken, email: adminEmail, accountId: 'admin' });
 });
 
-// POST /auth/demo-session — Issues a short-lived read-only demo session for public preview
+// POST /auth/demo-session — Issues a demo session for public preview (no sign-in required).
+// Lasts 24 hours (same as a real session) so the demo survives page refreshes.
 router.post('/auth/demo-session', express.json(), (req, res) => {
   const sessionToken = generateSessionToken();
   const demoEmail = 'demo@haulbox.app';
@@ -302,7 +304,7 @@ router.post('/auth/demo-session', express.json(), (req, res) => {
     accountId: demoAccountId,
     isDemo: true,
     createdAt: Date.now(),
-    expiresAt: Date.now() + 2 * 60 * 60 * 1000, // 2-hour demo session
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24-hour — survives page refreshes
   });
   store.set(demoAccountId, { email: demoEmail, tokens: {}, isDemo: true });
   res.json({ ok: true, sessionToken, email: demoEmail, accountId: demoAccountId, isDemo: true });

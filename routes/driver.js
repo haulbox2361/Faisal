@@ -1880,6 +1880,130 @@ router.post('/api/driver/documents/file', async (req, res) => {
   res.json({ ok: true, name: file.name, data: file.data });
 });
 
+// GET /api/driver/driver-docs - Returns structured list of driver documents for the mobile app
+router.get('/api/driver/driver-docs', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const stored = ctx.driver.documents || {};
+  const driverDocDefs = [
+    { key: 'cdl', title: 'Commercial Driver License (CDL)', type: 'CDL' },
+    { key: 'license', title: 'Driver License', type: 'DRIVER_LICENSE' },
+    { key: 'medicalCard', title: 'DOT Medical Examiner Card', type: 'MEDICAL_CARD' },
+    { key: 'registration', title: 'Driver Registration / W-9', type: 'W9' },
+    { key: 'insurance', title: 'Driver Coverage Certificate', type: 'INSURANCE' },
+  ];
+
+  const docs = driverDocDefs.map((def, idx) => {
+    const doc = stored[def.key];
+    const hasDoc = !!(doc && doc.name);
+    const flag = expiryFlag(doc);
+    return {
+      id: 'dd-' + (idx + 1),
+      slotKey: def.key,
+      type: def.type,
+      title: def.title,
+      documentNumber: doc?.documentNumber || (hasDoc ? ('DOC-' + def.type + '-' + ctx.driver.id.slice(-4)) : 'NOT_UPLOADED'),
+      issueDate: doc?.uploadedDate || doc?.issueDate || '—',
+      expirationDate: doc?.expiryDate || '—',
+      status: !hasDoc ? 'MISSING' : (flag === 'EXPIRED' ? 'EXPIRED' : (flag === 'EXPIRES_SOON' ? 'EXPIRING' : 'VALID')),
+      hasFile: !!(doc && doc.hasFile !== false && (doc.data || doc.name)),
+      name: doc?.name || null,
+    };
+  });
+
+  // Include any extra documents from the 'other' array
+  (stored.other || []).forEach((d, i) => {
+    if (d && d.name) {
+      const flag = expiryFlag(d);
+      docs.push({
+        id: 'dd-other-' + (i + 1),
+        slotKey: 'other',
+        type: 'OTHER',
+        title: d.name,
+        documentNumber: d.documentNumber || ('OTHER-' + (i + 1)),
+        issueDate: d.uploadedDate || '—',
+        expirationDate: d.expiryDate || '—',
+        status: flag === 'EXPIRED' ? 'EXPIRED' : (flag === 'EXPIRES_SOON' ? 'EXPIRING' : 'VALID'),
+        hasFile: !!(d.data || d.name),
+        name: d.name,
+      });
+    }
+  });
+
+  res.json({ documents: docs, canEdit: permissionsFor(ctx.driver).canEditOwnDocuments });
+});
+
+// GET /api/driver/truck-docs - Returns structured list of truck documents for the mobile app
+router.get('/api/driver/truck-docs', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const stored = ctx.driver.documents || {};
+  const truckDocDefs = [
+    { key: 'truckRegistration', title: 'Truck Cab Card Registration', type: 'REGISTRATION' },
+    { key: 'truckInsurance', title: 'Commercial Truck Insurance', type: 'INSURANCE' },
+    { key: 'truckInspection', title: 'Annual DOT Safety Inspection', type: 'INSPECTION' },
+    { key: 'truckIfta', title: 'IFTA License & Decals', type: 'IFTA' },
+    { key: 'truckPermits', title: 'State Highway & Oversize Permits', type: 'PERMIT' },
+  ];
+
+  const docs = truckDocDefs.map((def, idx) => {
+    const doc = stored[def.key];
+    const hasDoc = !!(doc && doc.name);
+    const flag = expiryFlag(doc);
+    return {
+      id: 'td-' + (idx + 1),
+      slotKey: def.key,
+      type: def.type,
+      title: def.title,
+      documentNumber: doc?.documentNumber || (hasDoc ? ('TRK-' + def.type + '-' + (ctx.driver.truck || 'UNIT')) : 'NOT_UPLOADED'),
+      issueDate: doc?.uploadedDate || doc?.issueDate || '—',
+      expirationDate: doc?.expiryDate || '—',
+      status: !hasDoc ? 'MISSING' : (flag === 'EXPIRED' ? 'EXPIRED' : (flag === 'EXPIRES_SOON' ? 'EXPIRING' : 'VALID')),
+      hasFile: !!(doc && doc.hasFile !== false && (doc.data || doc.name)),
+      name: doc?.name || null,
+    };
+  });
+
+  res.json({ documents: docs, canEdit: permissionsFor(ctx.driver).canEditOwnDocuments });
+});
+
+// GET /api/driver/truck-gallery - Returns real upload state for 8 truck gallery photos
+router.get('/api/driver/truck-gallery', async (req, res) => {
+  const ctx = await requireDriver(req, res);
+  if (!ctx) return;
+  const stored = (ctx.driver.documents && ctx.driver.documents.truckPhotos) || [];
+  const SLOTS = [
+    { slotKey: 'truck_front', label: 'Truck Front' },
+    { slotKey: 'truck_driver_side', label: 'Truck Driver Side' },
+    { slotKey: 'truck_passenger_side', label: 'Truck Passenger Side' },
+    { slotKey: 'truck_rear', label: 'Truck Rear' },
+    { slotKey: 'trailer_front', label: 'Trailer Front' },
+    { slotKey: 'trailer_side', label: 'Trailer Side' },
+    { slotKey: 'trailer_rear', label: 'Trailer Rear' },
+    { slotKey: 'equipment_additional', label: 'Additional Photo' },
+  ];
+
+  const photos = SLOTS.map((slot, i) => {
+    // Check if slot photo exists either by slotKey or index
+    let found = stored.find(p => p.slotKey === slot.slotKey);
+    if (!found && i < stored.length) {
+      found = stored[i];
+    }
+    const isUploaded = !!(found && (found.name || found.data));
+    return {
+      id: 'g-' + (i + 1),
+      slotKey: slot.slotKey,
+      label: slot.label,
+      isUploaded: isUploaded,
+      name: found?.name || null,
+      uploadedDate: found?.uploadedDate || null,
+      index: i,
+    };
+  });
+
+  res.json({ photos, canEdit: permissionsFor(ctx.driver).canEditOwnDocuments });
+});
+
 // ---------------------------------------------------------------------------
 // Truck Information (number, make, model, year, VIN) — stored as flat fields
 // on the driver record. driver.truck already existed (used by the dispatch
