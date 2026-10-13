@@ -38,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('serverUrl', newUrl);
       } catch (_) {}
+      if (!mounted) return;
     }
 
     final driverId = _driverIdController.text.trim();

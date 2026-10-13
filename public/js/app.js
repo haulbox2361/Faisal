@@ -1112,9 +1112,37 @@
         setDocReviewTab(_docReviewTab || 'pending'); 
       }
     }
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (!sidebar) return;
+      const isOpen = sidebar.classList.toggle('open');
+      if (backdrop) backdrop.classList.toggle('active', isOpen);
+      document.body.classList.toggle('sidebar-open', isOpen);
+    }
+    window.toggleMobileSidebar = toggleMobileSidebar;
+
+    function closeMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (sidebar) sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('active');
+      document.body.classList.remove('sidebar-open');
+    }
+    window.closeMobileSidebar = closeMobileSidebar;
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        window.closeMobileSidebar();
+      }
+    });
+
     document.getElementById('mainnav').addEventListener('click', e => {
       const item = e.target.closest('.nav-item');
-      if (item) switchView(item.dataset.view);
+      if (item) {
+        switchView(item.dataset.view);
+        window.closeMobileSidebar();
+      }
     });
 
     /* ---------------- Toast ---------------- */

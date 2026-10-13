@@ -148,8 +148,8 @@ router.post('/api/admin/drivers/mass-pin-reset', async (req, res) => {
 
     for (const d of state.drivers || []) {
       if (!targetDriverIds || targetDriverIds.has(String(d.id))) {
-        // Reset to temporary default PIN '1234' with fresh PBKDF2 hash & flag for reset
-        d.pin = '1234';
+        // Reset with a fresh PBKDF2 hash only — never store the raw PIN in state
+        delete d.pin;
         d.pinHash = dataStore.hashPin('1234');
         d.mustResetPin = true;
         affectedDriverIds.push(d.id);
@@ -527,10 +527,7 @@ function driverLoads(state, driverId) {
   });
 }
 
-function isCompleted(l) {
-  const st = String(l.status || '').trim().toLowerCase();
-  return st === 'drop-off' || st === 'completed' || st === 'delivered' || st === 'paid';
-}
+// Note: isCompleted() is defined further below (line ~1171) with the full checkpoint logic.
 
 // ---------------------------------------------------------------------------
 // Auth & Security Rate Limiting
@@ -1601,17 +1598,12 @@ router.delete('/api/driver/upload-doc', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 function toTransaction(l) {
-  const ps = l.paymentStatus || (l.driverPayAccepted ? 'PAID_CONFIRMED' : (l.driverPaid ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID'));
   return {
     loadId: l.id,
     loadNumber: l.loadNumber,
     amount: Number(l.driverPay) || 0,
     date: l.deliveryDate || l.pickupDate || null,
     status: l.driverPaid ? 'PAID' : 'PENDING',
-    paymentStatus: ps,
-    paidDate: l.driverPaidDate || null,
-    markedPaidAt: l.markedPaidAt || null,
-    markedPaidBy: l.markedPaidBy || null,
     pickup: l.pickup,
     dropoff: l.dropoff,
     pickupDate: l.pickupDate,
@@ -1619,8 +1611,9 @@ function toTransaction(l) {
     driverPay: Number(l.driverPay) || 0,
     driverPaid: !!l.driverPaid,
     driverPaidDate: l.driverPaidDate || null,
-    paymentStatus: l.paymentStatus || (l.driverPaid ? 'PAID_CONFIRMED' : 'UNPAID'),
+    paymentStatus: l.paymentStatus || (l.driverPayAccepted ? 'PAID_CONFIRMED' : (l.driverPaid ? 'PAYMENT_PENDING_CONFIRMATION' : 'UNPAID')),
     markedPaidAt: l.markedPaidAt || (l.driverPaid ? l.driverPaidDate : null),
+    markedPaidBy: l.markedPaidBy || null,
     confirmedAt: l.confirmedAt || (l.driverPayAccepted ? l.driverPayAcceptedAt : null),
     disputedAt: l.disputedAt || null,
   };
@@ -1768,6 +1761,41 @@ function expiryFlag(doc) {
   return null;
 }
 
+function buildDocumentsFeed(ctx) {
+  const rawLoads = driverLoads(ctx.state, ctx.driver.id);
+  return rawLoads.map(load => {
+    const docs = load.docs || load.documents || {};
+    const statusMeta = (doc) => {
+      if (!doc) return { status: 'MISSING', statusColor: 'gray', label: 'Upload Required', hasFile: false };
+      const st = String(doc.status || (doc.hasFile || doc.data || doc.name ? 'APPROVED' : 'MISSING')).toUpperCase();
+      if (st === 'APPROVED') return { status: 'APPROVED', statusColor: 'green', label: 'Approved', hasFile: true, name: doc.name || doc.fileName };
+      if (st === 'REJECTED' || st === 'RETAKE_REQUIRED' || st === 'FIX REQUIRED') return { status: 'REJECTED', statusColor: 'red', label: 'Fix Required', hasFile: true, reason: doc.rejectionReason };
+      if (st === 'PENDING' || st === 'UNDER REVIEW' || st === 'CHECKING') return { status: 'CHECKING', statusColor: 'yellow', label: 'Checking', hasFile: true };
+      return { status: 'MISSING', statusColor: 'gray', label: 'Upload Required', hasFile: false };
+    };
+
+    return {
+      loadId: load.id,
+      loadNumber: load.loadNumber,
+      status: load.status,
+      pickup: load.pickup,
+      dropoff: load.dropoff,
+      pickupDate: load.pickupDate,
+      deliveryDate: load.deliveryDate,
+      requiredDocs: {
+        RC: statusMeta(docs.RC),
+        BOL: statusMeta(docs.BOL),
+        POD: statusMeta(docs.POD),
+      },
+      optionalPhotos: {
+        pickupPhotos: Array.isArray(docs.PhotosPU) ? docs.PhotosPU : [],
+        deliveryPhotos: Array.isArray(docs.PhotosDO) ? docs.PhotosDO : [],
+        extraDocs: Array.isArray(docs.Extra) ? docs.Extra : [],
+      }
+    };
+  });
+}
+
 // GET /api/driver/documents
 router.get('/api/driver/documents', async (req, res) => {
   const ctx = await requireDriver(req, res);
@@ -1786,7 +1814,8 @@ router.get('/api/driver/documents', async (req, res) => {
   PROFILE_DOC_KEYS.forEach((k) => { documents[k] = shape(stored[k]); });
   PROFILE_ARRAY_KEYS.forEach((k) => { documents[k] = (stored[k] || []).map((d, i) => ({ index: i, ...shape(d) })); });
 
-  res.json({ documents, canEdit: permissionsFor(ctx.driver).canEditOwnDocuments });
+  const documentsFeed = buildDocumentsFeed(ctx);
+  res.json({ ok: true, documents, canEdit: permissionsFor(ctx.driver).canEditOwnDocuments, documentsFeed });
 });
 
 // POST /api/driver/documents  { key, fileName, data, expiryDate }
@@ -2905,47 +2934,15 @@ router.post('/api/driver/contact-dispatch', async (req, res) => {
   }
 });
 
-// GET /api/driver/documents
+// GET /api/driver/documents/feed
 // Dedicated Driver Documents Tab feed (current load docs + past loads doc history)
-router.get('/api/driver/documents', async (req, res) => {
+router.get('/api/driver/documents/feed', async (req, res) => {
   const ctx = await requireDriver(req, res);
   if (!ctx) return;
 
   try {
-    const rawLoads = driverLoads(ctx.state, ctx.driver.id);
-    const docOverview = rawLoads.map(load => {
-      const docs = load.docs || load.documents || {};
-      const statusMeta = (doc) => {
-        if (!doc) return { status: 'MISSING', statusColor: 'gray', label: 'Upload Required', hasFile: false };
-        const st = String(doc.status || (doc.hasFile || doc.data || doc.name ? 'APPROVED' : 'MISSING')).toUpperCase();
-        if (st === 'APPROVED') return { status: 'APPROVED', statusColor: 'green', label: 'Approved', hasFile: true, name: doc.name || doc.fileName };
-        if (st === 'REJECTED' || st === 'RETAKE_REQUIRED' || st === 'FIX REQUIRED') return { status: 'REJECTED', statusColor: 'red', label: 'Fix Required', hasFile: true, reason: doc.rejectionReason };
-        if (st === 'PENDING' || st === 'UNDER REVIEW' || st === 'CHECKING') return { status: 'CHECKING', statusColor: 'yellow', label: 'Checking', hasFile: true };
-        return { status: 'MISSING', statusColor: 'gray', label: 'Upload Required', hasFile: false };
-      };
-
-      return {
-        loadId: load.id,
-        loadNumber: load.loadNumber,
-        status: load.status,
-        pickup: load.pickup,
-        dropoff: load.dropoff,
-        pickupDate: load.pickupDate,
-        deliveryDate: load.deliveryDate,
-        requiredDocs: {
-          RC: statusMeta(docs.RC),
-          BOL: statusMeta(docs.BOL),
-          POD: statusMeta(docs.POD),
-        },
-        optionalPhotos: {
-          pickupPhotos: Array.isArray(docs.PhotosPU) ? docs.PhotosPU : [],
-          deliveryPhotos: Array.isArray(docs.PhotosDO) ? docs.PhotosDO : [],
-          extraDocs: Array.isArray(docs.Extra) ? docs.Extra : [],
-        }
-      };
-    });
-
-    res.json({ ok: true, documentsFeed: docOverview });
+    const documentsFeed = buildDocumentsFeed(ctx);
+    res.json({ ok: true, documentsFeed });
   } catch (err) {
     console.error('Failed to load driver documents feed:', err);
     res.status(500).json({ error: 'Failed to load documents feed.' });

@@ -3,7 +3,10 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0F172A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>HaulBoX — Enterprise Dispatch Command</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -338,6 +341,9 @@
     <aside id="sidebar" style="background:#ffffff;border-right:1px solid #e2e8f0;color:#0f172a;">
       <div class="brand"
         style="padding:18px 10px 16px;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+        <button type="button" class="mobile-sidebar-close" onclick="closeMobileSidebar()" aria-label="Close navigation" title="Close navigation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
         <div id="haulbox-3d-cube-container"
           style="width:105px;height:105px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;"
           title="Interactive 3D HaulBoX Navigation Dice"></div>
@@ -451,10 +457,19 @@
       </div>
     </aside>
 
+    <div id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
     <!-- ============ MAIN ============ -->
     <div id="main">
       <div id="topbar" style="background:#ffffff;border-bottom:1.5px solid #e2e8f0;height:72px;padding:0 28px;">
         <div class="topbar-left">
+          <button type="button" class="mobile-menu-toggle icon-btn" id="mobile-menu-toggle" onclick="toggleMobileSidebar()" aria-label="Open navigation menu" title="Open navigation menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <div>
             <h1 id="pagetitle" style="font-size:26px;font-weight:800;margin:0;color:#0f172a;letter-spacing:-0.02em;">Dashboard</h1>
             <div style="font-size:13.5px;color:#475569;margin-top:3px;font-weight:600;">Overview & Operations</div>
@@ -524,7 +539,7 @@
         <section class="view active" id="view-dashboard">
 
           <!-- TOP 5 KPI CARDS -->
-          <div id="stat-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px;">
+          <div id="stat-grid" class="stat-grid" style="margin-bottom:24px;">
             <!-- Card 1: Available Drivers -->
             <div onclick="openKpiAvailableDrivers()"
               style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 4px 20px -2px rgba(15,23,42,0.06);display:flex;align-items:flex-start;gap:14px;cursor:pointer;transition:transform 0.15s ease, box-shadow 0.15s ease;"
@@ -676,7 +691,7 @@
             </div>
 
             <!-- 3 PARALLEL SIDE-BY-SIDE BOXES: 1st DRIVER INFO, 2nd MAPS, 3rd NOTIFICATIONS -->
-            <div style="display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;">
+            <div class="live-ops-grid" style="display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;">
               <!-- 1ST: DRIVER & ACTIVE LOAD INFORMATION PANEL -->
               <div style="flex:1;min-width:280px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;min-height:480px;max-height:480px;overflow-y:auto;" id="driver-tracking-panel">
                 <div style="text-align:center;color:#64748b;font-size:13px;padding-top:100px;">Select a driver from the dropdown above or click a truck on the map.</div>
@@ -1269,7 +1284,7 @@
           </div>
 
           <!-- Company Fleet Metrics Overview -->
-          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:16px;margin-bottom:20px;">
+          <div class="stat-grid" style="margin-bottom:20px;">
             <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 20px;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
               <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Total Fleets</div>
               <div id="metric-total-companies" style="font-size:26px;font-weight:800;color:#0f172a;margin-top:4px;">0</div>
@@ -1344,7 +1359,7 @@
             </div>
 
             <!-- Admin KPI summary row -->
-            <div id="dailyreports-kpi-row" style="display:none;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+            <div id="dailyreports-kpi-row" class="stat-grid" style="display:none;margin-bottom:20px;">
               <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;">
                 <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Total Dispatchers</div>
                 <div style="font-size:22px;font-weight:800;color:#0f172a;margin-top:2px;" id="kpi-dr-dispatchers">0</div>

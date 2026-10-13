@@ -439,6 +439,7 @@ class _CurrentLoadScreenState extends State<CurrentLoadScreen> {
 
     try {
       final bytes = await file.readAsBytes();
+      if (!mounted) return;
       final base64Image = base64Encode(bytes);
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final token = auth.token;

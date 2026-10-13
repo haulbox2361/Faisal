@@ -6,7 +6,7 @@ void main() {
     await tester.pumpWidget(const HaulBoxApp());
     await tester.pump();
 
-    // Verify HaulBoX brand text exists
-    expect(find.text('HaulBoX'), findsWidgets);
+    // Verify HAULBOX brand text exists on login screen
+    expect(find.text('HAULBOX'), findsWidgets);
   });
 }

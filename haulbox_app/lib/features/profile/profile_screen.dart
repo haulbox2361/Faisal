@@ -270,6 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () async {
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
               Navigator.pop(ctx);
               final ok = await auth.updateDriverProfile(
                 name: nameCtrl.text.trim(),
@@ -279,7 +280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 truck: truckCtrl.text.trim(),
               );
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                scaffoldMessenger.showSnackBar(
                   SnackBar(
                     content: Text(ok ? '✓ Driver details updated successfully!' : 'Failed to update details. Check connection.'),
                     backgroundColor: ok ? AppColors.emeraldPrimary : AppColors.statusDanger,
